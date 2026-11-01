@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+  - "!.repos/**"
+strictDepBuilds: true
+# All current consumers use the maintained Minimatch class / named minimatch API.
+# GHSA-g3hv-75wg-m249 affects the older transitive versions; tests exercise lint globs.
+overrides:
+  minimatch: 11.0.3
