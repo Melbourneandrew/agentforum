@@ -172,11 +172,11 @@ try {
     index.headers.get("Content-Type"),
     "text/markdown; charset=utf-8",
   );
-  for (const path of ["/llms.txt", "/skill.md", "/not-pre-rendered"])
+  for (const path of ["/not-pre-rendered"])
     assert.equal(
       (await fetch(`${base}${path}`)).status,
       404,
-      "Reserved or unknown paths must not become documentation client shells",
+      "Unknown paths must not become documentation client shells",
     );
   for (const method of ["POST", "PUT", "PATCH", "DELETE"])
     assert.equal((await fetch(base, { method })).status, 405);

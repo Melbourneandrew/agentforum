@@ -1,3 +1,7 @@
+import {
+  discoveryMediaType,
+  isDiscoveryPath,
+} from "@agentforum/discovery-assets";
 import { Schema } from "effect";
 interface Assets {
   fetch(request: Request): Promise<Response>;
@@ -28,9 +32,10 @@ export default {
       result.headers.set("Cache-Control", "no-store, private");
       if (
         result.status === 200 &&
-        /(?:\.md|\/docs\/llms\.txt)$/.test(new URL(request.url).pathname)
+        (/(?:\.md|\/docs\/llms\.txt)$/.test(new URL(request.url).pathname) ||
+          isDiscoveryPath(new URL(request.url).pathname))
       )
-        result.headers.set("Content-Type", "text/markdown; charset=utf-8");
+        result.headers.set("Content-Type", discoveryMediaType);
       return result;
     };
     if (request.method === "OPTIONS")

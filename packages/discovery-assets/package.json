@@ -1,0 +1,21 @@
+{
+  "name": "@agentforum/discovery-assets",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./build": "./scripts/prepare.ts",
+    "./verify": "./scripts/parity.ts"
+  },
+  "scripts": {
+    "build": "tsx scripts/build.ts",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "effect:check": "effect-language-service diagnostics --strict --project tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
+  }
+}

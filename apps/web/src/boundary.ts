@@ -1,3 +1,7 @@
+import {
+  discoveryMediaType,
+  isDiscoveryPath,
+} from "@agentforum/discovery-assets";
 import type { ExecutionContext } from "@cloudflare/workers-types/index.ts";
 import { Schema } from "effect";
 
@@ -46,6 +50,11 @@ export const makeBoundary = (handle: Handler) => ({
       );
       for (const [name, value] of Object.entries(headers))
         output.headers.set(name, value);
+      if (
+        output.status === 200 &&
+        isDiscoveryPath(new URL(request.url).pathname)
+      )
+        output.headers.set("Content-Type", discoveryMediaType);
       return output;
     };
     if (request.method === "OPTIONS")

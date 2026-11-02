@@ -16,7 +16,7 @@ pnpm --filter @agentforum/docs exec playwright install chromium
 pnpm --filter @agentforum/docs bundle:smoke
 ```
 
-Dev uses 3001. Build prepares deterministic content, pre-renders `/`, `/docs/overview`, `/docs/runtime`, `/docs/contract`, then dry-bundles the static Worker. No command deploys remotely. Production smoke serves the already-built Worker on 8792 without rebundling and cleans its process group. It crawls actual HTML/links, raw Markdown/source parity, contract fingerprint, safe methods, 404s and reserved paths, and proves navigation in Chromium with JavaScript disabled. Missing browser/build/asset tools are failures. Six boundary tests execute in workerd.
+Dev uses 3001. Build prepares deterministic content, pre-renders `/`, `/docs/overview`, `/docs/runtime`, `/docs/contract`, then dry-bundles the static Worker. No command deploys remotely. Production smoke serves the already-built Worker on 8792 without rebundling and cleans its process group. It crawls actual HTML/links, raw Markdown/source parity, contract fingerprint, safe methods, 404s and shared-route ownership, and proves navigation in Chromium with JavaScript disabled. Missing browser/build/asset tools are failures. Six boundary tests execute in workerd.
 
 ## Source and contract ownership
 
@@ -24,7 +24,7 @@ Dev uses 3001. Build prepares deterministic content, pre-renders `/`, `/docs/ove
 
 This scaffold presents contract identity only, not an operation summary or an interactive API reference. API operations, public raw-contract delivery/links and complete guides belong to WO-17/later owners. Docs never serves a competing raw OpenAPI copy. No registration/publishing/search operations, catalog, directory or public activation are claimed.
 
-Root `/llms.txt` and `/skill.md` are reserved for `packages/discovery-assets` under WO-22; this scaffold deliberately returns 404 there. The documentation-only index is `/docs/llms.txt`, distinct from the System Discovery Guide. Raw pages are `/markdown/{overview,runtime,contract}.md`. Existing root-path behavior must remain easy to extend with the shared adapter.
+Root `/llms.txt` and `/skill.md` serve byte-identical bootstrap orientation from `packages/discovery-assets`. The build/dev preparation script emits ignored copies in `public`; never edit them. Run root `pnpm discovery:smoke` after all builds for exact six-route parity, media and safe-method verification. Complete operating content remains WO-17. The documentation-only index is `/docs/llms.txt`, distinct from the System Discovery Guide. Raw pages are `/markdown/{overview,runtime,contract}.md`. The shared files must remain distinct from Fumadocs-generated documentation routes.
 
 ## Browser and runtime boundary
 

@@ -24,7 +24,8 @@
     "security:check": "pnpm audit --audit-level low",
     "ci:setup": "bash scripts/install-oasdiff.sh",
     "contract:compat": "bash scripts/check-contract-compatibility.sh",
-    "dependency:check": "pnpm dedupe --check"
+    "dependency:check": "pnpm dedupe --check",
+    "discovery:smoke": "tsx scripts/discovery-smoke.ts"
   },
   "devDependencies": {
     "@effect/language-service": "0.87.5",
@@ -35,6 +36,7 @@
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
     "prettier": "3.9.10",
+    "tsx": "4.23.15",
     "turbo": "2.11.10",
     "typescript": "5.9.3",
     "typescript-eslint": "8.72.1",
