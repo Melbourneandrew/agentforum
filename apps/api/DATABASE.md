@@ -73,7 +73,32 @@ Wrangler loads the auth token from a mode-0600 `.dev.vars` file and hides it.
 
 No public database route or final product schema has been added. The timeout
 problem schema and private fixture mapping exist; production typed 503 boundary
-integration, transaction/interrupt/release cases, migration/reset commands, and
-complete deployable provider probes are still in progress. Native PostgreSQL
+integration, acquisition-fault cases, migration/reset commands, and complete
+deployable provider probes are still in progress. Native PostgreSQL
 cancellation evidence is not a Hyperdrive guarantee; real provider verification
 belongs to the delivery order and must not be inferred from local routing tests.
+
+### Native transaction evidence
+
+The mandatory workerd/PostgreSQL service suite verifies commit visibility from a
+new connection; typed failure and defect rollback; parameterized writes and JSONB
+null/nested data; and safe typed row-decode failure. Before interrupting a
+30-second sleep, an independent connection observes the actual backend in
+`PgSleep`. Interruption must leave zero inserted rows, the same client alive and
+idle outside a transaction, and—after its scope closes—no such backend before
+Worker shutdown. Killing a socket alone cannot satisfy that assertion.
+
+Cancellation waits for both the target query's terminal event and the native
+cancellation channel's close before permitting rollback or another statement.
+An already completed query is not canceled; a queued query removed by pg needs
+no completion callback. Twenty-four varied completion/interruption races verify
+that the next real SQL statement is not hit by a late cancel. A separate case
+interrupts semaphore-queued work without disrupting the owning transaction.
+Commit acknowledgment and the local committed flag share an uninterruptible
+boundary. Network loss during commit can still leave the caller uncertain;
+this is not a guarantee of rollback after an acknowledged commit and does not
+introduce an idempotency subsystem.
+
+These cases prove native PostgreSQL behavior, not Hyperdrive's cancellation,
+acknowledgment, pooling or session-reset semantics. Provider probes must establish
+those independently through the actual deployment path.

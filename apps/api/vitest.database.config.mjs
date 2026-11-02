@@ -28,6 +28,8 @@ export default defineConfig({
           },
           DATABASE_SMOKE_TOKEN: config.DATABASE_SMOKE_TOKEN,
           DATABASE_TEST_ORIGIN: config.DATABASE_TEST_ORIGIN,
+          DATABASE_TEST_DIRECT_URL: config.DATABASE_TEST_DIRECT_URL,
+          DATABASE_TEST_CACHED_URL: config.DATABASE_TEST_CACHED_URL,
         },
       },
     }),

@@ -1,14 +1,4 @@
-import {
-  Context,
-  Data,
-  Deferred,
-  Effect,
-  Layer,
-  Option,
-  MutableRef,
-  Redacted,
-  Schema,
-} from "effect";
+import { Context, Data, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { Client, Query } from "pg";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PgDialect } from "drizzle-orm/pg-core";
@@ -170,8 +160,8 @@ const closeClient = (client: Client) =>
 const cancelQuery = (
   client: Client,
   query: Query<Record<string, unknown>, unknown[]>,
-  completion: Deferred.Deferred<boolean>,
   url: Redacted.Redacted,
+  completed: () => boolean,
 ) =>
   Effect.acquireUseRelease(
     Effect.try({
@@ -183,53 +173,60 @@ const cancelQuery = (
         const cancel = yield* Schema.decodeUnknown(NativeCancel)(
           Reflect.get(canceller, "cancel"),
         ).pipe(Effect.mapError(() => new DatabaseCleanupError()));
-        const expired = MutableRef.make(false);
-        yield* Effect.acquireUseRelease(
-          Effect.sync(() =>
-            setTimeout(() => {
-              MutableRef.set(expired, true);
-              client.connection.stream.destroy();
-              canceller.connection.stream.destroy();
-            }, 5_000),
-          ),
-          () =>
-            Effect.raceFirst(
-              Deferred.await(completion),
-              Effect.async<boolean, DatabaseCleanupError>((resume) => {
-                canceller.connection.on("error", () => {
-                  resume(Effect.fail(new DatabaseCleanupError()));
-                });
-                canceller.connection.once("end", () => {
-                  resume(Effect.succeed(false));
-                });
-                const queue = Schema.decodeUnknownEither(QueuedQueries)(client);
-                if (queue._tag === "Left") {
-                  resume(Effect.fail(new DatabaseCleanupError()));
-                  return;
-                }
-                try {
-                  // Inspect and cancel in one synchronous turn: queued queries never
-                  // receive a callback; active queries must acknowledge cancellation.
-                  const waiting = queue.right._queryQueue.includes(query);
-                  cancel.call(canceller, client, query);
-                  if (waiting) resume(Effect.succeed(true));
-                } catch {
-                  resume(Effect.fail(new DatabaseCleanupError()));
-                }
-              }).pipe(
-                Effect.flatMap((queued) =>
-                  queued ? Effect.succeed(true) : Deferred.await(completion),
-                ),
-              ),
-            ),
-          (timer) =>
-            Effect.sync(() => {
-              clearTimeout(timer);
-            }),
-        );
-        yield* Effect.if(MutableRef.get(expired), {
-          onTrue: () => Effect.fail(new DatabaseCleanupError()),
-          onFalse: () => Effect.void,
+        yield* Effect.async<boolean, DatabaseCleanupError>((resume) => {
+          let settled = false;
+          let channelClosed = false;
+          const timer = setTimeout(() => {
+            finish(Effect.fail(new DatabaseCleanupError()));
+            client.connection.stream.destroy();
+            canceller.connection.stream.destroy();
+          }, 5_000);
+          const cleanup = () => {
+            clearTimeout(timer);
+            query.removeListener("error", queryCompleted);
+            query.removeListener("end", queryCompleted);
+          };
+          const finish = (
+            result: Effect.Effect<boolean, DatabaseCleanupError>,
+          ) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resume(result);
+          };
+          const queryCompleted = () => {
+            if (channelClosed && completed()) finish(Effect.succeed(true));
+          };
+          query.on("error", queryCompleted);
+          query.on("end", queryCompleted);
+          canceller.connection.on("error", () => {
+            finish(Effect.fail(new DatabaseCleanupError()));
+          });
+          canceller.connection.once("end", () => {
+            channelClosed = true;
+            queryCompleted();
+          });
+          // Completion and queue inspection share the exact turn with native cancel.
+          // Once sent, wait for BOTH the target result and cancellation channel close;
+          // a late cancellation must never strike rollback or the next statement.
+          if (completed()) {
+            finish(Effect.succeed(true));
+            return;
+          }
+          const queue = Schema.decodeUnknownEither(QueuedQueries)(client);
+          if (queue._tag === "Left") {
+            finish(Effect.fail(new DatabaseCleanupError()));
+            return;
+          }
+          try {
+            const waiting = queue.right._queryQueue.includes(query);
+            cancel.call(canceller, client, query);
+            // Removing a queued query has no callback and opens no cancellation socket.
+            if (waiting) finish(Effect.succeed(true));
+          } catch {
+            finish(Effect.fail(new DatabaseCleanupError()));
+          }
+          return Effect.sync(cleanup);
         });
       }),
     (canceller) =>
@@ -276,7 +273,6 @@ const connection = (key: "HYPERDRIVE_DIRECT" | "HYPERDRIVE_CACHED") =>
           disconnected ? Effect.fail(queryFailure({})) : Effect.void,
         );
         const statement = dialect.sqlToQuery(build(db).getSQL());
-        const completion = yield* Deferred.make<boolean>();
         return yield* Effect.async<
           readonly Schema.Schema.Type<typeof row>[],
           QueryFailure
@@ -288,7 +284,6 @@ const connection = (key: "HYPERDRIVE_DIRECT" | "HYPERDRIVE_CACHED") =>
           });
           const finish = () => {
             settled = true;
-            Deferred.unsafeDone(completion, Effect.succeed(true));
           };
           query.on("error", (error) => {
             finish();
@@ -312,7 +307,9 @@ const connection = (key: "HYPERDRIVE_DIRECT" | "HYPERDRIVE_CACHED") =>
             resume(Effect.fail(queryFailure(error)));
           }
           return Effect.suspend(() =>
-            settled ? Effect.void : cancelQuery(client, query, completion, url),
+            settled
+              ? Effect.void
+              : cancelQuery(client, query, url, () => settled),
           ).pipe(Effect.orDie);
         });
       });
@@ -349,8 +346,15 @@ const connection = (key: "HYPERDRIVE_DIRECT" | "HYPERDRIVE_CACHED") =>
                     serial.withPermits(1)(run(build, row)),
                 };
                 const value = yield* Effect.suspend(() => body(session));
-                yield* Effect.uninterruptible(control(sql`COMMIT`));
-                committed = true;
+                yield* Effect.uninterruptible(
+                  control(sql`COMMIT`).pipe(
+                    Effect.tap(() =>
+                      Effect.sync(() => {
+                        committed = true;
+                      }),
+                    ),
+                  ),
+                );
                 return value;
               }),
             () =>
