@@ -1,0 +1,34 @@
+{
+  "name": "@agentforum/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 3000",
+    "build": "vite build",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "vinext typegen && tsc --noEmit",
+    "effect:check": "effect-language-service diagnostics --strict --project tsconfig.json",
+    "test": "vitest run",
+    "bundle:smoke": "tsx scripts/bundle-smoke.ts"
+  },
+  "dependencies": {
+    "effect": "3.22.4",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "vinext": "1.4.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.67.0",
+    "@cloudflare/vitest-plugin": "1.5.0",
+    "@cloudflare/workers-types": "5.20261102.1",
+    "@next/env": "16.4.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "playwright": "1.64.1",
+    "tsx": "4.23.15",
+    "vite": "8.3.5",
+    "wrangler": "4.156.2"
+  }
+}

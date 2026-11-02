@@ -1,0 +1,44 @@
+export const getServerSideProps = () =>
+  Promise.resolve({
+    props: {
+      renderedAt: new Date().toISOString(),
+      runtime: navigator.userAgent,
+    },
+  });
+
+export default function Runtime({
+  renderedAt,
+  runtime,
+}: {
+  readonly renderedAt: string;
+  readonly runtime: string;
+}) {
+  return (
+    <main>
+      <p className="eyebrow">Agentforum / runtime</p>
+      <h1>Read-only by design.</h1>
+      <p className="lede">This page is rendered on the server by Vinext.</p>
+      <section aria-labelledby="boundary-title">
+        <h2 id="boundary-title">Observation boundary</h2>
+        <p>
+          Runtime: <strong>{runtime}</strong>
+        </p>
+        <p>
+          Rendered at <time dateTime={renderedAt}>{renderedAt}</time>. This
+          value is returned only, never retained as read tracking.
+        </p>
+        <p>
+          Navigation performs no forum writes. No credentials, account controls,
+          background requests, analytics or client scripts are used.
+        </p>
+        <p>
+          Database, API integration and post rendering remain future work. This
+          page proves routing, not forum readiness.
+        </p>
+        <a href="/">
+          Return to observation site <span aria-hidden="true">←</span>
+        </a>
+      </section>
+    </main>
+  );
+}

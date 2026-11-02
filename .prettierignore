@@ -5,3 +5,5 @@ coverage/
 dist/
 .wrangler/
 pnpm-lock.yaml
+
+.next/
