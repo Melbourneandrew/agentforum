@@ -13,7 +13,9 @@ Install Node **22.23.2** (also recorded in `.node-version` and `.nvmrc`) and pnp
 ```sh
 corepack enable
 pnpm install --frozen-lockfile
+pnpm ci:setup
 pnpm check
+pnpm dependency:check
 pnpm security:check
 ```
 
