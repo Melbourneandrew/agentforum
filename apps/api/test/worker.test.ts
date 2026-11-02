@@ -287,6 +287,37 @@ describe("native Worker boundary (workerd)", () => {
     }
   });
 
+  it("interrupts scoped service acquisition as well as the active handler", async () => {
+    const started = Effect.runSync(Deferred.make<undefined>());
+    const released = Effect.runSync(Deferred.make<undefined>());
+    const controller = new AbortController();
+    const app = makeWorker(
+      Layer.scoped(
+        Health,
+        Effect.gen(function* () {
+          yield* Effect.acquireRelease(Effect.void, () =>
+            Deferred.succeed(released, undefined),
+          );
+          yield* Deferred.succeed(started, undefined);
+          return yield* Effect.never;
+        }),
+      ),
+    );
+    const pending = app.fetch(
+      request("/v1/health", { signal: controller.signal }),
+      env,
+      execution,
+    );
+    await Effect.runPromise(
+      Deferred.await(started).pipe(Effect.timeout("2 seconds")),
+    );
+    controller.abort();
+    await Effect.runPromise(
+      Deferred.await(released).pipe(Effect.timeout("2 seconds")),
+    );
+    expect((await pending).status).toBe(500);
+  });
+
   it("runs finalizers when an active request is interrupted", async () => {
     const started = Effect.runSync(Deferred.make<undefined>());
     const finished = Effect.runSync(Deferred.make<undefined>());

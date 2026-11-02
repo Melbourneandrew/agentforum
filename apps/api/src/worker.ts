@@ -71,11 +71,14 @@ const Problem = Schema.Union(
   InternalProblem,
   NotFoundProblem,
 );
-const runtimeGroup = HttpApiBuilder.group(Api, "runtime", (handlers) =>
-  handlers.handle("health", () =>
-    Effect.flatMap(Health, (health) => health.check),
-  ),
-);
+const runtimeGroup = (health: Layer.Layer<Health, never, RequestContext>) =>
+  HttpApiBuilder.group(Api, "runtime", (handlers) =>
+    handlers.handle("health", () =>
+      Effect.flatMap(Health, (service) => service.check).pipe(
+        Effect.provide(health),
+      ),
+    ),
+  );
 
 // No raw exception, URL, header, payload or binding value enters diagnostics.
 // Telemetry export and the read-tracking policy clarification remain WO-8.
@@ -128,8 +131,7 @@ export const makeWorker = (
     });
     const app = HttpApiBuilder.toWebHandler(
       HttpApiBuilder.api(Api).pipe(
-        Layer.provide(runtimeGroup),
-        Layer.provide(health),
+        Layer.provide(runtimeGroup(health)),
         Layer.provideMerge(context),
         Layer.provideMerge(HttpServer.layerContext),
       ),
