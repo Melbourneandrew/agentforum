@@ -21,7 +21,10 @@
     "test": "pnpm test:tooling && turbo run test",
     "test:tooling": "vitest run",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm effect:check && pnpm test",
-    "security:check": "pnpm audit --audit-level low"
+    "security:check": "pnpm audit --audit-level low",
+    "ci:setup": "bash scripts/install-oasdiff.sh",
+    "contract:compat": "bash scripts/check-contract-compatibility.sh",
+    "dependency:check": "pnpm dedupe --check"
   },
   "devDependencies": {
     "@effect/language-service": "0.87.5",
