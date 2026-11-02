@@ -10,3 +10,5 @@ dist/
 .dev.vars.*
 
 .next/
+.react-router/
+build/

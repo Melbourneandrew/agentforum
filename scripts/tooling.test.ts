@@ -110,6 +110,10 @@ describe("repository toolchain", () => {
         path: `${process.cwd()}/apps/api`,
       }),
       expect.objectContaining({
+        name: "@agentforum/docs",
+        path: `${process.cwd()}/apps/docs`,
+      }),
+      expect.objectContaining({
         name: "@agentforum/web",
         path: `${process.cwd()}/apps/web`,
       }),
@@ -131,7 +135,7 @@ describe("repository toolchain", () => {
       ),
     );
     expect(graph).toMatchObject({
-      packages: ["@agentforum/api", "@agentforum/web"],
+      packages: ["@agentforum/api", "@agentforum/docs", "@agentforum/web"],
     });
     expect(graph).toHaveProperty(
       "tasks",
@@ -140,6 +144,8 @@ describe("repository toolchain", () => {
         expect.objectContaining({ taskId: "@agentforum/api#test" }),
         expect.objectContaining({ taskId: "@agentforum/web#build" }),
         expect.objectContaining({ taskId: "@agentforum/web#test" }),
+        expect.objectContaining({ taskId: "@agentforum/docs#build" }),
+        expect.objectContaining({ taskId: "@agentforum/docs#test" }),
       ]),
     );
     expect(json("turbo.json")).toMatchObject({
