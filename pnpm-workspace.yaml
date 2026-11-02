@@ -2,19 +2,23 @@ packages:
   - apps/*
   - packages/*
   - "!.repos/**"
-strictDepBuilds: true
-# All current consumers use the maintained Minimatch class / named minimatch API.
-# GHSA-g3hv-75wg-m249 affects the older transitive versions; tests exercise lint globs.
-overrides:
-  minimatch: 11.0.3
-  # GHSA-px8p-9vwx-vf98: patch Satori's ZIP decoder; no advisory is ignored.
-  satori>fflate: 0.7.5
+# Optional Node image processing is not part of the Workers observation shell.
+# Keep strict native-build approval; do not install an unused native addon.
+ignoredOptionalDependencies:
+  - sharp
 # Reviewed native installers for the pinned local Workers test/build toolchain.
 onlyBuiltDependencies:
   - esbuild
   - msgpackr-extract
   - workerd
-# Optional Node image processing is not part of the Workers observation shell.
-# Keep strict native-build approval; do not install an unused native addon.
-ignoredOptionalDependencies:
-  - sharp
+# All current consumers use the maintained Minimatch class / named minimatch API.
+# GHSA-g3hv-75wg-m249 affects the older transitive versions; tests exercise lint globs.
+overrides:
+  # GHSA-67mh-4wv8-2f99: the legacy drizzle-kit loader uses stable transform APIs.
+  "@esbuild-kit/core-utils>esbuild": 0.25.12
+  minimatch: 11.0.3
+  # GHSA-px8p-9vwx-vf98: patch Satori's ZIP decoder; no advisory is ignored.
+  satori>fflate: 0.7.5
+patchedDependencies:
+  drizzle-orm@0.45.4: patches/drizzle-orm@0.45.4.patch
+strictDepBuilds: true

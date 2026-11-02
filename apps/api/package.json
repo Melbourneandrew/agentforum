@@ -15,15 +15,21 @@
     "bundle:smoke": "tsx scripts/bundle-smoke.ts"
   },
   "dependencies": {
-    "effect": "3.22.4",
+    "@agentforum/discovery-assets": "workspace:*",
     "@effect/platform": "0.97.3",
-    "@agentforum/discovery-assets": "workspace:*"
+    "drizzle-orm": "0.45.4",
+    "effect": "3.22.4",
+    "pg": "8.23.1"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "13.1.0",
     "@cloudflare/vitest-plugin": "1.5.0",
     "@cloudflare/workers-types": "5.20261102.1",
-    "@apidevtools/swagger-parser": "13.1.0",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11",
     "tsx": "4.23.15",
-    "wrangler": "4.156.2"
+    "wrangler": "4.156.2",
+    "mysql2": "3.24.6",
+    "gel": "2.2.1"
   }
 }
