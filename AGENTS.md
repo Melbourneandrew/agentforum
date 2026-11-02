@@ -15,26 +15,26 @@ Inspect the work order, dependencies, comments, code, tests and CI. Verify prere
 
 Use Node from `.node-version` and the exact pnpm version in `package.json` (via Corepack or an equivalent exact-version installation).
 
-| Command                                               | Meaning                                                                                                   |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `pnpm install --frozen-lockfile`                      | Reproducible install; never regenerate the lockfile in CI                                                 |
-| `pnpm check`                                          | Format, zero-warning typed lint, strict types, Effect diagnostics, tooling and workspace tests            |
-| `pnpm format` / `pnpm format:check`                   | Prettier write / verify, independently of ESLint                                                          |
-| `pnpm lint` / `pnpm typecheck` / `pnpm test`          | Root tooling checks followed by corresponding workspace tasks                                             |
-| `pnpm effect:check`                                   | Noninteractive Effect diagnostics for root tooling; each Effect app must register its own diagnostic gate |
-| `pnpm security:check`                                 | Dependency vulnerability audit; failure blocks delivery                                                   |
-| `pnpm build`                                          | Turbo production builds for implemented apps/packages                                                     |
-| `pnpm turbo dev`                                      | Local development tasks once app setup orders supply them                                                 |
-| `pnpm turbo run build lint typecheck test --dry=json` | Inspect real task discovery and dependencies                                                              |
-| `pnpm --filter <package-name> <task>`                 | Run a package's documented task                                                                           |
+| Command                                               | Meaning                                                                                                 |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `pnpm install --frozen-lockfile`                      | Reproducible install; never regenerate the lockfile in CI                                               |
+| `pnpm check`                                          | Format, zero-warning typed lint, strict types, Effect diagnostics, tooling and workspace tests          |
+| `pnpm format` / `pnpm format:check`                   | Prettier write / verify, independently of ESLint                                                        |
+| `pnpm lint` / `pnpm typecheck` / `pnpm test`          | Root tooling checks followed by corresponding workspace tasks                                           |
+| `pnpm effect:check`                                   | Noninteractive Effect diagnostics for root tooling; also runs each registered workspace diagnostic gate |
+| `pnpm security:check`                                 | Dependency vulnerability audit; failure blocks delivery                                                 |
+| `pnpm build`                                          | Turbo production builds for implemented apps/packages                                                   |
+| `pnpm turbo dev`                                      | Local development tasks once app setup orders supply them                                               |
+| `pnpm turbo run build lint typecheck test --dry=json` | Inspect real task discovery and dependencies                                                            |
+| `pnpm --filter <package-name> <task>`                 | Run a package's documented task                                                                         |
 
-There are no applications yet. Empty task graphs do **not** establish build/runtime correctness. Add capability tests and gates in the same PR as the capability. Worker tests must use the current `@cloudflare/vitest-plugin` in workerd; database guarantees need disposable real PostgreSQL. Add framework-specific lint rules, production build and bundle checks, runtime/contract checks, generated-artifact cleanliness, browser checks and affected-consumer verification as their capabilities appear. WO-6 owns growing CI enforcement; bootstrap CI covers only the tooling introduced by WO-1.
+The native API runtime now exists under `apps/api` (read its AGENTS.md). Business endpoints and the other applications do not exist yet. Empty task graphs do **not** establish build/runtime correctness. Add capability tests and gates in the same PR as the capability. Worker tests must use the current `@cloudflare/vitest-plugin` in workerd; database guarantees need disposable real PostgreSQL. Add framework-specific lint rules, production build and bundle checks, runtime/contract checks, generated-artifact cleanliness, browser checks and affected-consumer verification as their capabilities appear. WO-6 owns growing CI enforcement; bootstrap CI covers only the tooling introduced by WO-1.
 
 ## Type safety and Effect
 
 All TypeScript projects extend `tsconfig.base.json` and retain strict mode, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes`. No unsafe type escapes, ignored errors, skipped tests or disabled checks to get a green build.
 
-Before writing Effect code, read `node_modules/effect/AGENTS.md`. If that installed release does not ship it, record that fact and read `.repos/effect/AGENTS.md` and relevant upstream source/tests rather than inventing guidance. The Effect runtime is not yet a root dependency: app setup orders select it with the actual consumer. Never import from the subtree. Use Effect Schema for untrusted boundaries, typed errors and explicit services/Layers; manage resources with scoped Layers. Never wrap `yield*` in native try/catch inside `Effect.gen`; recover through Effect combinators. Use `return yield* Effect.fail(...)` for failure termination. No ambient third-party clients in business logic.
+Before writing Effect code, read `node_modules/effect/AGENTS.md`. If that installed release does not ship it, record that fact and read `.repos/effect/AGENTS.md` and relevant upstream source/tests rather than inventing guidance. The Effect runtime is an API dependency, not a root dependency. This pinned npm release has no AGENTS.md; the vendored guidance is `.repos/effect/.agents/AGENTS.md`. Consult installed source for exact versioned APIs. Never import from the subtree. Use Effect Schema for untrusted boundaries, typed errors and explicit services/Layers; manage resources with scoped Layers. Never wrap `yield*` in native try/catch inside `Effect.gen`; recover through Effect combinators. Use `return yield* Effect.fail(...)` for failure termination. No ambient third-party clients in business logic.
 
 ## Git and delivery
 
