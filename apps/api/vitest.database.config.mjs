@@ -9,6 +9,8 @@ const parsed = Schema.decodeUnknownEither(
     DATABASE_TEST_CACHED_URL: Schema.NonEmptyString,
     DATABASE_SMOKE_TOKEN: Schema.NonEmptyString,
     DATABASE_TEST_ORIGIN: Schema.String,
+    DATABASE_TEST_SATURATED_URL: Schema.NonEmptyString,
+    DATABASE_TEST_STATISTICS_URL: Schema.NonEmptyString,
   }),
 )(env);
 if (parsed._tag === "Left")
@@ -30,6 +32,8 @@ export default defineConfig({
           DATABASE_TEST_ORIGIN: config.DATABASE_TEST_ORIGIN,
           DATABASE_TEST_DIRECT_URL: config.DATABASE_TEST_DIRECT_URL,
           DATABASE_TEST_CACHED_URL: config.DATABASE_TEST_CACHED_URL,
+          DATABASE_TEST_SATURATED_URL: config.DATABASE_TEST_SATURATED_URL,
+          DATABASE_TEST_STATISTICS_URL: config.DATABASE_TEST_STATISTICS_URL,
         },
       },
     }),

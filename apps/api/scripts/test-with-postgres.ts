@@ -3,8 +3,13 @@ import { createServer } from "node:net";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { Data, Effect, Exit, Redacted, Schedule, Schema } from "effect";
+import { Data, Effect, Exit, Layer, Redacted, Schedule, Schema } from "effect";
 import { LocalPostgres, localPostgresLayer } from "./local-postgres.js";
+
+import {
+  LocalDatabaseFaults,
+  localDatabaseFaultsLayer,
+} from "./local-database-faults.js";
 
 class TestHarnessError extends Data.TaggedError("TestHarnessError") {}
 const missingProcess = Schema.Struct({ code: Schema.Literal("ESRCH") });
@@ -116,7 +121,13 @@ const FixtureConfig = Schema.parseJson(
     observability: Schema.Struct({ enabled: Schema.Literal(false) }),
   }),
 );
-const privateWorker = (direct: string, cached: string, token: string) =>
+const privateWorker = (
+  direct: string,
+  cached: string,
+  token: string,
+  blackhole: string,
+  saturated: string,
+) =>
   Effect.gen(function* () {
     const port = yield* availablePort;
     const origin = `http://127.0.0.1:${String(port)}`;
@@ -149,6 +160,8 @@ const privateWorker = (direct: string, cached: string, token: string) =>
             vars: {
               HYPERDRIVE_DIRECT: { connectionString: direct },
               HYPERDRIVE_CACHED: { connectionString: cached },
+              HYPERDRIVE_TIMEOUT: { connectionString: blackhole },
+              HYPERDRIVE_SATURATED: { connectionString: saturated },
             },
           }),
           { mode: 0o600 },
@@ -193,6 +206,7 @@ const privateWorker = (direct: string, cached: string, token: string) =>
 const databaseTests = Effect.scoped(
   Effect.gen(function* () {
     const postgres = yield* LocalPostgres;
+    const faults = yield* LocalDatabaseFaults;
     yield* postgres.execute("CREATE DATABASE agentforum_direct", "postgres");
     yield* postgres.execute("CREATE DATABASE agentforum_cached", "postgres");
     yield* postgres.execute(
@@ -202,7 +216,15 @@ const databaseTests = Effect.scoped(
     const direct = Redacted.value(postgres.url("agentforum_direct"));
     const cached = Redacted.value(postgres.url("agentforum_cached"));
     const token = crypto.randomUUID();
-    const origin = yield* privateWorker(direct, cached, token).pipe(
+    const saturated = new URL(direct);
+    saturated.username = "agentforum_saturated";
+    const origin = yield* privateWorker(
+      direct,
+      cached,
+      token,
+      Redacted.value(faults.connectionString),
+      saturated.toString(),
+    ).pipe(
       Effect.tapErrorCause(() =>
         Effect.logError("database_harness_worker_start_failed"),
       ),
@@ -212,10 +234,12 @@ const databaseTests = Effect.scoped(
       DATABASE_TEST_CACHED_URL: cached,
       DATABASE_SMOKE_TOKEN: token,
       DATABASE_TEST_ORIGIN: origin,
+      DATABASE_TEST_SATURATED_URL: saturated.toString(),
+      DATABASE_TEST_STATISTICS_URL: faults.statisticsUrl,
     });
   }),
 ).pipe(
-  Effect.provide(localPostgresLayer),
+  Effect.provide(Layer.merge(localPostgresLayer, localDatabaseFaultsLayer)),
   Effect.tapErrorCause(() =>
     Effect.logError("database_harness_database_suite_failed"),
   ),

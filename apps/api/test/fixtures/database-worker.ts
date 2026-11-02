@@ -16,6 +16,11 @@ import { ConnectionInfo } from "./database-schema.js";
 const Authorization = Schema.Struct({
   DATABASE_SMOKE_TOKEN: Schema.Redacted(Schema.NonEmptyString),
 });
+const FaultBindings = Schema.Struct({
+  HYPERDRIVE_CACHED: Schema.Unknown,
+  HYPERDRIVE_TIMEOUT: Schema.optionalWith(Schema.Unknown, { as: "Option" }),
+  HYPERDRIVE_SATURATED: Schema.optionalWith(Schema.Unknown, { as: "Option" }),
+});
 const Failure = Schema.Struct({
   type: Schema.String,
   title: Schema.String,
@@ -63,8 +68,25 @@ export default {
     )
       return failure(401, correlationId);
     const path = new URL(request.url).pathname;
-    if (request.method !== "GET" || !["/direct", "/cached"].includes(path))
+    if (
+      request.method !== "GET" ||
+      !["/direct", "/cached", "/timeout", "/saturated"].includes(path)
+    )
       return failure(404, correlationId);
+    let effectiveBindings = bindings;
+    if (path === "/timeout" || path === "/saturated") {
+      const configured = Schema.decodeUnknownEither(FaultBindings)(bindings);
+      if (configured._tag === "Left") return failure(500, correlationId);
+      const selected =
+        path === "/timeout"
+          ? configured.right.HYPERDRIVE_TIMEOUT
+          : configured.right.HYPERDRIVE_SATURATED;
+      if (Option.isNone(selected)) return failure(500, correlationId);
+      effectiveBindings = {
+        HYPERDRIVE_DIRECT: selected.value,
+        HYPERDRIVE_CACHED: configured.right.HYPERDRIVE_CACHED,
+      };
+    }
     const direct = Effect.flatMap(DirectDatabase, (database) =>
       database.execute(
         () =>
@@ -88,7 +110,7 @@ export default {
       (path === "/cached" ? cached : direct).pipe(
         Effect.flatMap(Schema.decodeUnknown(Schema.Tuple(ConnectionInfo))),
         Effect.map((rows) => rows[0]),
-        Effect.provide(databaseBindingsLayer(bindings)),
+        Effect.provide(databaseBindingsLayer(effectiveBindings)),
       ),
       { signal: request.signal },
     );

@@ -72,9 +72,9 @@ routing**, not Hyperdrive query caching. Test-only URLs are synthetic local URLs
 Wrangler loads the auth token from a mode-0600 `.dev.vars` file and hides it.
 
 No public database route or final product schema has been added. The timeout
-problem schema and private fixture mapping exist; production typed 503 boundary
-integration, acquisition-fault cases, migration/reset commands, and complete
-deployable provider probes are still in progress. Native PostgreSQL
+problem schema is recognized narrowly at the production boundary; undeclared or
+malformed failures remain generic 500s. Direct-origin migration/reset commands
+and complete deployable provider probes are still in progress. Native PostgreSQL
 cancellation evidence is not a Hyperdrive guarantee; real provider verification
 belongs to the delivery order and must not be inferred from local routing tests.
 
@@ -102,3 +102,33 @@ introduce an idempotency subsystem.
 These cases prove native PostgreSQL behavior, not Hyperdrive's cancellation,
 acknowledgment, pooling or session-reset semantics. Provider probes must establish
 those independently through the actual deployment path.
+
+### Acquisition and HTTP evidence
+
+A real non-superuser PostgreSQL role with connection limit one establishes
+SQLSTATE 53300 saturation and recovery after release. An owned loopback TCP server
+accepts and drains real pg startup bytes but never responds to the handshake.
+The Worker must return the typed 503 around the explicit five-second bound, and
+an independent HTTP counter must observe its frontend socket closed before
+Worker shutdown. This is a transport-fault test, not a simulated rollback proof.
+
+The production boundary recognizes only the declared tagged RFC 9457 timeout
+schema with the expected media type, consumes at most 8 KiB, rebuilds safe details
+and server-owned instance IDs, and sets `Retry-After: 1` case-insensitively.
+Malformed/oversized/other-schema 503s become generic 500s. Throwing an undeclared
+timeout does not promote it to 503. A real private HttpApi declaration exercises
+schema encoding and normalization; the harmless public health and discovery
+contracts do not advertise database errors or database readiness.
+
+### Remaining WO-5 delivery coverage
+
+- [x] Request-local direct/cached services and real Worker fetch isolation.
+- [x] Native commit, rollback, interruption, cancellation-race and release proof.
+- [x] Native origin saturation, default acquisition deadline and frontend cleanup.
+- [x] Narrow declared HTTP 503 mapping, Retry-After and secret-safe diagnostics.
+- [ ] Direct-origin migrations and safe owned-local development/reset commands.
+- [ ] Deployable private transaction/cleanup/provider smoke fixtures.
+- [ ] Final CI guidance, clean-checkout verification, exact-head remote CI and PR delivery.
+
+Actual Hyperdrive/deployment guarantees remain separate delivery evidence; no
+public activation or paid resource provisioning is authorized here.

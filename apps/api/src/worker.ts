@@ -1,7 +1,7 @@
 import { discoveryGuide } from "@agentforum/discovery-assets";
 import type { ExecutionContext } from "@cloudflare/workers-types/index.ts";
 import { HttpApiBuilder, HttpServer } from "@effect/platform";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Effect, Layer, Option, Schema } from "effect";
 import {
   Api,
   HealthResponse,
@@ -9,6 +9,11 @@ import {
   NotFoundProblem,
   ValidationProblem,
 } from "./contract.js";
+
+import {
+  DatabaseConnectionTimeoutProblem,
+  recognizeDatabaseTimeout,
+} from "./database/problems.js";
 
 export type WorkerExecutionContext = Pick<
   ExecutionContext,
@@ -71,7 +76,35 @@ const Problem = Schema.Union(
   ValidationProblem,
   InternalProblem,
   NotFoundProblem,
+  DatabaseConnectionTimeoutProblem,
 );
+export const normalizeProblem = (response: Response, correlationId: string) =>
+  recognizeDatabaseTimeout(response, correlationId).pipe(
+    Effect.map((timeout) =>
+      Option.getOrElse(timeout, () =>
+        response.status === 400
+          ? validationProblem(correlationId)
+          : response.status === 404
+            ? notFoundProblem(correlationId)
+            : genericProblem(correlationId),
+      ),
+    ),
+  );
+export const renderProblem = (
+  problem: Schema.Schema.Type<typeof Problem>,
+  method: string,
+  headers: Readonly<Record<string, string>>,
+) => {
+  const outputHeaders = new Headers(headers);
+  outputHeaders.set("Content-Type", "application/problem+json");
+  outputHeaders.delete("Retry-After");
+  if (problem.status === 503) outputHeaders.set("Retry-After", "1");
+  const response = Response.json(Schema.encodeSync(Problem)(problem), {
+    status: problem.status,
+    headers: outputHeaders,
+  });
+  return method === "HEAD" ? new Response(null, response) : response;
+};
 const runtimeGroup = (health: Layer.Layer<Health, never, RequestContext>) =>
   HttpApiBuilder.group(Api, "runtime", (handlers) =>
     handlers.handle("health", () =>
@@ -106,15 +139,8 @@ export const makeWorker = (
       "Cache-Control": "no-store, private",
       "X-Request-Id": correlationId,
     };
-    const problemResponse = (problem: Schema.Schema.Type<typeof Problem>) => {
-      const response = Response.json(Schema.encodeSync(Problem)(problem), {
-        status: problem.status,
-        headers: { ...headers, "Content-Type": "application/problem+json" },
-      });
-      return request.method === "HEAD"
-        ? new Response(null, response)
-        : response;
-    };
+    const problemResponse = (problem: Schema.Schema.Type<typeof Problem>) =>
+      renderProblem(problem, request.method, headers);
     if (request.method === "OPTIONS")
       return new Response(null, { status: 204, headers });
     const env = Schema.decodeUnknownEither(Environment)(bindings);
@@ -150,12 +176,9 @@ export const makeWorker = (
       // No framework error body is passed through to clients.
       let result = response;
       if (response.status >= 400) {
-        const problem =
-          response.status === 400
-            ? validationProblem(correlationId)
-            : response.status === 404
-              ? notFoundProblem(correlationId)
-              : genericProblem(correlationId);
+        const problem = await Effect.runPromise(
+          normalizeProblem(response, correlationId),
+        );
         if (problem.status === 500)
           await Effect.runPromise(recordDefect(correlationId));
         result = problemResponse(problem);
