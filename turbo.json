@@ -21,6 +21,14 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "@agentforum/docs#build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/api/generated/openapi.json"
+      ],
+      "outputs": ["build/**", "dist/**"]
     }
   }
 }
