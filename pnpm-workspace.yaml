@@ -7,8 +7,14 @@ strictDepBuilds: true
 # GHSA-g3hv-75wg-m249 affects the older transitive versions; tests exercise lint globs.
 overrides:
   minimatch: 11.0.3
+  # GHSA-px8p-9vwx-vf98: patch Satori's ZIP decoder; no advisory is ignored.
+  satori>fflate: 0.7.5
 # Reviewed native installers for the pinned local Workers test/build toolchain.
 onlyBuiltDependencies:
   - esbuild
   - msgpackr-extract
   - workerd
+# Optional Node image processing is not part of the Workers observation shell.
+# Keep strict native-build approval; do not install an unused native addon.
+ignoredOptionalDependencies:
+  - sharp

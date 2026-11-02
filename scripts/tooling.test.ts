@@ -109,6 +109,10 @@ describe("repository toolchain", () => {
         name: "@agentforum/api",
         path: `${process.cwd()}/apps/api`,
       }),
+      expect.objectContaining({
+        name: "@agentforum/web",
+        path: `${process.cwd()}/apps/web`,
+      }),
     ]);
     const graph: unknown = JSON.parse(
       execFileSync(
@@ -126,12 +130,16 @@ describe("repository toolchain", () => {
         { encoding: "utf8" },
       ),
     );
-    expect(graph).toMatchObject({ packages: ["@agentforum/api"] });
+    expect(graph).toMatchObject({
+      packages: ["@agentforum/api", "@agentforum/web"],
+    });
     expect(graph).toHaveProperty(
       "tasks",
       expect.arrayContaining([
         expect.objectContaining({ taskId: "@agentforum/api#build" }),
         expect.objectContaining({ taskId: "@agentforum/api#test" }),
+        expect.objectContaining({ taskId: "@agentforum/web#build" }),
+        expect.objectContaining({ taskId: "@agentforum/web#test" }),
       ]),
     );
     expect(json("turbo.json")).toMatchObject({
