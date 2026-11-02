@@ -1,0 +1,13 @@
+diff --git a/lib/client.js b/lib/client.js
+index 2b13c1de74ce2742e521eb2ef71803b1da579439..98a180c5caac86e2160c6619f6fb3950a18636ec 100644
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -572,7 +572,7 @@ class Client extends EventEmitter {
+   }
+ 
+   cancel(client, query) {
+-    if (client.activeQuery === query) {
++    if (client._getActiveQuery() === query) {
+       const con = this.connection
+ 
+       if (this.host && this.host.indexOf('/') === 0) {

@@ -9,7 +9,7 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "effect:check": "effect-language-service diagnostics --strict --project tsconfig.json",
-    "test": "vitest run",
+    "test": "tsx scripts/test-with-postgres.ts",
     "contract:generate": "tsx scripts/generate-contract.ts",
     "contract:check": "tsx scripts/verify-contract.ts",
     "bundle:smoke": "tsx scripts/bundle-smoke.ts"

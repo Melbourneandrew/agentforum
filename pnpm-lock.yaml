@@ -5,14 +5,17 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  minimatch: 11.0.3
   '@esbuild-kit/core-utils>esbuild': 0.25.12
+  minimatch: 11.0.3
   satori>fflate: 0.7.5
 
 patchedDependencies:
   drizzle-orm@0.45.4:
     hash: 8b9b7b67f278574eae6c1b0910d1f756a2213b036c9d096dfddc491a66eae77d
     path: patches/drizzle-orm@0.45.4.patch
+  pg@8.23.1:
+    hash: 12f898bfa1402c6a676d2abd672a639a6927f8c2e06255ee0469c9a2de4ef9e3
+    path: patches/pg@8.23.1.patch
 
 importers:
 
@@ -68,13 +71,13 @@ importers:
         version: 0.97.3(effect@3.22.4)
       drizzle-orm:
         specifier: 0.45.4
-        version: 0.45.4(patch_hash=8b9b7b67f278574eae6c1b0910d1f756a2213b036c9d096dfddc491a66eae77d)(@cloudflare/workers-types@5.20261102.1)(@types/pg@8.23.1)(gel@2.2.1)(mysql2@3.24.6(@types/node@22.20.5))(pg@8.23.1)
+        version: 0.45.4(patch_hash=8b9b7b67f278574eae6c1b0910d1f756a2213b036c9d096dfddc491a66eae77d)(@cloudflare/workers-types@5.20261102.1)(@types/pg@8.23.1)(gel@2.2.1)(mysql2@3.24.6(@types/node@22.20.5))(pg@8.23.1(patch_hash=12f898bfa1402c6a676d2abd672a639a6927f8c2e06255ee0469c9a2de4ef9e3))
       effect:
         specifier: 3.22.4
         version: 3.22.4
       pg:
         specifier: 8.23.1
-        version: 8.23.1
+        version: 8.23.1(patch_hash=12f898bfa1402c6a676d2abd672a639a6927f8c2e06255ee0469c9a2de4ef9e3)
     devDependencies:
       '@apidevtools/swagger-parser':
         specifier: 13.1.0
@@ -6492,13 +6495,13 @@ snapshots:
       esbuild: 0.25.12
       tsx: 4.23.15
 
-  drizzle-orm@0.45.4(patch_hash=8b9b7b67f278574eae6c1b0910d1f756a2213b036c9d096dfddc491a66eae77d)(@cloudflare/workers-types@5.20261102.1)(@types/pg@8.23.1)(gel@2.2.1)(mysql2@3.24.6(@types/node@22.20.5))(pg@8.23.1):
+  drizzle-orm@0.45.4(patch_hash=8b9b7b67f278574eae6c1b0910d1f756a2213b036c9d096dfddc491a66eae77d)(@cloudflare/workers-types@5.20261102.1)(@types/pg@8.23.1)(gel@2.2.1)(mysql2@3.24.6(@types/node@22.20.5))(pg@8.23.1(patch_hash=12f898bfa1402c6a676d2abd672a639a6927f8c2e06255ee0469c9a2de4ef9e3)):
     optionalDependencies:
       '@cloudflare/workers-types': 5.20261102.1
       '@types/pg': 8.23.1
       gel: 2.2.1
       mysql2: 3.24.6(@types/node@22.20.5)
-      pg: 8.23.1
+      pg: 8.23.1(patch_hash=12f898bfa1402c6a676d2abd672a639a6927f8c2e06255ee0469c9a2de4ef9e3)
 
   dunder-proto@1.0.1:
     dependencies:
@@ -8137,9 +8140,9 @@ snapshots:
 
   pg-int8@1.0.1: {}
 
-  pg-pool@3.14.0(pg@8.23.1):
+  pg-pool@3.14.0(pg@8.23.1(patch_hash=12f898bfa1402c6a676d2abd672a639a6927f8c2e06255ee0469c9a2de4ef9e3)):
     dependencies:
-      pg: 8.23.1
+      pg: 8.23.1(patch_hash=12f898bfa1402c6a676d2abd672a639a6927f8c2e06255ee0469c9a2de4ef9e3)
 
   pg-protocol@1.16.1: {}
 
@@ -8151,10 +8154,10 @@ snapshots:
       postgres-date: 1.0.7
       postgres-interval: 1.2.0
 
-  pg@8.23.1:
+  pg@8.23.1(patch_hash=12f898bfa1402c6a676d2abd672a639a6927f8c2e06255ee0469c9a2de4ef9e3):
     dependencies:
       pg-connection-string: 2.14.1
-      pg-pool: 3.14.0(pg@8.23.1)
+      pg-pool: 3.14.0(pg@8.23.1(patch_hash=12f898bfa1402c6a676d2abd672a639a6927f8c2e06255ee0469c9a2de4ef9e3))
       pg-protocol: 1.16.1
       pg-types: 2.2.0
       pgpass: 1.0.5

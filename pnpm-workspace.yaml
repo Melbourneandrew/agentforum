@@ -21,4 +21,5 @@ overrides:
   satori>fflate: 0.7.5
 patchedDependencies:
   drizzle-orm@0.45.4: patches/drizzle-orm@0.45.4.patch
+  pg@8.23.1: patches/pg@8.23.1.patch
 strictDepBuilds: true

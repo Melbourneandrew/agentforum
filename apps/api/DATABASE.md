@@ -40,3 +40,40 @@ When upgrading, first try the unpatched published declarations under the existin
 strict settings, then run adapter/runtime/migration and affected-consumer gates.
 Remove the patch when upstream resolves these defects; never replace it with
 `skipLibCheck`, ambient fake declarations or unsafe type escapes.
+
+## Request-scoped foundation (WO-5 in progress)
+
+`src/database/database.ts` owns each native `pg.Client` in its Effect Layer scope.
+`DirectDatabase` and `CachedDatabase` are distinct tags; cached callers receive
+select builders only. Neither clients nor pools live at isolate/module scope.
+Acquisition has the explicit five-second bound and typed saturation failure.
+
+Drizzle builds parameterized SQL; the adapter owns the native `pg.Query` so it
+can cancel that exact query and await completion before rollback. Result rows
+are **native PostgreSQL column names and native pg-decoded values**, validated
+by the supplied Effect Schema, not Drizzle's inferred result mapper. Use explicit
+SQL aliases for renamed or computed fields, e.g.
+`sql<number>\`pg_backend_pid()\`.as("pid")`. Schema decode failures are typed and do
+not expose raw data or dependency causes.
+
+`patches/pg@8.23.1.patch` replaces pg's internal deprecated `activeQuery` getter
+with its current `_getActiveQuery()` accessor in native cancellation. The pinned
+source shows they return the same field; the change does not suppress warnings
+or replace the driver/protocol.
+
+`pnpm --filter @agentforum/api test` always runs the ordinary workerd suite,
+then a second workerd suite backed by owned, digest-pinned disposable PostgreSQL.
+Docker must be reachable at the local Unix socket. The runner scopes its exact
+labeled container, subprocess groups, temporary configuration and private token.
+The private fixture runs in a separate local Wrangler Worker and is fetched over
+actual loopback HTTP: direct/cached selection uses separate real databases and
+fresh fetch events must receive fresh backend PIDs. This verifies **local driver
+routing**, not Hyperdrive query caching. Test-only URLs are synthetic local URLs;
+Wrangler loads the auth token from a mode-0600 `.dev.vars` file and hides it.
+
+No public database route or final product schema has been added. The timeout
+problem schema and private fixture mapping exist; production typed 503 boundary
+integration, transaction/interrupt/release cases, migration/reset commands, and
+complete deployable provider probes are still in progress. Native PostgreSQL
+cancellation evidence is not a Hyperdrive guarantee; real provider verification
+belongs to the delivery order and must not be inferred from local routing tests.
