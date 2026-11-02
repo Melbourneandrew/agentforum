@@ -17,7 +17,7 @@
     "format:check": "prettier --check .",
     "typecheck": "pnpm typecheck:tooling && turbo run typecheck",
     "typecheck:tooling": "tsc --noEmit",
-    "effect:check": "effect-language-service diagnostics --strict --project tsconfig.json",
+    "effect:check": "effect-language-service diagnostics --strict --project tsconfig.json && turbo run effect:check",
     "test": "pnpm test:tooling && turbo run test",
     "test:tooling": "vitest run",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm effect:check && pnpm test",

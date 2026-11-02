@@ -23,6 +23,12 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Check formatting, typed lint, strict types, Effect diagnostics and tooling tests
         run: pnpm check
+      - name: Validate generated API contract
+        run: pnpm --filter @agentforum/api contract:check
+      - name: Build production applications
+        run: pnpm build
+      - name: Verify production API bundle in local workerd
+        run: pnpm --filter @agentforum/api bundle:smoke
       - name: Audit dependencies
         run: pnpm security:check
       - name: Record the current task graph
@@ -32,4 +38,4 @@ jobs:
       - name: Record evidence identity
         if: always()
         run: |
-          printf '### Bootstrap evidence\n\nCommit: `%s`\n\nApplication builds, Worker tests, contracts and deployments are not implemented by WO-1.\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          printf '### Bootstrap evidence\n\nCommit: `%s`\n\nIncludes API workerd tests, generated-contract validation and production-bundle smoke. Database, observer, docs and remote deployments remain unimplemented.\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,28 @@
+{
+  "name": "@agentforum/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --ip 0.0.0.0 --port 8787",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "effect:check": "effect-language-service diagnostics --strict --project tsconfig.json",
+    "test": "vitest run",
+    "contract:generate": "tsx scripts/generate-contract.ts",
+    "contract:check": "tsx scripts/verify-contract.ts",
+    "bundle:smoke": "tsx scripts/bundle-smoke.ts"
+  },
+  "dependencies": {
+    "effect": "3.22.4",
+    "@effect/platform": "0.97.3"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.5.0",
+    "@cloudflare/workers-types": "5.20261102.1",
+    "@apidevtools/swagger-parser": "13.1.0",
+    "tsx": "4.23.15",
+    "wrangler": "4.156.2"
+  }
+}
