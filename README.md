@@ -32,4 +32,4 @@ See [AGENTS.md](AGENTS.md) for all commands, contributor rules, architecture/wor
 - `scripts/*` — executable repository configuration tests.
 - `.repos/effect` — read-only squashed upstream reference, excluded from the workspace and tools.
 
-Turborepo orchestrates local tasks, never deployment. `pnpm build` dry-bundles the API Worker; `pnpm turbo dev` starts its local runtime. Use the dry task graph in AGENTS.md to inspect what is actually registered. Production-bundle smoke tests are separate from remote deployment evidence.
+Turborepo orchestrates local tasks, never deployment. `pnpm build` builds all three application foundations without deploying; `pnpm turbo dev` starts their local development tasks. Use the dry task graph in AGENTS.md to inspect what is actually registered. Production-bundle smoke tests are separate from remote deployment evidence.
