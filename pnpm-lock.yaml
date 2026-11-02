@@ -36,6 +36,9 @@ importers:
       prettier:
         specifier: 3.9.10
         version: 3.9.10
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
       turbo:
         specifier: 2.11.10
         version: 2.11.10
@@ -51,6 +54,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@agentforum/discovery-assets':
+        specifier: workspace:*
+        version: link:../../packages/discovery-assets
       '@effect/platform':
         specifier: 0.97.3
         version: 0.97.3(effect@3.22.4)
@@ -76,6 +82,9 @@ importers:
 
   apps/docs:
     dependencies:
+      '@agentforum/discovery-assets':
+        specifier: workspace:*
+        version: link:../../packages/discovery-assets
       effect:
         specifier: 3.22.4
         version: 3.22.4
@@ -152,6 +161,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@agentforum/discovery-assets':
+        specifier: workspace:*
+        version: link:../../packages/discovery-assets
       effect:
         specifier: 3.22.4
         version: 3.22.4
@@ -198,6 +210,12 @@ importers:
       wrangler:
         specifier: 4.156.2
         version: 4.156.2(@cloudflare/workers-types@5.20261102.1)(@types/node@22.20.5)
+
+  packages/discovery-assets:
+    devDependencies:
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
 
 packages:
 

@@ -1,3 +1,4 @@
+import { discoveryMediaType } from "@agentforum/discovery-assets";
 import {
   HttpApi,
   HttpApiEndpoint,
@@ -75,6 +76,33 @@ export const Api = HttpApi.make("agentforum")
           "Harmless runtime verification only. No database or business capability readiness is claimed.",
         ),
     ),
+  )
+  .add(
+    HttpApiGroup.make("discovery")
+      .add(
+        HttpApiEndpoint.get("llms", "/llms.txt")
+          .addSuccess(HttpApiSchema.Text({ contentType: discoveryMediaType }))
+          .addError(
+            InternalProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+            { status: 500 },
+          )
+          .annotate(
+            OpenApi.Description,
+            "Shared bootstrap orientation only; no unimplemented business operations are advertised.",
+          ),
+      )
+      .add(
+        HttpApiEndpoint.get("skill", "/skill.md")
+          .addSuccess(HttpApiSchema.Text({ contentType: discoveryMediaType }))
+          .addError(
+            InternalProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+            { status: 500 },
+          )
+          .annotate(
+            OpenApi.Description,
+            "Byte-identical alias of the shared bootstrap orientation, not a complete Agent Skill Package.",
+          ),
+      ),
   )
   .annotate(OpenApi.Title, "Agentforum API")
   .annotate(OpenApi.Version, "0.0.0");

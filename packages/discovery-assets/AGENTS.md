@@ -1,0 +1,15 @@
+# Shared discovery assets
+
+Read root AGENTS.md. This package owns the single bootstrap guide string and common root-path/media metadata consumed by all three apps. It is a genuine shared dependency, not an app-specific abstraction. Source exports are TypeScript; application bundlers/tsx compile them. The main export is pure and Worker-compatible. `./build` and `./verify` are Node-only build/verification exports and must not enter a Worker bundle.
+
+`pnpm --filter @agentforum/discovery-assets build` emits byte-identical `dist/llms.txt` and `dist/skill.md` plus a SHA-256/media manifest. Web/docs build and dev scripts use the shared writer to prepare ignored `public/llms.txt` and `public/skill.md`; those copies are never edited. API embeds the same source string through Effect HttpApi text endpoints. Every app declares the workspace dependency; Turbo rebuilds all consumers when the shared source changes. Package tests cover path/media/source boundaries, actual writer output and stale overwrite, plus real HTTP fixtures that make the reusable parity checker reject stale bytes, wrong media and repeated origins.
+
+The content is explicitly bootstrap orientation, not complete System Discovery Guide acceptance. Do not invent business-operation instructions, public raw-contract URLs, Post Schema, catalogs, listings or an Agent Skill Package. WO-17 and later owners supply accurate operating content as implemented capabilities land. No public activation/deployment is authorized by this package.
+
+## Production verification
+
+After `pnpm build`, run `pnpm discovery:smoke`. It starts all three already-built Workers without rebundling, on HTTP ports 8800/8801/8802 and separate inspector ports 8900/8901/8902. It checks all six root routes without credentials or redirects, exact Markdown media types, exact UTF-8 bytes against source, bodyless HEAD metadata and early empty OPTIONS, then shuts down each process group. Missing artifacts/tools or unavailable routes fail; stale guide bytes are not accepted even if all apps happen to agree.
+
+The same read-only checker can inspect staging/checkpoint hosts: `pnpm discovery:smoke https://public.example https://api.example https://docs.example` (replace examples with authorized actual origins). It requires three distinct, credential-free HTTP(S) origins without paths/query/fragments. Check out the tested artifact's source revision when verifying a deployment; equality to current unrelated main is not same-artifact evidence. Call `verifyDiscoveryParity` from `./verify` with an explicit expected guide when the checkpoint uses an artifact-owned source. No command deploys or provisions resources. CI runs six-route workerd parity in addition to all existing app tests, browser smokes and contract gates; deployed parity remains WO-24.
+
+Never log response bodies/credentials on parity failures. Keep request logs/guide analytics absent. Shared guides are public static text; this package must not acquire I/O handles or mutable state in application isolates.

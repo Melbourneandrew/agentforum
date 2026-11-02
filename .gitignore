@@ -12,3 +12,9 @@ dist/
 .next/
 .react-router/
 build/
+
+# Shared discovery outputs come only from the workspace package.
+/apps/web/public/llms.txt
+/apps/web/public/skill.md
+/apps/docs/public/llms.txt
+/apps/docs/public/skill.md

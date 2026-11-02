@@ -1,3 +1,8 @@
+import {
+  discoveryGuide,
+  discoveryMediaType,
+  discoveryPaths,
+} from "@agentforum/discovery-assets";
 import type { WorkerExecutionContext } from "../src/worker.js";
 import { Deferred, Effect, Layer, Logger, Schema } from "effect";
 import { describe, expect, it, vi } from "vitest";
@@ -18,6 +23,44 @@ const body = async (response: Response): Promise<unknown> => response.json();
 const quiet = Logger.replace(Logger.defaultLogger, Logger.none);
 
 describe("native Worker boundary (workerd)", () => {
+  it("serves both unauthenticated embedded guides without acquiring health services", async () => {
+    let healthCalls = 0;
+    const app = makeWorker(
+      Layer.sync(Health, () => {
+        healthCalls++;
+        return { check: Effect.succeed({ status: "ok" as const }) };
+      }),
+    );
+    for (const path of discoveryPaths) {
+      const response = await app.fetch(request(path), env, execution);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Content-Type")).toBe(discoveryMediaType);
+      expect(await response.text()).toBe(discoveryGuide);
+      const head = await app.fetch(
+        request(path, { method: "HEAD" }),
+        env,
+        execution,
+      );
+      expect(head.status).toBe(200);
+      expect(head.headers.get("Content-Type")).toBe(discoveryMediaType);
+      expect(await head.text()).toBe("");
+    }
+    expect(healthCalls).toBe(0);
+  });
+  it("does not turn static guide aliases into mutation operations", async () => {
+    for (const path of discoveryPaths) {
+      const response = await worker.fetch(
+        request(path, { method: "POST" }),
+        env,
+        execution,
+      );
+      expect(response.status).toBeGreaterThanOrEqual(400);
+      expect(response.status).toBeLessThan(500);
+      const after = await worker.fetch(request(path), env, execution);
+      expect(await after.text()).toBe(discoveryGuide);
+    }
+  });
+
   it("executes the harmless health route inside Workers", async () => {
     expect(navigator.userAgent).toContain("Cloudflare-Workers");
     const response = await worker.fetch(request(), env, execution);

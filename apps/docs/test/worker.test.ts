@@ -23,7 +23,12 @@ describe("static documentation Worker in workerd", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store, private");
   });
   it("keeps raw Markdown in its declared media type", async () => {
-    for (const path of ["/markdown/runtime.md", "/docs/llms.txt"]) {
+    for (const path of [
+      "/markdown/runtime.md",
+      "/docs/llms.txt",
+      "/llms.txt",
+      "/skill.md",
+    ]) {
       const response = await worker.fetch(
         request(path),
         bindings(() => Promise.resolve(new Response("# Raw"))),

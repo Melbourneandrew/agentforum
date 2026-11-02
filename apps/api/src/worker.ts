@@ -1,3 +1,4 @@
+import { discoveryGuide } from "@agentforum/discovery-assets";
 import type { ExecutionContext } from "@cloudflare/workers-types/index.ts";
 import { HttpApiBuilder, HttpServer } from "@effect/platform";
 import { Context, Effect, Layer, Schema } from "effect";
@@ -132,6 +133,13 @@ export const makeWorker = (
     const app = HttpApiBuilder.toWebHandler(
       HttpApiBuilder.api(Api).pipe(
         Layer.provide(runtimeGroup(health)),
+        Layer.provide(
+          HttpApiBuilder.group(Api, "discovery", (handlers) =>
+            handlers
+              .handle("llms", () => Effect.succeed(discoveryGuide))
+              .handle("skill", () => Effect.succeed(discoveryGuide)),
+          ),
+        ),
         Layer.provideMerge(context),
         Layer.provideMerge(HttpServer.layerContext),
       ),

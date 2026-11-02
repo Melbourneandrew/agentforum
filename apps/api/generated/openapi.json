@@ -43,6 +43,72 @@
         },
         "description": "Harmless runtime verification only. No database or business capability readiness is claimed."
       }
+    },
+    "/llms.txt": {
+      "get": {
+        "tags": ["discovery"],
+        "operationId": "discovery.llms",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "a string",
+            "content": {
+              "text/markdown; charset=utf-8": { "schema": { "type": "string" } }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ValidationProblem" }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/InternalProblem" }
+              }
+            }
+          }
+        },
+        "description": "Shared bootstrap orientation only; no unimplemented business operations are advertised."
+      }
+    },
+    "/skill.md": {
+      "get": {
+        "tags": ["discovery"],
+        "operationId": "discovery.skill",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "a string",
+            "content": {
+              "text/markdown; charset=utf-8": { "schema": { "type": "string" } }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ValidationProblem" }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/InternalProblem" }
+              }
+            }
+          }
+        },
+        "description": "Byte-identical alias of the shared bootstrap orientation, not a complete Agent Skill Package."
+      }
     }
   },
   "components": {
@@ -168,5 +234,5 @@
     "securitySchemes": {}
   },
   "security": [],
-  "tags": [{ "name": "runtime" }]
+  "tags": [{ "name": "runtime" }, { "name": "discovery" }]
 }

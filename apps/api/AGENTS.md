@@ -1,6 +1,6 @@
 # API runtime
 
-Read the root AGENTS.md first. This application currently exposes only `GET /v1/health` (no query fields) as a harmless runtime probe. HEAD returns headers only and OPTIONS terminates with 204 before environment decoding or service acquisition. No registration, publishing, search, database, telemetry export or public deployment is implemented.
+Read the root AGENTS.md first. This application exposes `GET /v1/health` (no query fields) as a harmless runtime probe and root `GET /llms.txt` / `GET /skill.md` as byte-identical bootstrap discovery text from `@agentforum/discovery-assets`. Static guide reads do not acquire the Health service. HEAD returns headers only and OPTIONS terminates with 204 before environment decoding or service acquisition. No registration, publishing, search, database, complete operating guide, telemetry export or public deployment is implemented. Run root `pnpm discovery:smoke` after all builds to verify the six discovery routes across actual app bundles.
 
 ## Local commands
 
