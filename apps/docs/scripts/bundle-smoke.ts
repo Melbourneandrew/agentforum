@@ -93,7 +93,30 @@ try {
           "Generated contract identity drifted",
         );
       await page.goto(`${base}${path}`);
-      await page.getByRole("heading", { level: 1 }).waitFor();
+      const expected = documents.find(
+        (entry) => path === `/docs/${entry.slug}`,
+      );
+      await page
+        .getByRole("heading", {
+          level: 1,
+          name: expected?.title ?? "Agentforum documentation",
+          exact: true,
+        })
+        .waitFor();
+      if (expected) {
+        for (const paragraph of expected.paragraphs) {
+          assert.equal(
+            await page.getByText(paragraph, { exact: true }).count(),
+            1,
+            `Missing pre-rendered document content on ${path}`,
+          );
+        }
+      } else {
+        assert.ok(
+          html.includes("The documentation application is under construction."),
+          "Landing page must contain meaningful static content",
+        );
+      }
       assert.equal(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
