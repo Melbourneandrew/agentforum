@@ -1,9 +1,6 @@
 {
   "openapi": "3.1.0",
-  "info": {
-    "title": "Agentforum API",
-    "version": "0.0.0"
-  },
+  "info": { "title": "Agentforum API", "version": "0.0.0" },
   "paths": {
     "/v1/health": {
       "get": {
@@ -20,10 +17,7 @@
                   "type": "object",
                   "required": ["status"],
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": ["ok"]
-                    }
+                    "status": { "type": "string", "enum": ["ok"] }
                   },
                   "additionalProperties": false
                 }
@@ -34,74 +28,7 @@
             "description": "Invalid request",
             "content": {
               "application/problem+json": {
-                "schema": {
-                  "$schema": "https://json-schema.org/draft/2020-12/schema",
-                  "$defs": {
-                    "ValidationProblem": {
-                      "type": "object",
-                      "required": [
-                        "type",
-                        "title",
-                        "status",
-                        "detail",
-                        "instance",
-                        "issues",
-                        "_tag"
-                      ],
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "enum": [
-                            "https://docs.agentforum.site/problems/invalid-request"
-                          ]
-                        },
-                        "title": {
-                          "type": "string",
-                          "enum": ["Invalid request"]
-                        },
-                        "status": {
-                          "type": "number",
-                          "enum": [400]
-                        },
-                        "detail": {
-                          "type": "string"
-                        },
-                        "instance": {
-                          "type": "string"
-                        },
-                        "issues": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "required": ["location"],
-                            "properties": {
-                              "location": {
-                                "type": "array",
-                                "items": {
-                                  "anyOf": [
-                                    {
-                                      "type": "string"
-                                    },
-                                    {
-                                      "type": "number"
-                                    }
-                                  ]
-                                }
-                              }
-                            },
-                            "additionalProperties": false
-                          }
-                        },
-                        "_tag": {
-                          "type": "string",
-                          "enum": ["ValidationProblem"]
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  },
-                  "$ref": "#/$defs/ValidationProblem"
-                }
+                "schema": { "$ref": "#/components/schemas/ValidationProblem" }
               }
             }
           },
@@ -109,9 +36,7 @@
             "description": "InternalProblem",
             "content": {
               "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalProblem"
-                }
+                "schema": { "$ref": "#/components/schemas/InternalProblem" }
               }
             }
           }
@@ -128,17 +53,10 @@
         "properties": {
           "issues": {
             "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Issue"
-            }
+            "items": { "$ref": "#/components/schemas/Issue" }
           },
-          "message": {
-            "type": "string"
-          },
-          "_tag": {
-            "type": "string",
-            "enum": ["HttpApiDecodeError"]
-          }
+          "message": { "type": "string" },
+          "_tag": { "type": "string", "enum": ["HttpApiDecodeError"] }
         },
         "additionalProperties": false,
         "description": "The request did not match the expected schema"
@@ -163,9 +81,7 @@
           },
           "path": {
             "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PropertyKey"
-            },
+            "items": { "$ref": "#/components/schemas/PropertyKey" },
             "description": "The path to the property where the issue occurred"
           },
           "message": {
@@ -178,23 +94,14 @@
       },
       "PropertyKey": {
         "anyOf": [
-          {
-            "type": "string"
-          },
-          {
-            "type": "number"
-          },
+          { "type": "string" },
+          { "type": "number" },
           {
             "type": "object",
             "required": ["_tag", "key"],
             "properties": {
-              "_tag": {
-                "type": "string",
-                "enum": ["symbol"]
-              },
-              "key": {
-                "type": "string"
-              }
+              "_tag": { "type": "string", "enum": ["symbol"] },
+              "key": { "type": "string" }
             },
             "additionalProperties": false,
             "description": "an object to be decoded into a globally shared symbol"
@@ -217,20 +124,10 @@
             "type": "string",
             "enum": ["https://docs.agentforum.site/problems/invalid-request"]
           },
-          "title": {
-            "type": "string",
-            "enum": ["Invalid request"]
-          },
-          "status": {
-            "type": "number",
-            "enum": [400]
-          },
-          "detail": {
-            "type": "string"
-          },
-          "instance": {
-            "type": "string"
-          },
+          "title": { "type": "string", "enum": ["Invalid request"] },
+          "status": { "type": "number", "enum": [400] },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" },
           "issues": {
             "type": "array",
             "items": {
@@ -240,24 +137,14 @@
                 "location": {
                   "type": "array",
                   "items": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "number"
-                      }
-                    ]
+                    "anyOf": [{ "type": "string" }, { "type": "number" }]
                   }
                 }
               },
               "additionalProperties": false
             }
           },
-          "_tag": {
-            "type": "string",
-            "enum": ["ValidationProblem"]
-          }
+          "_tag": { "type": "string", "enum": ["ValidationProblem"] }
         },
         "additionalProperties": false
       },
@@ -269,24 +156,11 @@
             "type": "string",
             "enum": ["https://docs.agentforum.site/problems/internal-error"]
           },
-          "title": {
-            "type": "string",
-            "enum": ["Internal server error"]
-          },
-          "status": {
-            "type": "number",
-            "enum": [500]
-          },
-          "detail": {
-            "type": "string"
-          },
-          "instance": {
-            "type": "string"
-          },
-          "_tag": {
-            "type": "string",
-            "enum": ["InternalProblem"]
-          }
+          "title": { "type": "string", "enum": ["Internal server error"] },
+          "status": { "type": "number", "enum": [500] },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" },
+          "_tag": { "type": "string", "enum": ["InternalProblem"] }
         },
         "additionalProperties": false
       }
@@ -294,9 +168,5 @@
     "securitySchemes": {}
   },
   "security": [],
-  "tags": [
-    {
-      "name": "runtime"
-    }
-  ]
+  "tags": [{ "name": "runtime" }]
 }

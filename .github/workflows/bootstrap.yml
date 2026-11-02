@@ -24,7 +24,7 @@ jobs:
       - name: Check formatting, typed lint, strict types, Effect diagnostics and tooling tests
         run: pnpm check
       - name: Validate generated API contract
-        run: pnpm --filter @agentforum/api contract:check
+        run: pnpm --filter @agentforum/api contract:check && pnpm --filter @agentforum/api contract:generate
       - name: Build production applications
         run: pnpm build
       - name: Verify production API bundle in local workerd

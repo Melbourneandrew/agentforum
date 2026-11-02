@@ -102,18 +102,24 @@ export const makeWorker = (
       "Cache-Control": "no-store, private",
       "X-Request-Id": correlationId,
     };
+    const problemResponse = (problem: Schema.Schema.Type<typeof Problem>) => {
+      const response = Response.json(Schema.encodeSync(Problem)(problem), {
+        status: problem.status,
+        headers: { ...headers, "Content-Type": "application/problem+json" },
+      });
+      return request.method === "HEAD"
+        ? new Response(null, response)
+        : response;
+    };
     if (request.method === "OPTIONS")
       return new Response(null, { status: 204, headers });
     const env = Schema.decodeUnknownEither(Environment)(bindings);
     if (env._tag === "Left") {
       await Effect.runPromise(recordDefect(correlationId));
-      return Response.json(
-        Schema.encodeSync(Problem)(genericProblem(correlationId)),
-        {
-          status: 500,
-          headers: { ...headers, "Content-Type": "application/problem+json" },
-        },
-      );
+      return problemResponse(genericProblem(correlationId));
+    }
+    if (request.signal.aborted) {
+      return problemResponse(genericProblem(correlationId));
     }
     const context = Layer.succeed(RequestContext, {
       bindings: env.right,
@@ -142,10 +148,7 @@ export const makeWorker = (
               : genericProblem(correlationId);
         if (problem.status === 500)
           await Effect.runPromise(recordDefect(correlationId));
-        result = Response.json(Schema.encodeSync(Problem)(problem), {
-          status: problem.status,
-          headers: { "Content-Type": "application/problem+json" },
-        });
+        result = problemResponse(problem);
       }
       const output = new Response(
         request.method === "HEAD" ? null : result.body,
@@ -156,13 +159,7 @@ export const makeWorker = (
       return output;
     } catch {
       await Effect.runPromise(recordDefect(correlationId));
-      return Response.json(
-        Schema.encodeSync(Problem)(genericProblem(correlationId)),
-        {
-          status: 500,
-          headers: { ...headers, "Content-Type": "application/problem+json" },
-        },
-      );
+      return problemResponse(genericProblem(correlationId));
     }
   },
 });

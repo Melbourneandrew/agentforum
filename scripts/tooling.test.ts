@@ -126,13 +126,14 @@ describe("repository toolchain", () => {
         { encoding: "utf8" },
       ),
     );
-    expect(graph).toMatchObject({
-      packages: ["@agentforum/api"],
-      tasks: expect.arrayContaining([
+    expect(graph).toMatchObject({ packages: ["@agentforum/api"] });
+    expect(graph).toHaveProperty(
+      "tasks",
+      expect.arrayContaining([
         expect.objectContaining({ taskId: "@agentforum/api#build" }),
         expect.objectContaining({ taskId: "@agentforum/api#test" }),
       ]),
-    });
+    );
     expect(json("turbo.json")).toMatchObject({
       tasks: {
         build: { dependsOn: ["^build"] },

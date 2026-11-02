@@ -1,6 +1,6 @@
 import type { WorkerExecutionContext } from "../src/worker.js";
 import { Deferred, Effect, Layer, Logger, Schema } from "effect";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import worker, { Health, makeWorker, RequestContext } from "../src/worker.js";
 import { InternalProblem, ValidationProblem } from "../src/contract.js";
 
@@ -196,6 +196,95 @@ describe("native Worker boundary (workerd)", () => {
     );
     expect(response.status).toBe(500);
     expect(await response.text()).not.toContain("secret-config");
+  });
+
+  it("maps declared typed failures and strips occurrence-specific unsafe fields", async () => {
+    const app = makeWorker(
+      Layer.succeed(Health, {
+        check: Effect.fail(
+          new ValidationProblem({
+            type: "https://docs.agentforum.site/problems/invalid-request",
+            title: "Invalid request",
+            status: 400,
+            detail: "unsafe-dependency-detail",
+            instance: "unsafe-instance",
+            issues: [{ location: ["payload"] }],
+          }),
+        ),
+      }),
+    );
+    const response = await app.fetch(request(), env, execution);
+    expect(response.status).toBe(400);
+    const text = await response.text();
+    expect(text).not.toContain("unsafe");
+    expect(
+      Schema.decodeUnknownSync(ValidationProblem)(JSON.parse(text)).status,
+    ).toBe(400);
+  });
+
+  it("contains finalizer failures and keeps error HEAD responses bodyless", async () => {
+    const app = makeWorker(
+      Layer.scoped(
+        Health,
+        Effect.acquireRelease(
+          Effect.succeed({ check: Effect.succeed({ status: "ok" as const }) }),
+          () => Effect.die(new Error("finalizer-secret")),
+        ),
+      ),
+    );
+    const response = await app.fetch(request(), env, execution);
+    expect(response.status).toBe(500);
+    expect(await response.text()).not.toContain("finalizer-secret");
+    const head = await app.fetch(
+      request("/v1/health", { method: "HEAD" }),
+      {},
+      execution,
+    );
+    expect(head.status).toBe(500);
+    expect(await head.text()).toBe("");
+  });
+
+  it("does not start a service for an already-aborted request", async () => {
+    let invoked = false;
+    const controller = new AbortController();
+    controller.abort();
+    const app = makeWorker(
+      Layer.sync(Health, () => {
+        invoked = true;
+        return { check: Effect.succeed({ status: "ok" as const }) };
+      }),
+    );
+    const response = await app.fetch(
+      request("/v1/health", { signal: controller.signal }),
+      env,
+      execution,
+    );
+    expect(response.status).toBe(500);
+    expect(invoked).toBe(false);
+  });
+
+  it("emits only a fixed diagnostic category and server correlation, never exception content", async () => {
+    const diagnostic = vi
+      .spyOn(console, "log")
+      .mockImplementation(() => undefined);
+    try {
+      const app = makeWorker(
+        Layer.succeed(Health, {
+          check: Effect.die(
+            new Error("Authorization: Bearer diagnostic-secret"),
+          ),
+        }),
+      );
+      const response = await app.fetch(request(), env, execution);
+      expect(response.status).toBe(500);
+      const log = JSON.stringify(diagnostic.mock.calls);
+      expect(log).toContain("api_unexpected_failure");
+      expect(log).toContain(response.headers.get("X-Request-Id") ?? "missing");
+      expect(log).not.toContain("diagnostic-secret");
+      expect(log).not.toContain("Authorization");
+    } finally {
+      diagnostic.mockRestore();
+    }
   });
 
   it("runs finalizers when an active request is interrupted", async () => {

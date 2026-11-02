@@ -5,7 +5,7 @@ import {
   HttpApiSchema,
   OpenApi,
 } from "@effect/platform";
-import { JSONSchema, Schema } from "effect";
+import { Schema } from "effect";
 
 const occurrence = {
   detail: Schema.String,
@@ -90,9 +90,7 @@ export const makeOpenApi = () => {
           description: "Invalid request",
           content: {
             "application/problem+json": {
-              schema: JSONSchema.make(ValidationProblem, {
-                target: "openApi3.1",
-              }),
+              schema: { $ref: "#/components/schemas/ValidationProblem" },
             },
           },
         },

@@ -4,9 +4,9 @@ import SwaggerParser from "@apidevtools/swagger-parser";
 import { makeOpenApi } from "../src/contract.js";
 
 const spec = makeOpenApi();
-const expected = `${JSON.stringify(spec, null, 2)}\n`;
-assert.equal(
-  await readFile("generated/openapi.json", "utf8"),
+const expected: unknown = spec;
+assert.deepEqual(
+  JSON.parse(await readFile("generated/openapi.json", "utf8")),
   expected,
   "Regenerate the OpenAPI description",
 );
