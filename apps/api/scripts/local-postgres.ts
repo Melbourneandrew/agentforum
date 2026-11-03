@@ -65,7 +65,11 @@ export class LocalPostgres extends Context.Tag(
     ) => Redacted.Redacted;
     readonly execute: (
       sql: string,
-      database?: "agentforum_local" | "postgres",
+      database?:
+        | "agentforum_local"
+        | "postgres"
+        | "agentforum_direct"
+        | "agentforum_cached",
     ) => Effect.Effect<string, LocalPostgresError>;
   }
 >() {}
@@ -179,7 +183,11 @@ const local = Effect.gen(function* () {
       ),
     execute: (
       sql: string,
-      database: "agentforum_local" | "postgres" = "agentforum_local",
+      database:
+        | "agentforum_local"
+        | "postgres"
+        | "agentforum_direct"
+        | "agentforum_cached" = "agentforum_local",
     ) =>
       docker.run([
         "exec",

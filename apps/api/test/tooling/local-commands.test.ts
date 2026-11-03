@@ -165,10 +165,23 @@ describe("actual owned-local commands", () => {
               stopped.code === 143 ||
               Option.contains(stopped.signal, "SIGTERM"),
           ).toBe(true);
-          const released = yield* Effect.exit(
-            ownedLocalDatabaseUrl(descriptor),
+          // pnpm may exit before the CLI finishes asynchronous scope cleanup.
+          // Await actual resource release, not wrapper exit as a substitute.
+          yield* Effect.exit(ownedLocalDatabaseUrl(descriptor)).pipe(
+            Effect.repeat({
+              until: Exit.isFailure,
+              schedule: Schedule.spaced("20 millis"),
+            }),
+            Effect.timeoutFail({
+              duration: "5 seconds",
+              onTimeout: () => new LocalCliFailure(),
+            }),
           );
-          expect(Exit.isFailure(released)).toBe(true);
+          expect(
+            Exit.isFailure(
+              yield* Effect.exit(ownedLocalDatabaseUrl(descriptor)),
+            ),
+          ).toBe(true);
         }),
       ).pipe(
         Effect.timeoutFail({

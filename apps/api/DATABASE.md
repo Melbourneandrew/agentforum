@@ -74,7 +74,7 @@ Wrangler loads the auth token from a mode-0600 `.dev.vars` file and hides it.
 No public database route or final product schema has been added. The timeout
 problem schema is recognized narrowly at the production boundary; undeclared or
 malformed failures remain generic 500s. Direct-origin migration/reset commands are implemented;
-complete deployable provider probes are still in progress. Native PostgreSQL
+deployable private provider probes are implemented; actual provider verification remains a delivery obligation. Native PostgreSQL
 cancellation evidence is not a Hyperdrive guarantee; real provider verification
 belongs to the delivery order and must not be inferred from local routing tests.
 
@@ -127,7 +127,7 @@ contracts do not advertise database errors or database readiness.
 - [x] Native origin saturation, default acquisition deadline and frontend cleanup.
 - [x] Narrow declared HTTP 503 mapping, Retry-After and secret-safe diagnostics.
 - [x] Direct-origin migrations and safe owned-local development/reset commands.
-- [ ] Deployable private transaction/cleanup/provider smoke fixtures.
+- [x] Deployable private transaction/cleanup/provider smoke fixtures.
 - [ ] Final CI guidance, clean-checkout verification, exact-head remote CI and PR delivery.
 
 Actual Hyperdrive/deployment guarantees remain separate delivery evidence; no
@@ -162,6 +162,57 @@ Mandatory verification includes real pinned drizzle-kit generation/application,
 reapplication and whole-database reset/reapplication; wrong port/ID refusal with
 synthetic data preserved; actual local dev/reset invocation; descriptor mode;
 remote-argument refusal; UTF-8 capture, bounded overflow and TERM-resistant
-child teardown. The verified milestone has 48 API tests (27 ordinary workerd,
-9 Node tooling and 12 native PostgreSQL/workerd), plus real migration proof.
+child teardown. The verified adapter milestone has 57 API tests (27 ordinary workerd,
+12 Node tooling and 18 native PostgreSQL/workerd), plus real migration proof
+and the actual Node-to-Worker smoke program.
 These are local results, not remote CI, direct-origin connectivity or deployment.
+
+## Private provider fixture contract
+
+`test/fixtures/database-worker.ts` is a verification-only deployable Worker;
+`wrangler.database.json` intentionally contains no fabricated resource IDs,
+public routes, workers.dev exposure or automatic observability. WO-7 owns its
+actual Actions-generated environment configuration, private endpoint/transport,
+real direct/cached bindings, fresh high-entropy `DATABASE_SMOKE_TOKEN`, deployment
+and teardown. Never route it onto a product hostname. Do not deploy from here.
+
+In authorized Actions, `db:smoke:fixture prepare` requires the dedicated
+`MIGRATION_DATABASE_URL` and explicit `DATABASE_SMOKE_RUNTIME_ROLE`. It creates
+only `agentforum_adapter_probe` and grants only SELECT/INSERT/DELETE on that
+synthetic table. Setup and grants are transactional. In an always-run cleanup
+step, `db:smoke:fixture cleanup` removes only that fixture table; this is test
+fixture teardown, not a reverse product migration. Product migration files and
+journal remain separate. The local harness exercises the same setup program.
+
+`db:smoke` requires `GITHUB_ACTIONS=true`, an authorized HTTPS
+`DATABASE_SMOKE_ORIGIN` (origin only), secret `DATABASE_SMOKE_TOKEN` and expected
+`DATABASE_SMOKE_DATABASE`. It rejects redirects, uses bounded response decoding
+and deadlines, and logs neither endpoint, token nor dependency causes. The
+runner executes in Node (Actions); mandatory local proof uses the same Node
+program against a real Wrangler HTTP Worker, not unsupported Worker-global
+AbortSignal APIs. Delivery must collect actual exact-release results.
+
+The token-gated POST `/transaction` accepts only UUID markers and commit,
+rollback or interrupt modes with a 2 KiB input bound. It observes writes from a
+second direct frontend, detects a genuine server-side PgSleep before explicit
+fiber interruption, checks rollback and that the uniquely tagged transaction
+has cleared, deletes its own synthetic marker, and completes both Layer scopes
+before returning. Allow at least two origin connections for these private probes.
+Origin backend PIDs may remain pooled or change across transaction boundaries;
+the provider probe deliberately does not transfer native PID-disappearance or
+same-client-PID assertions to Hyperdrive. GET `/direct` and `/cached` report origin
+selection, not query caching behavior. HEAD/OPTIONS do not acquire a database.
+
+These fixtures do **not** establish incoming HTTP-disconnect propagation,
+provider cancellation support, caching behavior, HA/failover, pool exhaustion,
+session reset or deployed environment isolation before actual provider tests.
+WO-7 must run and record those applicable scenarios; any unsupported guarantee
+is a blocker, not a passing placeholder. No product acceptance criterion is
+completed by this adapter.
+
+Transaction bodies now run in a scoped child fiber so ordinary unjoined children
+are interrupted/awaited before COMMIT/ROLLBACK. A session retained past its body
+fails with a typed closed-session error before SQL construction/execution.
+Regression tests verify no escaped or late writes; callers must still join all
+intended work, and deliberately detached daemon work is not a supported
+transaction pattern. Commit acknowledgment/network uncertainty remains as above.

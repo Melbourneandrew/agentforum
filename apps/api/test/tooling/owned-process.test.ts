@@ -62,7 +62,7 @@ describe("owned subprocess groups", () => {
               process.execPath,
               [
                 "-e",
-                "const{spawn}=require('node:child_process');const{writeFileSync}=require('node:fs');const child=spawn(process.execPath,['-e',\"process.on('SIGTERM',()=>{});setInterval(()=>{},1000)\"],{stdio:'ignore'});writeFileSync(process.env.PROBE_PID_FILE,String(child.pid));setInterval(()=>{},1000)",
+                "const{spawn}=require('node:child_process');spawn(process.execPath,['-e',\"process.on('SIGTERM',()=>{});require('node:fs').writeFileSync(process.env.PROBE_PID_FILE,String(process.pid));setInterval(()=>{},1000)\"],{stdio:'ignore'});setInterval(()=>{},1000)",
               ],
               { output: "capture", environment: { PROBE_PID_FILE: pidFile } },
             );

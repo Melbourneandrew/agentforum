@@ -1,3 +1,5 @@
+import { ownedProcess } from "../../scripts/owned-process.js";
+import { SmokeEnvironment } from "../../scripts/database-smoke-program.js";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { Cause, Effect, Exit, Option, Redacted, Schema } from "effect";
@@ -139,3 +141,55 @@ describe("migration and reset safety", () => {
     }
   });
 });
+
+it("refuses insecure or non-Actions smoke targets before network access", () => {
+  const environment = {
+    GITHUB_ACTIONS: "true",
+    DATABASE_SMOKE_ORIGIN: "http://127.0.0.1:1",
+    DATABASE_SMOKE_TOKEN: "synthetic",
+    DATABASE_SMOKE_DATABASE: "synthetic",
+  };
+  expect(Schema.decodeUnknownEither(SmokeEnvironment)(environment)._tag).toBe(
+    "Left",
+  );
+  expect(
+    Schema.decodeUnknownEither(SmokeEnvironment)({
+      ...environment,
+      GITHUB_ACTIONS: "false",
+      DATABASE_SMOKE_ORIGIN: "https://smoke.example.invalid",
+    })._tag,
+  ).toBe("Left");
+});
+
+for (const [script, args] of [
+  ["database-smoke.ts", []],
+  ["smoke-fixture.ts", ["prepare"]],
+] as const) {
+  it(`refuses actual ${script} outside Actions without leaking credentials`, async () => {
+    const result = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const lease = yield* ownedProcess(
+            "pnpm",
+            ["exec", "tsx", `scripts/${script}`, ...args],
+            {
+              output: "capture",
+              environment: {
+                GITHUB_ACTIONS: "false",
+                MIGRATION_DATABASE_URL: uri,
+                DATABASE_SMOKE_ORIGIN: "https://smoke.example.invalid",
+                DATABASE_SMOKE_TOKEN: secret,
+                DATABASE_SMOKE_DATABASE: "synthetic",
+                DATABASE_SMOKE_RUNTIME_ROLE: "postgres",
+              },
+            },
+          );
+          return yield* Effect.promise(() => lease.completion);
+        }),
+      ),
+    );
+    expect(result.code).toBe(1);
+    expect(result.stdout + result.stderr).not.toContain(secret);
+    expect(result.stdout + result.stderr).not.toContain(uri);
+  });
+}

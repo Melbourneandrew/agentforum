@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --local --ip 0.0.0.0 --port 8787",
+    "dev": "tsx scripts/database-dev.ts",
     "build": "wrangler deploy --dry-run --outdir dist",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
@@ -16,7 +16,9 @@
     "db:generate": "drizzle-kit generate --config drizzle.config.ts && prettier --write migrations",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:dev": "tsx scripts/database-dev.ts",
-    "db:reset": "tsx scripts/reset-local.ts"
+    "db:reset": "tsx scripts/reset-local.ts",
+    "db:smoke:fixture": "tsx scripts/smoke-fixture.ts",
+    "db:smoke": "tsx scripts/database-smoke.ts"
   },
   "dependencies": {
     "@agentforum/discovery-assets": "workspace:*",

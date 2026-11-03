@@ -1,4 +1,13 @@
-import { Context, Data, Effect, Layer, Option, Redacted, Schema } from "effect";
+import {
+  Context,
+  Data,
+  Effect,
+  Fiber,
+  Layer,
+  Option,
+  Redacted,
+  Schema,
+} from "effect";
 import { Client, Query } from "pg";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { PgDialect } from "drizzle-orm/pg-core";
@@ -23,7 +32,11 @@ export class DatabaseQueryError extends Data.TaggedError("DatabaseQueryError")<{
   readonly state: Option.Option<string>;
 }> {}
 
-type QueryFailure = DatabaseQueryError | DatabaseDecodeError;
+export class DatabaseTransactionClosedError extends Data.TaggedError(
+  "DatabaseTransactionClosedError",
+) {}
+type QueryFailure =
+  DatabaseQueryError | DatabaseDecodeError | DatabaseTransactionClosedError;
 type QueryBuilder = Pick<
   NodePgDatabase,
   | "select"
@@ -341,11 +354,30 @@ const connection = (key: "HYPERDRIVE_DIRECT" | "HYPERDRIVE_CACHED") =>
               Effect.gen(function* () {
                 yield* control(sql`BEGIN`);
                 const serial = yield* Effect.makeSemaphore(1);
+                let active = true;
                 const session: TransactionSession = {
                   execute: (build, row) =>
-                    serial.withPermits(1)(run(build, row)),
+                    serial.withPermits(1)(
+                      Effect.suspend(() =>
+                        active
+                          ? run(build, row)
+                          : Effect.fail(new DatabaseTransactionClosedError()),
+                      ),
+                    ),
                 };
-                const value = yield* Effect.suspend(() => body(session));
+                // Finish the body in its own scoped fiber: its unjoined children
+                // are interrupted and awaited before COMMIT or ROLLBACK.
+                const value = yield* Effect.scoped(
+                  Effect.suspend(() => body(session)),
+                ).pipe(
+                  Effect.fork,
+                  Effect.flatMap(Fiber.join),
+                  Effect.ensuring(
+                    Effect.sync(() => {
+                      active = false;
+                    }),
+                  ),
+                );
                 yield* Effect.uninterruptible(
                   control(sql`COMMIT`).pipe(
                     Effect.tap(() =>

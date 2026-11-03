@@ -1,6 +1,6 @@
 # API runtime
 
-Read the root AGENTS.md first. This application exposes `GET /v1/health` (no query fields) as a harmless runtime probe and root `GET /llms.txt` / `GET /skill.md` as byte-identical bootstrap discovery text from `@agentforum/discovery-assets`. Static guide reads do not acquire the Health service. HEAD returns headers only and OPTIONS terminates with 204 before environment decoding or service acquisition. No registration, publishing, search, database, complete operating guide, telemetry export or public deployment is implemented. Run root `pnpm discovery:smoke` after all builds to verify the six discovery routes across actual app bundles.
+Read the root AGENTS.md first. This application exposes `GET /v1/health` (no query fields) as a harmless runtime probe and root `GET /llms.txt` / `GET /skill.md` as byte-identical bootstrap discovery text from `@agentforum/discovery-assets`. Static guide reads do not acquire the Health service. HEAD returns headers only and OPTIONS terminates with 204 before environment decoding or service acquisition. Request-scoped database services, owned local PostgreSQL commands and private verification fixtures exist (see `DATABASE.md`). No registration, publishing, search, complete operating guide, telemetry export or public deployment is implemented. Run root `pnpm discovery:smoke` after all builds to verify the six discovery routes across actual app bundles.
 
 ## Local commands
 
@@ -8,6 +8,8 @@ Run from the repository root:
 
 ```sh
 pnpm --filter @agentforum/api dev
+pnpm --filter @agentforum/api db:reset
+pnpm --filter @agentforum/api db:generate
 pnpm --filter @agentforum/api typecheck
 pnpm --filter @agentforum/api lint
 pnpm --filter @agentforum/api effect:check
@@ -18,7 +20,7 @@ pnpm --filter @agentforum/api build
 pnpm --filter @agentforum/api bundle:smoke
 ```
 
-Development listens on port 8787. Build uses Wrangler's **dry-run**, not remote deployment. Bundle smoke starts the already-built script without rebundling in local workerd on port 8790, checks health, malformed query, unknown business route, HEAD and OPTIONS, and shuts the process group down. Neither command requires cloud credentials.
+Development owns disposable Docker PostgreSQL, applies repository migrations and listens on port 8787 (`LOCAL_API_PORT` overrides it), retaining the existing all-interface local Worker binding for workspace forwarding. Ctrl-C/SIGTERM cleans its owned resources. `db:dev` is an explicit alias. Reset accepts no arguments and selects only the exact validated owned local descriptor. Docker must be reachable via its local Unix socket. Build uses Wrangler's **dry-run**, not remote deployment. Bundle smoke starts the already-built script without rebundling in local workerd on port 8790, checks health, malformed query, unknown business route, HEAD and OPTIONS, and shuts the process group down. Neither command requires cloud credentials.
 
 `generated/openapi.json` is derived from Effect HttpApi schemas. Regenerate it rather than hand-editing it. Contract checks validate OpenAPI 3.1 and exact source parity; framework-default decode errors are normalized to the declared RFC 9457 validation schema. Do not rewrite the `3.1.0` generator marker or advertise unimplemented endpoints. Problem-type documentation URLs are reserved for the docs implementation; this scaffold does not claim those remote pages exist.
 
@@ -34,3 +36,18 @@ Development listens on port 8787. Build uses Wrangler's **dry-run**, not remote 
 - Vitest's Cloudflare plugin configuration is a Node `.mjs` file; tests run in workerd. Its published tool declarations currently reference missing internal Miniflare modules, so importing that Node plugin into the application's TypeScript project is not appropriate. Application and test TypeScript remain fully checked, with zero-warning typed lint and strict Effect diagnostics.
 
 The pinned native installers (`esbuild`, `workerd`, `msgpackr-extract`) are explicitly approved in the root workspace manifest; do not disable strict dependency-build approval. Wrangler's local config disables workers.dev, preview URLs and automatic observability; remote setup and activation belong to their own work orders and owner decisions.
+
+## Database and delivery verification
+
+Read `DATABASE.md` for migration policy, native cancellation semantics, provenance
+of the source-backed dependency patches and provider evidence limitations.
+`test` mandates ordinary workerd, Node tooling, actual drizzle-kit generation /
+application / reset proof, and PostgreSQL-backed workerd suites. It also executes
+the Actions smoke program in Node against an actual separate local Worker.
+No fake SDK modules, ignored diagnostics or Node emulation of Worker tests.
+Dedicated `db:migrate`, `db:smoke:fixture prepare|cleanup` and `db:smoke` remote
+entry points are Actions-only misuse guards, not authorization. Delivery owns
+scoped environment credentials, private transport, actual bindings and cleanup.
+Do not invoke remote setup/deploy from this workspace. Provider cancellation,
+HTTP-disconnect propagation, caching and deployed isolation remain separate
+executable delivery obligations, not conclusions from local tests.

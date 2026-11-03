@@ -12,6 +12,13 @@ import {
   databaseTimeoutProblem,
 } from "../../src/database/problems.js";
 
+import {
+  ProbeInput,
+  ProbeResult,
+  ProbeFailure,
+  readProbeJson,
+  transactionProbe,
+} from "./transaction-probe.js";
 import { ConnectionInfo } from "./database-schema.js";
 const Authorization = Schema.Struct({
   DATABASE_SMOKE_TOKEN: Schema.Redacted(Schema.NonEmptyString),
@@ -68,6 +75,23 @@ export default {
     )
       return failure(401, correlationId);
     const path = new URL(request.url).pathname;
+    if (request.method === "POST" && path === "/transaction") {
+      const outcome = await Effect.runPromiseExit(
+        Effect.tryPromise({
+          try: () => readProbeJson(request.body),
+          catch: () => new ProbeFailure(),
+        }).pipe(
+          Effect.flatMap(Schema.decodeUnknown(ProbeInput)),
+          Effect.flatMap(transactionProbe),
+          Effect.provide(databaseBindingsLayer(bindings)),
+        ),
+        { signal: request.signal },
+      );
+      if (Exit.isFailure(outcome)) return failure(500, correlationId);
+      return Response.json(Schema.encodeSync(ProbeResult)(outcome.value), {
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
     if (
       request.method !== "GET" ||
       !["/direct", "/cached", "/timeout", "/saturated"].includes(path)

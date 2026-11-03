@@ -16,9 +16,10 @@ import {
   Schedule,
   Schema,
 } from "effect";
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   DatabaseDecodeError,
+  DatabaseTransactionClosedError,
   DirectDatabase,
   databaseBindingsLayer,
   directDatabaseLayer,
@@ -78,18 +79,6 @@ const run = <A, E>(program: Effect.Effect<A, E, DirectDatabase>) =>
       Effect.provide(directDatabaseLayer.pipe(Layer.provide(bindings))),
     ),
   );
-
-beforeAll(async () => {
-  await run(
-    Effect.flatMap(DirectDatabase, (database) =>
-      database.execute(
-        () =>
-          sql`CREATE TABLE agentforum_adapter_probe (id text PRIMARY KEY, payload jsonb NOT NULL)`,
-        Schema.Never,
-      ),
-    ),
-  );
-});
 
 describe("scoped pg/Drizzle transactions in workerd", () => {
   it("commits parameterized writes and preserves JSONB null and nested data", async () => {
@@ -344,6 +333,82 @@ describe("scoped pg/Drizzle transactions in workerd", () => {
           yield* number(
             database.execute,
             sql`SELECT count(*)::integer AS n FROM agentforum_adapter_probe WHERE id = ${marker}`,
+          ),
+        ).toBe(0);
+      }),
+    );
+  });
+});
+
+describe("transaction session lifetime", () => {
+  it("rejects escaped sessions before executing SQL after commit", async () => {
+    await run(
+      Effect.gen(function* () {
+        const database = yield* DirectDatabase;
+        const marker = crypto.randomUUID();
+        const escaped = yield* database.transaction((session) =>
+          Effect.succeed(session),
+        );
+        const outcome = yield* Effect.exit(
+          escaped.execute(
+            (builder) => builder.insert(Probe).values({ id: marker, payload }),
+            Schema.Never,
+          ),
+        );
+        expect(
+          Exit.isFailure(outcome) &&
+            Option.exists(
+              Cause.failureOption(outcome.cause),
+              (error) => error instanceof DatabaseTransactionClosedError,
+            ),
+        ).toBe(true);
+        expect(
+          yield* number(
+            database.execute,
+            sql`SELECT count(*)::integer AS n FROM agentforum_adapter_probe WHERE id=${marker}`,
+          ),
+        ).toBe(0);
+      }),
+    );
+  });
+  it("interrupts unjoined transaction children before commit, preventing late writes", async () => {
+    await run(
+      Effect.gen(function* () {
+        const database = yield* DirectDatabase;
+        const marker = crypto.randomUUID();
+        let childClosed = false;
+        const entered = yield* Deferred.make<boolean>();
+        yield* database.transaction((session) =>
+          Effect.gen(function* () {
+            yield* Effect.fork(
+              Deferred.succeed(entered, true)
+                .pipe(
+                  Effect.zipRight(Effect.sleep("200 millis")),
+                  Effect.zipRight(
+                    session.execute(
+                      (builder) =>
+                        builder.insert(Probe).values({ id: marker, payload }),
+                      Schema.Never,
+                    ),
+                  ),
+                )
+                .pipe(
+                  Effect.ensuring(
+                    Effect.sync(() => {
+                      childClosed = true;
+                    }),
+                  ),
+                ),
+            );
+            yield* Deferred.await(entered);
+          }),
+        );
+        expect(childClosed).toBe(true);
+        yield* Effect.sleep("250 millis");
+        expect(
+          yield* number(
+            database.execute,
+            sql`SELECT count(*)::integer AS n FROM agentforum_adapter_probe WHERE id=${marker}`,
           ),
         ).toBe(0);
       }),

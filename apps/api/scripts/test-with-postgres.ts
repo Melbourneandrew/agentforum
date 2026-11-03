@@ -15,6 +15,19 @@ import { verifyLocalMigrations } from "./verify-local-migrations.js";
 
 import { ownedProcess } from "./owned-process.js";
 
+import {
+  databaseBindingsLayer,
+  directDatabaseLayer,
+} from "../src/database/database.js";
+import {
+  prepareSmokeFixture,
+  cleanupSmokeFixture,
+} from "./smoke-fixture-program.js";
+
+import {
+  runDatabaseSmoke,
+  smokeTransportLayer,
+} from "./database-smoke-program.js";
 class TestHarnessError extends Data.TaggedError("TestHarnessError") {}
 const processLease = (
   args: readonly string[],
@@ -167,6 +180,18 @@ const databaseTests = Effect.scoped(
     );
     const direct = Redacted.value(postgres.url("agentforum_direct"));
     const cached = Redacted.value(postgres.url("agentforum_cached"));
+    yield* prepareSmokeFixture("postgres").pipe(
+      Effect.provide(
+        directDatabaseLayer.pipe(
+          Layer.provide(
+            databaseBindingsLayer({
+              HYPERDRIVE_DIRECT: { connectionString: direct },
+              HYPERDRIVE_CACHED: { connectionString: cached },
+            }),
+          ),
+        ),
+      ),
+    );
     const token = crypto.randomUUID();
     const saturated = new URL(direct);
     saturated.username = "agentforum_saturated";
@@ -181,6 +206,11 @@ const databaseTests = Effect.scoped(
         Effect.logError("database_harness_worker_start_failed"),
       ),
     );
+    // The Actions smoke runner targets Node, not the Worker global API surface.
+    // Exercise that actual transport against the separately running real Worker.
+    yield* runDatabaseSmoke("agentforum_direct", "agentforum_cached").pipe(
+      Effect.provide(smokeTransportLayer(origin, Redacted.make(token))),
+    );
     yield* runVitest(["--config", "vitest.database.config.mjs"], {
       DATABASE_TEST_DIRECT_URL: direct,
       DATABASE_TEST_CACHED_URL: cached,
@@ -188,7 +218,24 @@ const databaseTests = Effect.scoped(
       DATABASE_TEST_ORIGIN: origin,
       DATABASE_TEST_SATURATED_URL: saturated.toString(),
       DATABASE_TEST_STATISTICS_URL: faults.statisticsUrl,
-    });
+    }).pipe(
+      Effect.ensuring(
+        cleanupSmokeFixture.pipe(
+          Effect.provide(
+            directDatabaseLayer.pipe(
+              Layer.provide(
+                databaseBindingsLayer({
+                  HYPERDRIVE_DIRECT: { connectionString: direct },
+                  HYPERDRIVE_CACHED: { connectionString: cached },
+                }),
+              ),
+            ),
+          ),
+          Effect.orDie,
+        ),
+      ),
+    );
+    yield* Effect.logInfo("private_smoke_and_fixture_cleanup_verified_locally");
   }),
 ).pipe(
   Effect.provide(Layer.merge(localPostgresLayer, localDatabaseFaultsLayer)),

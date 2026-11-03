@@ -97,7 +97,7 @@ const program = Effect.scoped(
         configPath,
         "--local",
         "--ip",
-        "127.0.0.1",
+        "0.0.0.0",
         "--port",
         String(environment.LOCAL_API_PORT),
         "--inspector-port",
