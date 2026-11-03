@@ -4,25 +4,38 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --local --ip 0.0.0.0 --port 8787",
+    "dev": "tsx scripts/database-dev.ts",
     "build": "wrangler deploy --dry-run --outdir dist",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "effect:check": "effect-language-service diagnostics --strict --project tsconfig.json",
-    "test": "vitest run",
+    "test": "tsx scripts/test-with-postgres.ts",
     "contract:generate": "tsx scripts/generate-contract.ts",
     "contract:check": "tsx scripts/verify-contract.ts",
-    "bundle:smoke": "tsx scripts/bundle-smoke.ts"
+    "bundle:smoke": "tsx scripts/bundle-smoke.ts",
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts && prettier --write migrations",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:dev": "tsx scripts/database-dev.ts",
+    "db:reset": "tsx scripts/reset-local.ts",
+    "db:smoke:fixture": "tsx scripts/smoke-fixture.ts",
+    "db:smoke": "tsx scripts/database-smoke.ts"
   },
   "dependencies": {
-    "effect": "3.22.4",
+    "@agentforum/discovery-assets": "workspace:*",
     "@effect/platform": "0.97.3",
-    "@agentforum/discovery-assets": "workspace:*"
+    "drizzle-orm": "0.45.4",
+    "effect": "3.22.4",
+    "pg": "8.23.1"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "13.1.0",
     "@cloudflare/vitest-plugin": "1.5.0",
     "@cloudflare/workers-types": "5.20261102.1",
-    "@apidevtools/swagger-parser": "13.1.0",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11",
+    "gel": "2.2.1",
+    "jsonc-parser": "3.3.1",
+    "mysql2": "3.24.6",
     "tsx": "4.23.15",
     "wrangler": "4.156.2"
   }
