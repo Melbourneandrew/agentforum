@@ -3,14 +3,21 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Data, Effect, Exit, Layer, Redacted, Schedule, Schema } from "effect";
-import { LocalPostgres, localPostgresLayer } from "./local-postgres.js";
+import {
+  LocalPostgres,
+  localPostgresLayer,
+  resetOwnedLocalDatabase,
+} from "./local-postgres.js";
 
 import {
   LocalDatabaseFaults,
   localDatabaseFaultsLayer,
 } from "./local-database-faults.js";
 
-import { migrationProcessLayer } from "./migrations.js";
+import {
+  migrationProcessLayer,
+  migrateOwnedLocalDatabase,
+} from "./migrations.js";
 import { verifyLocalMigrations } from "./verify-local-migrations.js";
 
 import { ownedProcess } from "./owned-process.js";
@@ -172,7 +179,19 @@ const databaseTests = Effect.scoped(
     const postgres = yield* LocalPostgres;
     const faults = yield* LocalDatabaseFaults;
     yield* verifyLocalMigrations.pipe(Effect.provide(migrationProcessLayer));
-    yield* postgres.execute("CREATE DATABASE agentforum_direct", "postgres");
+    // Restore the actual product schema after the isolated synthetic migration proof.
+    // Clone only this owned, fully migrated local database into the direct fixture.
+    yield* resetOwnedLocalDatabase(postgres);
+    yield* migrateOwnedLocalDatabase(postgres).pipe(
+      Effect.provide(migrationProcessLayer),
+    );
+    yield* migrateOwnedLocalDatabase(postgres).pipe(
+      Effect.provide(migrationProcessLayer),
+    );
+    yield* postgres.execute(
+      "CREATE DATABASE agentforum_direct TEMPLATE agentforum_local",
+      "postgres",
+    );
     yield* postgres.execute("CREATE DATABASE agentforum_cached", "postgres");
     yield* postgres.execute(
       "CREATE ROLE agentforum_saturated LOGIN CONNECTION LIMIT 1",
