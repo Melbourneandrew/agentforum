@@ -1,4 +1,3 @@
-import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,68 +10,20 @@ import {
   localDatabaseFaultsLayer,
 } from "./local-database-faults.js";
 
+import { migrationProcessLayer } from "./migrations.js";
+import { verifyLocalMigrations } from "./verify-local-migrations.js";
+
+import { ownedProcess } from "./owned-process.js";
+
 class TestHarnessError extends Data.TaggedError("TestHarnessError") {}
-const missingProcess = Schema.Struct({ code: Schema.Literal("ESRCH") });
-interface ProcessLease {
-  readonly child: ChildProcess;
-  readonly completion: Promise<number>;
-}
-const stopProcess = (lease: ProcessLease) =>
-  Effect.tryPromise({
-    try: async () => {
-      const pid = lease.child.pid;
-      if (pid === undefined) return;
-      const kill = (signal: NodeJS.Signals) => {
-        try {
-          process.kill(-pid, signal);
-        } catch (error) {
-          if (Schema.decodeUnknownEither(missingProcess)(error)._tag === "Left")
-            throw new TestHarnessError();
-        }
-      };
-      kill("SIGTERM");
-      if (lease.child.exitCode !== null || lease.child.signalCode !== null)
-        return;
-      await new Promise<void>((done, reject) => {
-        const timer = setTimeout(() => {
-          try {
-            kill("SIGKILL");
-            done();
-          } catch {
-            reject(new TestHarnessError());
-          }
-        }, 3_000);
-        void lease.completion.then(() => {
-          clearTimeout(timer);
-          done();
-        });
-      });
-    },
-    catch: () => new TestHarnessError(),
-  }).pipe(Effect.orDie);
 const processLease = (
   args: readonly string[],
   environment: Readonly<Record<string, string>> = {},
 ) =>
-  Effect.acquireRelease(
-    Effect.sync(() => {
-      const child = spawn("pnpm", ["exec", ...args], {
-        detached: true,
-        stdio: "inherit",
-        env: { ...process.env, WRANGLER_SEND_METRICS: "false", ...environment },
-      });
-      const completion = new Promise<number>((done) => {
-        child.once("error", () => {
-          done(1);
-        });
-        child.once("exit", (code) => {
-          done(code ?? 1);
-        });
-      });
-      return { child, completion };
-    }),
-    stopProcess,
-  );
+  ownedProcess("pnpm", ["exec", ...args], {
+    output: "inherit",
+    environment: { WRANGLER_SEND_METRICS: "false", ...environment },
+  });
 const runVitest = (
   args: readonly string[],
   environment: Readonly<Record<string, string>> = {},
@@ -85,7 +36,7 @@ const runVitest = (
       );
       yield* Effect.promise(() => lease.completion).pipe(
         Effect.filterOrFail(
-          (code) => code === 0,
+          (result) => result.code === 0,
           () => new TestHarnessError(),
         ),
       );
@@ -207,6 +158,7 @@ const databaseTests = Effect.scoped(
   Effect.gen(function* () {
     const postgres = yield* LocalPostgres;
     const faults = yield* LocalDatabaseFaults;
+    yield* verifyLocalMigrations.pipe(Effect.provide(migrationProcessLayer));
     yield* postgres.execute("CREATE DATABASE agentforum_direct", "postgres");
     yield* postgres.execute("CREATE DATABASE agentforum_cached", "postgres");
     yield* postgres.execute(
@@ -251,7 +203,10 @@ const abort = () => {
 process.once("SIGINT", abort);
 process.once("SIGTERM", abort);
 const outcome = await Effect.runPromiseExit(
-  runVitest([]).pipe(Effect.zipRight(databaseTests)),
+  runVitest([]).pipe(
+    Effect.zipRight(runVitest(["--config", "vitest.tooling.config.mjs"])),
+    Effect.zipRight(databaseTests),
+  ),
   { signal: controller.signal },
 );
 process.removeListener("SIGINT", abort);

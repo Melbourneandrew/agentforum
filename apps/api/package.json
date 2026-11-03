@@ -12,7 +12,11 @@
     "test": "tsx scripts/test-with-postgres.ts",
     "contract:generate": "tsx scripts/generate-contract.ts",
     "contract:check": "tsx scripts/verify-contract.ts",
-    "bundle:smoke": "tsx scripts/bundle-smoke.ts"
+    "bundle:smoke": "tsx scripts/bundle-smoke.ts",
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts && prettier --write migrations",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:dev": "tsx scripts/database-dev.ts",
+    "db:reset": "tsx scripts/reset-local.ts"
   },
   "dependencies": {
     "@agentforum/discovery-assets": "workspace:*",
@@ -27,9 +31,10 @@
     "@cloudflare/workers-types": "5.20261102.1",
     "@types/pg": "8.23.1",
     "drizzle-kit": "0.31.11",
-    "tsx": "4.23.15",
-    "wrangler": "4.156.2",
+    "gel": "2.2.1",
+    "jsonc-parser": "3.3.1",
     "mysql2": "3.24.6",
-    "gel": "2.2.1"
+    "tsx": "4.23.15",
+    "wrangler": "4.156.2"
   }
 }

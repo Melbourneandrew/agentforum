@@ -73,8 +73,8 @@ Wrangler loads the auth token from a mode-0600 `.dev.vars` file and hides it.
 
 No public database route or final product schema has been added. The timeout
 problem schema is recognized narrowly at the production boundary; undeclared or
-malformed failures remain generic 500s. Direct-origin migration/reset commands
-and complete deployable provider probes are still in progress. Native PostgreSQL
+malformed failures remain generic 500s. Direct-origin migration/reset commands are implemented;
+complete deployable provider probes are still in progress. Native PostgreSQL
 cancellation evidence is not a Hyperdrive guarantee; real provider verification
 belongs to the delivery order and must not be inferred from local routing tests.
 
@@ -126,9 +126,42 @@ contracts do not advertise database errors or database readiness.
 - [x] Native commit, rollback, interruption, cancellation-race and release proof.
 - [x] Native origin saturation, default acquisition deadline and frontend cleanup.
 - [x] Narrow declared HTTP 503 mapping, Retry-After and secret-safe diagnostics.
-- [ ] Direct-origin migrations and safe owned-local development/reset commands.
+- [x] Direct-origin migrations and safe owned-local development/reset commands.
 - [ ] Deployable private transaction/cleanup/provider smoke fixtures.
 - [ ] Final CI guidance, clean-checkout verification, exact-head remote CI and PR delivery.
 
 Actual Hyperdrive/deployment guarantees remain separate delivery evidence; no
 public activation or paid resource provisioning is authorized here.
+
+## Migration and local command safety
+
+- `pnpm --filter @agentforum/api db:generate` uses credential-free configuration.
+  The product schema and generated baseline journal are deliberately empty; final
+  identity/posts schemas belong to their owning orders.
+- `pnpm --filter @agentforum/api db:dev` owns a new disposable container, applies
+  repository migrations and runs the actual local API Worker (default port 8787;
+  override `LOCAL_API_PORT`). Ctrl-C/SIGTERM closes its Worker group, descriptor
+  lease and container. Both local bindings address the same local database;
+  this does not emulate Hyperdrive caching.
+- `pnpm --filter @agentforum/api db:reset` accepts no arguments. It verifies the
+  live mode-0600 `.wrangler/local-postgres.json` descriptor against the exact
+  Docker ID, ownership label and loopback port, resets only `agentforum_local`
+  (including the migration journal), and reapplies repository migrations.
+  A second dev session refuses an existing descriptor; it never overwrites it.
+- `pnpm --filter @agentforum/api db:migrate` requires dedicated
+  `MIGRATION_DATABASE_URL` in GitHub Actions, direct-origin port 5432 and verified
+  TLS. Runtime Hyperdrive bindings are never a fallback. The Actions flag is
+  accidental-use protection, **not** authorization; delivery must provide
+  properly scoped credentials and environment access.
+- Temporary migration configs are mode 0600 and scoped. Captured CLI output is
+  credential-redacted, UTF-8-safe and limited to 8 MiB; migration execution is
+  bounded to 120 seconds. Owned process groups receive TERM then KILL even if
+  their leader exits before a descendant.
+
+Mandatory verification includes real pinned drizzle-kit generation/application,
+reapplication and whole-database reset/reapplication; wrong port/ID refusal with
+synthetic data preserved; actual local dev/reset invocation; descriptor mode;
+remote-argument refusal; UTF-8 capture, bounded overflow and TERM-resistant
+child teardown. The verified milestone has 48 API tests (27 ordinary workerd,
+9 Node tooling and 12 native PostgreSQL/workerd), plus real migration proof.
+These are local results, not remote CI, direct-origin connectivity or deployment.

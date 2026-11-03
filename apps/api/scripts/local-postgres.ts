@@ -203,8 +203,11 @@ export const localPostgresLayer = Layer.scoped(LocalPostgres, local).pipe(
 
 // Reset never accepts a URL, migration environment variable, remote Docker host or
 // arbitrary database name. The exact local container, label and port must match.
-export const resetOwnedLocalDatabase = (descriptor: Descriptor) =>
+const verifiedDescriptor = (input: unknown) =>
   Effect.gen(function* () {
+    const descriptor = yield* Schema.decodeUnknown(LocalDescriptor)(input).pipe(
+      Effect.mapError(() => new LocalPostgresError()),
+    );
     const docker = yield* Docker;
     const id = yield* ownedId(docker, descriptor.name);
     yield* Effect.filterOrFail(
@@ -228,9 +231,24 @@ export const resetOwnedLocalDatabase = (descriptor: Descriptor) =>
       (value) => value === descriptor.port,
       () => new LocalPostgresError(),
     );
+    return descriptor;
+  });
+export const ownedLocalDatabaseUrl = (input: unknown) =>
+  verifiedDescriptor(input).pipe(
+    Effect.map((descriptor) =>
+      Redacted.make(
+        `postgresql://postgres@127.0.0.1:${String(descriptor.port)}/agentforum_local`,
+      ),
+    ),
+    Effect.provide(dockerLayer),
+  );
+export const resetOwnedLocalDatabase = (input: unknown) =>
+  Effect.gen(function* () {
+    const descriptor = yield* verifiedDescriptor(input);
+    const docker = yield* Docker;
     yield* docker.run([
       "exec",
-      id,
+      descriptor.id,
       "psql",
       "--no-psqlrc",
       "--username",

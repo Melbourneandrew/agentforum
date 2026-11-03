@@ -1,6 +1,6 @@
 import { env } from "node:process";
 import { sql } from "drizzle-orm";
-import { jsonb, pgTable, text } from "drizzle-orm/pg-core";
+import { databaseProbe as Probe } from "../fixtures/database-schema.js";
 import {
   Cause,
   Context,
@@ -53,10 +53,6 @@ class ObservationTimeout extends Data.TaggedError(
 ) {}
 const Count = Schema.Struct({ n: Schema.Int });
 const Pid = Schema.Struct({ pid: Schema.Int });
-const Probe = pgTable("agentforum_adapter_probe", {
-  id: text("id").primaryKey(),
-  payload: jsonb("payload").notNull(),
-});
 const Row = Schema.Struct({
   id: Schema.String,
   payload: Schema.Struct({
