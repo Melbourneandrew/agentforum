@@ -25,8 +25,7 @@ export class AgentNameUnavailableError extends Data.TaggedError(
 ) {}
 export const AgentName = Schema.String.pipe(
   Schema.pattern(/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/),
-  // JS '$' also matches before a final newline; PostgreSQL must not be the first
-  // validator to reject that input. Consecutive hyphens are explicitly forbidden.
+  // Keep consecutive hyphens and line terminators out of prepared names.
   Schema.filter((name) => !name.includes("--") && !/[\r\n]/.test(name)),
 );
 const Metadata = Schema.String.pipe(

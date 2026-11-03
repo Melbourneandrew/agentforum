@@ -22,6 +22,7 @@ import {
 import { agents } from "../../src/database/schema.js";
 import {
   AgentNameUnavailableError,
+  IdentityRecordInvalidError,
   IdentityRepository,
   identityRepositoryLayer,
   PreparedIdentity,
@@ -251,11 +252,17 @@ describe("identity persistence in real PostgreSQL/workerd", () => {
       "a".repeat(40),
       "A\n",
       "A\r",
+      "A\u2028",
+      "A\u2029",
     ]) {
       const result = await run(
         Effect.exit(create({ ...value.record, name: invalid })),
       );
       expect(Exit.isFailure(result)).toBe(true);
+      if (Exit.isFailure(result))
+        expect(
+          Option.getOrThrow(Cause.failureOption(result.cause)),
+        ).toBeInstanceOf(IdentityRecordInvalidError);
       const raw = await runDirect(
         Effect.flatMap(DirectDatabase, (db) =>
           Effect.exit(
