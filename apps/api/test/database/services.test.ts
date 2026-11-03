@@ -381,24 +381,21 @@ describe("transaction session lifetime", () => {
         yield* database.transaction((session) =>
           Effect.gen(function* () {
             yield* Effect.fork(
-              Deferred.succeed(entered, true)
-                .pipe(
-                  Effect.zipRight(Effect.sleep("200 millis")),
-                  Effect.zipRight(
-                    session.execute(
-                      (builder) =>
-                        builder.insert(Probe).values({ id: marker, payload }),
-                      Schema.Never,
-                    ),
-                  ),
-                )
-                .pipe(
-                  Effect.ensuring(
-                    Effect.sync(() => {
-                      childClosed = true;
-                    }),
+              Deferred.succeed(entered, true).pipe(
+                Effect.zipRight(Effect.sleep("200 millis")),
+                Effect.zipRight(
+                  session.execute(
+                    (builder) =>
+                      builder.insert(Probe).values({ id: marker, payload }),
+                    Schema.Never,
                   ),
                 ),
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    childClosed = true;
+                  }),
+                ),
+              ),
             );
             yield* Deferred.await(entered);
           }),

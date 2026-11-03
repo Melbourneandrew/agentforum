@@ -35,6 +35,8 @@ jobs:
         run: pnpm dependency:check
       - name: Check formatting, typed lint, strict types, Effect diagnostics and tooling tests
         run: pnpm check
+      - name: Verify generated database migration artifacts
+        run: pnpm --filter @agentforum/api db:generate
       - name: Validate generated API contract
         run: pnpm --filter @agentforum/api contract:check && pnpm --filter @agentforum/api contract:generate
       - name: Reject incompatible contract changes
