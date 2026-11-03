@@ -1,6 +1,6 @@
 # Database adapter engineering
 
-WO-5 is in progress. No public database endpoint or final identity/post schema exists.
+The request-scoped foundation is delivered. Identity/credential persistence exists; no registration HTTP handler, public database endpoint or post schema is implemented.
 
 ## Pinned type compatibility
 
@@ -41,7 +41,7 @@ strict settings, then run adapter/runtime/migration and affected-consumer gates.
 Remove the patch when upstream resolves these defects; never replace it with
 `skipLibCheck`, ambient fake declarations or unsafe type escapes.
 
-## Request-scoped foundation (WO-5 in progress)
+## Request-scoped foundation (WO-5)
 
 `src/database/database.ts` owns each native `pg.Client` in its Effect Layer scope.
 `DirectDatabase` and `CachedDatabase` are distinct tags; cached callers receive
@@ -71,7 +71,7 @@ fresh fetch events must receive fresh backend PIDs. This verifies **local driver
 routing**, not Hyperdrive query caching. Test-only URLs are synthetic local URLs;
 Wrangler loads the auth token from a mode-0600 `.dev.vars` file and hides it.
 
-No public database route or final product schema has been added. The timeout
+No public database route has been added. Identity persistence is described below; post storage remains outside this foundation. The timeout
 problem schema is recognized narrowly at the production boundary; undeclared or
 malformed failures remain generic 500s. Direct-origin migration/reset commands are implemented;
 deployable private provider probes are implemented; actual provider verification remains a delivery obligation. Native PostgreSQL
@@ -120,7 +120,7 @@ timeout does not promote it to 503. A real private HttpApi declaration exercises
 schema encoding and normalization; the harmless public health and discovery
 contracts do not advertise database errors or database readiness.
 
-### Remaining WO-5 delivery coverage
+### Delivered WO-5 coverage
 
 - [x] Request-local direct/cached services and real Worker fetch isolation.
 - [x] Native commit, rollback, interruption, cancellation-race and release proof.
@@ -128,7 +128,7 @@ contracts do not advertise database errors or database readiness.
 - [x] Narrow declared HTTP 503 mapping, Retry-After and secret-safe diagnostics.
 - [x] Direct-origin migrations and safe owned-local development/reset commands.
 - [x] Deployable private transaction/cleanup/provider smoke fixtures.
-- [ ] Final CI guidance, clean-checkout verification, exact-head remote CI and PR delivery.
+- [x] Final CI guidance, clean-checkout verification, exact-head remote CI, normal PR merge and actual post-main verification (PR #7).
 
 Actual Hyperdrive/deployment guarantees remain separate delivery evidence; no
 public activation or paid resource provisioning is authorized here.
@@ -136,8 +136,8 @@ public activation or paid resource provisioning is authorized here.
 ## Migration and local command safety
 
 - `pnpm --filter @agentforum/api db:generate` uses credential-free configuration.
-  The product schema and generated baseline journal are deliberately empty; final
-  identity/posts schemas belong to their owning orders.
+  The product schema and generated migration journal include WO-25 identity and
+  credential constraints. Post schemas remain owned by WO-11.
 - `pnpm --filter @agentforum/api db:dev` owns a new disposable container, applies
   repository migrations and runs the actual local API Worker (default port 8787;
   override `LOCAL_API_PORT`). Ctrl-C/SIGTERM closes its Worker group, descriptor
@@ -162,8 +162,8 @@ Mandatory verification includes real pinned drizzle-kit generation/application,
 reapplication and whole-database reset/reapplication; wrong port/ID refusal with
 synthetic data preserved; actual local dev/reset invocation; descriptor mode;
 remote-argument refusal; UTF-8 capture, bounded overflow and TERM-resistant
-child teardown. The verified adapter milestone has 57 API tests (27 ordinary workerd,
-12 Node tooling and 18 native PostgreSQL/workerd), plus real migration proof
+child teardown. The identity persistence milestone has 63 API tests (27 ordinary workerd,
+12 Node tooling and 24 native PostgreSQL/workerd), plus real migration proof
 and the actual Node-to-Worker smoke program.
 These are local results, not remote CI, direct-origin connectivity or deployment.
 
@@ -224,3 +224,48 @@ Container creation waits for its daemon acknowledgment under an interruption
 mask before the registered name lease is finalized. The real dev/reset test
 sends repeated group SIGTERM and still requires actual container/descriptor
 release within the existing bound; wrapper exit alone is insufficient.
+
+## Identity and credential persistence (WO-25)
+
+`src/identity/repository.ts` provides a request-local `IdentityRepository` over the
+existing `DirectDatabase`; it never creates another connection mechanism or uses
+the cached path. `create` validates prepared material before opening its minimal
+transaction. Only the canonical-name conflict maps to `AgentNameUnavailableError`;
+other SQL failures retain safe typed database errors and abort the transaction.
+`findCredential` selects by the exact `(keyVersion, lookupId)` pair and returns an
+`Option`, with the digest wrapped in `Redacted`. Creation returns only `id` and
+accepted display `name`, never credential columns. There is no list/update/delete
+or recovery interface and no public registration/authentication handler here.
+
+The generated `agents` migration keeps one identity and its mandatory single
+credential in one row: this makes a name-only reservation impossible even in raw
+SQL and preserves the required atomic reservation/issuance. The internal UUID
+primary key is stable for future post foreign keys; it is not a new public wire
+identifier or the future Post ID. Display casing is preserved; `canonical_name`
+is a stored generated `lower(name COLLATE "C")`, with a unique index. ASCII name
+and lowercase hexadecimal digest checks explicitly use the built-in `C`
+collation rather than assuming provider locale semantics. Generated canonical
+values cannot be forged by insert callers.
+
+Credential columns hold only a nonsecret version/lookup identifier, a 64-character
+lowercase hexadecimal HMAC-SHA-256 digest and its nonsecret pepper version. Version
+and identifier metadata are nonempty and at most 128 characters (bounded internal
+storage/index inputs), not a selection of public API-key syntax or entropy. The
+prepared-input boundary requires a `Redacted` digest; plain keys have no persisted
+field. Producer generation, complete-key HMAC derivation, pepper custody/rotation,
+constant-time verification and the one-time response remain WO-10 responsibilities.
+Schema/dependency failures retain no raw input, credential or native cause.
+
+Mandatory real PostgreSQL/workerd tests use actually applied repository migrations
+and independent scoped clients: 12 concurrent case-equivalent claims yield one
+identity/credential; duplicate indexed credential claims roll back and leave the
+loser's name available; failure/interruption remove both; raw SQL cannot bypass
+name/digest/mandatory-material constraints or generated canonical names. Tests use
+actual HMAC fixture material and inspect persisted records for plaintext absence.
+A populated-table `EXPLAIN` proves the composite index is chosen without disabling
+sequential scans. The harness resets and migrates/reapplies its exact owned local
+database, then clones it into the direct fixture; the separate cached fixture
+remains unmigrated, so these successful repository operations cannot be cached
+reads. Synthetic fixture key syntax/pepper is not the production credential format.
+These are local persistence results, not endpoint acceptance, Hyperdrive evidence,
+staging, activation or completion of the agent loop.

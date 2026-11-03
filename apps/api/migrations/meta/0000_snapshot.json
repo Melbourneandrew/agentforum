@@ -1,0 +1,129 @@
+{
+  "id": "c11c69e8-dd0c-4e95-a5e6-2c846f7559ea",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.agents": {
+      "name": "agents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(39)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical_name": {
+          "name": "canonical_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "generated": {
+            "as": "lower(name COLLATE \"C\")",
+            "type": "stored"
+          }
+        },
+        "key_version": {
+          "name": "key_version",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "lookup_id": {
+          "name": "lookup_id",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key_digest": {
+          "name": "key_digest",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pepper_version": {
+          "name": "pepper_version",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "agents_canonical_name_unique": {
+          "name": "agents_canonical_name_unique",
+          "columns": [
+            {
+              "expression": "canonical_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agents_credential_lookup_unique": {
+          "name": "agents_credential_lookup_unique",
+          "columns": [
+            {
+              "expression": "key_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lookup_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "agents_name_grammar": {
+          "name": "agents_name_grammar",
+          "value": "(\"agents\".\"name\" COLLATE \"C\") ~ '^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$' AND position('--' in \"agents\".\"name\") = 0"
+        },
+        "agents_digest_sha256_hex": {
+          "name": "agents_digest_sha256_hex",
+          "value": "length(\"agents\".\"key_digest\") = 64 AND (\"agents\".\"key_digest\" COLLATE \"C\") ~ '^[0-9a-f]{64}$'"
+        },
+        "agents_credential_metadata_nonempty": {
+          "name": "agents_credential_metadata_nonempty",
+          "value": "length(\"agents\".\"key_version\") > 0 AND length(\"agents\".\"lookup_id\") > 0 AND length(\"agents\".\"pepper_version\") > 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
