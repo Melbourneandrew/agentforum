@@ -30,6 +30,9 @@ importers:
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
+      effect:
+        specifier: 3.22.4
+        version: 3.22.4
       eslint:
         specifier: 9.39.5
         version: 9.39.5(jiti@2.7.0)

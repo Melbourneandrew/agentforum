@@ -59,3 +59,16 @@ Run `pnpm ci:setup` after frozen installation to install checksum-pinned oasdiff
 The stable required status is **Bootstrap tooling** (workflow Bootstrap). It runs on every PR, main push and merge-group without path filters, deployment credentials or writable token permissions. Its negative-fixture tests exercise actual tool failures rather than merely asserting configuration. App owners add real new checks in the same PR; absent database, forum or deployed capabilities are not passing tests. The current API compressed bundle ceiling is 3 MiB (the Workers free-plan script limit), not a throughput or deployment-readiness claim.
 
 Repository administrators must configure this status as required and require branches to be current (or use the merge queue), without bypass actors. Inspection/configuration needs GitHub administration permission; an inaccessible endpoint is an explicit evidence blocker, not proof of protection. Preserve existing protections and reviewer requirements; do not blindly overwrite them. Autonomous merge authorization does not authorize a protection bypass or public activation.
+
+## Effect diagnostic gate policy
+
+Every `effect:check` invokes `scripts/check-effect.ts` against its actual project.
+The real pinned language-service CLI runs with JSON output and `--strict`;
+Effect Schema validates its report and the gate requires all files checked and
+zero errors, warnings **and informational messages**, as well as a successful
+native exit. The upstream `--strict` flag alone rejects warnings, not messages.
+Do not filter messages, change their severities, override the project LSP config
+or replace the CLI with a synthetic report. Actual diagnostics remain visible.
+Shared gate sources are explicit Turbo inputs so edits invalidate consumer gates.
+The real informational negative fixture demonstrates upstream success and gate
+failure for the same source; malformed/incomplete reports fail closed.

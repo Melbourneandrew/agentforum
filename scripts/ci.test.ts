@@ -157,6 +157,42 @@ describe("required gates detect real introduced failures", () => {
     );
   }, 60_000);
 
+  it("rejects a genuine informational Effect diagnostic even when the pinned CLI exits zero", () => {
+    const path = "apps/api/test/ci-probe.ts";
+    writeFileSync(
+      path,
+      'import { Effect } from "effect";\nexport const message = Effect.succeed(1).pipe(Effect.map((n) => n + 1)).pipe(Effect.map((n) => n + 1));\n',
+      { flag: "wx" },
+    );
+    try {
+      const upstream = execute("pnpm", [
+        "--filter",
+        "@agentforum/api",
+        "exec",
+        "effect-language-service",
+        "diagnostics",
+        "--strict",
+        "--format",
+        "json",
+        "--project",
+        "tsconfig.json",
+      ]);
+      expect(upstream.status).toBe(0);
+      expect(upstream.output).toContain('"name": "unnecessaryPipeChain"');
+      expect(upstream.output).toContain('"severity": "message"');
+      const gated = execute("pnpm", [
+        "--filter",
+        "@agentforum/api",
+        "effect:check",
+      ]);
+      expect(gated.status).not.toBe(0);
+      expect(gated.output).toContain('"name": "unnecessaryPipeChain"');
+      expect(gated.output).toContain("zero errors, warnings and messages");
+    } finally {
+      rmSync(path);
+    }
+  }, 60_000);
+
   it("rejects an actual failing unit test", () => {
     negativeFixture(
       "scripts/ci-probe.test.ts",
