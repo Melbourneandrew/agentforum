@@ -24,6 +24,14 @@ import {
 import { localDescriptorPath } from "../../scripts/local-descriptor.js";
 import { ownedProcess } from "../../scripts/owned-process.js";
 class LocalCliFailure extends Data.TaggedError("LocalCliFailure") {}
+const signalTermination = (pid: number) => {
+  try {
+    process.kill(-pid, "SIGTERM");
+  } catch (error) {
+    if (!Schema.is(Schema.Struct({ code: Schema.Literal("ESRCH") }))(error))
+      throw new LocalCliFailure();
+  }
+};
 const freePort = () =>
   new Promise<number>((done, reject) => {
     const server = createServer();
@@ -147,8 +155,14 @@ describe("actual owned-local commands", () => {
             () => new LocalCliFailure(),
           ).pipe(
             Effect.tap((pid) =>
-              Effect.sync(() => {
-                process.kill(-pid, "SIGTERM");
+              Effect.promise(async () => {
+                // Exercise duplicate wrapper-forwarded signals during finalization.
+                for (let attempt = 0; attempt < 3; attempt++) {
+                  signalTermination(pid);
+                  await new Promise<void>((done) => {
+                    setTimeout(done, 10);
+                  });
+                }
               }),
             ),
           );

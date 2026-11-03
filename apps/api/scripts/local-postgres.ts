@@ -1,5 +1,3 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import {
   Context,
   Data,
@@ -15,7 +13,7 @@ export const postgresImage =
 export class LocalPostgresError extends Data.TaggedError(
   "LocalPostgresError",
 ) {}
-const exec = promisify(execFile);
+import { ownedProcess } from "./owned-process.js";
 class Docker extends Context.Tag("@agentforum/tooling/Docker")<
   Docker,
   {
@@ -25,17 +23,30 @@ class Docker extends Context.Tag("@agentforum/tooling/Docker")<
   }
 >() {}
 const dockerLayer = Layer.succeed(Docker, {
+  // Cleanup commands must not inherit the dev CLI's signal group: wrappers can
+  // forward SIGTERM repeatedly while finalizers are inspecting/removing Docker.
   run: (args) =>
-    Effect.tryPromise({
-      try: (signal) =>
-        exec("docker", ["--host", "unix:///var/run/docker.sock", ...args], {
-          encoding: "utf8",
-          signal,
-          timeout: 240_000,
-          maxBuffer: 8 * 1024 * 1024,
-        }),
-      catch: () => new LocalPostgresError(),
-    }).pipe(Effect.map((result) => result.stdout)),
+    Effect.scoped(
+      Effect.gen(function* () {
+        const lease = yield* ownedProcess(
+          "docker",
+          ["--host", "unix:///var/run/docker.sock", ...args],
+          { output: "capture", environment: {} },
+        );
+        const result = yield* Effect.promise(() => lease.completion).pipe(
+          Effect.timeoutFail({
+            duration: "240 seconds",
+            onTimeout: () => new LocalPostgresError(),
+          }),
+        );
+        yield* Effect.filterOrFail(
+          Effect.succeed(result),
+          (value) => value.code === 0 && !value.overflow,
+          () => new LocalPostgresError(),
+        );
+        return result.stdout;
+      }),
+    ),
 });
 const Id = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{64}$/));
 const Mapping = Schema.parseJson(
@@ -137,6 +148,9 @@ const local = Effect.gen(function* () {
       "max_connections=30",
     ])
     .pipe(
+      // Do not interrupt container creation between daemon acceptance and CLI
+      // acknowledgment; the registered name finalizer then sees the real lease.
+      Effect.uninterruptible,
       Effect.flatMap((value) => Schema.decodeUnknown(Id)(value.trim())),
       Effect.mapError(() => new LocalPostgresError()),
     );

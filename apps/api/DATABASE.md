@@ -216,3 +216,11 @@ fails with a typed closed-session error before SQL construction/execution.
 Regression tests verify no escaped or late writes; callers must still join all
 intended work, and deliberately detached daemon work is not a supported
 transaction pattern. Commit acknowledgment/network uncertainty remains as above.
+
+Local CLI signal handlers remain installed until asynchronous finalizers finish.
+Docker commands have their own owned detached groups, so repeated signals
+forwarded by pnpm/tsx cannot kill a Docker inspection/removal during cleanup.
+Container creation waits for its daemon acknowledgment under an interruption
+mask before the registered name lease is finalized. The real dev/reset test
+sends repeated group SIGTERM and still requires actual container/descriptor
+release within the existing bound; wrapper exit alone is insufficient.

@@ -120,8 +120,10 @@ const controller = new AbortController();
 const abort = () => {
   controller.abort();
 };
-process.once("SIGINT", abort);
-process.once("SIGTERM", abort);
+// Wrappers can forward the same group signal again during asynchronous cleanup.
+// Keep handlers installed until every scoped finalizer has completed.
+process.on("SIGINT", abort);
+process.on("SIGTERM", abort);
 const result = await Effect.runPromiseExit(program, {
   signal: controller.signal,
 });
