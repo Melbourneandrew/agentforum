@@ -8,7 +8,7 @@
     "build": "pnpm discovery:prepare && tsx scripts/prepare-content.ts && react-router build && wrangler deploy --dry-run --outdir dist",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "react-router typegen && tsc --noEmit",
-    "effect:check": "effect-language-service diagnostics --strict --project tsconfig.json",
+    "effect:check": "tsx ../../scripts/check-effect.ts --project tsconfig.json",
     "test": "vitest run",
     "content:generate": "tsx scripts/prepare-content.ts",
     "bundle:smoke": "tsx scripts/bundle-smoke.ts",

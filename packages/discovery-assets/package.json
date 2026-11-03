@@ -12,7 +12,7 @@
     "build": "tsx scripts/build.ts",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "effect:check": "effect-language-service diagnostics --strict --project tsconfig.json",
+    "effect:check": "tsx ../../scripts/check-effect.ts --project tsconfig.json",
     "test": "vitest run"
   },
   "devDependencies": {

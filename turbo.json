@@ -16,7 +16,12 @@
       "outputs": []
     },
     "effect:check": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/check-effect.ts",
+        "$TURBO_ROOT$/scripts/effect-diagnostics.ts"
+      ]
     },
     "dev": {
       "cache": false,

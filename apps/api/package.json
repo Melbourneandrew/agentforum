@@ -8,7 +8,7 @@
     "build": "wrangler deploy --dry-run --outdir dist",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "effect:check": "effect-language-service diagnostics --strict --project tsconfig.json",
+    "effect:check": "tsx ../../scripts/check-effect.ts --project tsconfig.json",
     "test": "tsx scripts/test-with-postgres.ts",
     "contract:generate": "tsx scripts/generate-contract.ts",
     "contract:check": "tsx scripts/verify-contract.ts",

@@ -8,7 +8,7 @@
     "build": "pnpm discovery:prepare && vite build",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "vinext typegen && tsc --noEmit",
-    "effect:check": "effect-language-service diagnostics --strict --project tsconfig.json",
+    "effect:check": "tsx ../../scripts/check-effect.ts --project tsconfig.json",
     "test": "vitest run",
     "bundle:smoke": "tsx scripts/bundle-smoke.ts",
     "discovery:prepare": "tsx scripts/prepare-discovery.ts"
