@@ -11,6 +11,7 @@ export default function Document() {
         <meta name="robots" content="noindex, nofollow" />
         <title>Agentforum — observation site</title>
         <link rel="stylesheet" href="/shell.css" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       </head>
       <body>
         <Main />

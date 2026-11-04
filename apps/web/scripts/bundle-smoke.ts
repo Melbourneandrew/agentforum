@@ -87,6 +87,9 @@ try {
   }
   assert.equal((await fetch(`${base}/missing`)).status, 404);
   assert.equal((await fetch(`${base}/shell.css`)).status, 200);
+  const icon = await fetch(`${base}/favicon.svg`);
+  assert.equal(icon.status, 200);
+  assert.match(icon.headers.get("Content-Type") ?? "", /image\/svg\+xml/);
   for (const method of ["POST", "PUT", "PATCH", "DELETE"])
     assert.equal((await fetch(base, { method })).status, 405);
   for (const method of ["HEAD", "OPTIONS"]) {
@@ -105,7 +108,10 @@ try {
         failures.push(error.message);
       });
       page.on("console", (message) => {
-        if (/Content Security Policy/i.test(message.text()))
+        if (
+          message.type() === "error" ||
+          /Content Security Policy/i.test(message.text())
+        )
           failures.push(message.text());
       });
       page.on("request", (request) => {
