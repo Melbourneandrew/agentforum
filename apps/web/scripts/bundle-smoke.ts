@@ -80,7 +80,10 @@ try {
       html,
       path === "/" ? /A public view of agent activity/ : /Read-only by design/,
     );
-    assert.doesNotMatch(html, /<script\b|<form\b|<iframe\b|\bon\w+=/i);
+    assert.doesNotMatch(
+      html,
+      /<script\b|<form\b|<iframe\b|<[a-z][^>]*\son\w+=/i,
+    );
   }
   assert.equal((await fetch(`${base}/missing`)).status, 404);
   assert.equal((await fetch(`${base}/shell.css`)).status, 200);
@@ -97,6 +100,7 @@ try {
       const page = await browser.newPage({ viewport: { width, height: 900 } });
       const failures: string[] = [];
       const mutations: string[] = [];
+      const unexpectedRequests: string[] = [];
       page.on("pageerror", (error) => {
         failures.push(error.message);
       });
@@ -106,6 +110,12 @@ try {
       });
       page.on("request", (request) => {
         if (request.method() !== "GET") mutations.push(request.url());
+        const url = new URL(request.url());
+        if (
+          url.origin !== base ||
+          /\/v1\/(register|publish)/.test(url.pathname)
+        )
+          unexpectedRequests.push(request.url());
       });
       await page.goto(base);
       await page
@@ -135,6 +145,47 @@ try {
       await page
         .getByRole("heading", { name: "Read-only by design." })
         .waitFor();
+      const content = page.locator("article.untrusted-post");
+      assert.equal(await content.count(), 2);
+      const rendered = content.first();
+      assert.equal(await rendered.locator("table").count(), 1);
+      assert.match(
+        await rendered.innerText(),
+        /Untrusted Agent-authored content/,
+      );
+      assert.equal(
+        await content
+          .locator(
+            "script, iframe, img, svg, form, input, a[href], [src], [srcdoc], [style], [onload], [onerror]",
+          )
+          .count(),
+        0,
+      );
+      assert.equal(
+        await page.evaluate(() => document.body.dataset.contentExecuted),
+        undefined,
+      );
+      assert.equal(await rendered.locator(".untrusted-destination").count(), 4);
+      await rendered.getByText("Raw Markdown", { exact: true }).click();
+      assert.match(
+        await rendered.locator(".raw-markdown").innerText(),
+        /<script>/,
+      );
+      await rendered
+        .getByText("Structured metadata (JSON)", { exact: true })
+        .click();
+      assert.match(
+        await rendered.locator(".structured-metadata").innerText(),
+        /<script>active-looking data<\/script>/,
+      );
+      assert.match(
+        await content.last().getByRole("status").innerText(),
+        /Markdown can't be rendered/,
+      );
+      await rendered.locator(".untrusted-destination").first().hover();
+      await rendered.locator(".untrusted-destination").first().click();
+      await page.waitForTimeout(200);
+      assert.equal(page.url(), `${base}/runtime`);
       await page
         .getByRole("link", { name: "Return to observation site" })
         .click();
@@ -143,6 +194,7 @@ try {
         .waitFor();
       assert.deepEqual(failures, []);
       assert.deepEqual(mutations, []);
+      assert.deepEqual(unexpectedRequests, []);
       await page.evaluate(() => {
         const script = document.createElement("script");
         script.textContent = "document.body.dataset.cspProbe='executed'";

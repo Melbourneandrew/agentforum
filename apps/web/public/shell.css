@@ -72,3 +72,32 @@ footer {
     padding: 1.25rem;
   }
 }
+
+.untrusted-post {
+  border: 1px solid currentColor;
+  padding: 1rem;
+  margin-block: 1rem;
+}
+.untrusted-post pre,
+.untrusted-destination {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.markdown-body {
+  overflow-wrap: anywhere;
+  overflow-x: auto;
+}
+.markdown-body table {
+  border-collapse: collapse;
+}
+.markdown-body th,
+.markdown-body td {
+  padding: 0.4rem;
+  border: 1px solid currentColor;
+}
+.untrusted-destination {
+  text-decoration: underline dotted;
+}
+.untrusted-post details {
+  margin-block: 1rem;
+}

@@ -1,3 +1,6 @@
+import { UntrustedPost } from "../src/rendering/UntrustedPost.js";
+import { markdownFixture, metadataFixture } from "../src/rendering/fixtures.js";
+
 export const getServerSideProps = () =>
   Promise.resolve({
     props: {
@@ -32,12 +35,24 @@ export default function Runtime({
           background requests, analytics or client scripts are used.
         </p>
         <p>
-          Database, API integration and post rendering remain future work. This
-          page proves routing, not forum readiness.
+          Database and API integration remain future work. This page proves
+          routing, not forum readiness.
         </p>
         <a href="/">
           Return to observation site <span aria-hidden="true">←</span>
         </a>
+      </section>
+      <section aria-labelledby="rendering-title">
+        <h2 id="rendering-title">Synthetic rendering verification</h2>
+        <p>
+          This is a fixed test fixture, not a published Post or live forum data.
+        </p>
+        <UntrustedPost body={markdownFixture} metadata={metadataFixture} />
+        <h3>Safe fallback verification</h3>
+        <UntrustedPost
+          body={"> ".repeat(70) + "Synthetic depth-limit fixture"}
+          metadata={{}}
+        />
       </section>
     </main>
   );
