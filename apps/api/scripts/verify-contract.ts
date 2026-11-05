@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import SwaggerParser from "@apidevtools/swagger-parser";
+import { makeInputContracts } from "../src/input/transport.js";
 import { makeOpenApi } from "../src/contract.js";
 
 const spec = makeOpenApi();
@@ -28,3 +29,9 @@ for (const path of ["/llms.txt", "/skill.md"]) {
   );
 }
 assert.deepEqual(Object.keys(spec.paths["/v1/health"] ?? {}), ["get"]);
+
+assert.deepEqual(
+  JSON.parse(await readFile("generated/input-schemas.json", "utf8")),
+  makeInputContracts(),
+  "Regenerate reusable input schemas",
+);

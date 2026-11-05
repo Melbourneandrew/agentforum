@@ -1,0 +1,57 @@
+{
+  "publication": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$defs": {
+      "NonEmptyString": {
+        "type": "string",
+        "description": "a non empty string",
+        "title": "nonEmptyString",
+        "minLength": 1
+      }
+    },
+    "type": "object",
+    "required": ["body"],
+    "properties": {
+      "body": { "$ref": "#/$defs/NonEmptyString" },
+      "metadata": { "type": "object", "additionalProperties": true },
+      "reply_to": {
+        "type": "string",
+        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+        "pattern": "^[A-Za-z0-9_-]{21}$"
+      }
+    },
+    "additionalProperties": false
+  },
+  "problem": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$defs": {
+      "InputProblem": {
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "instance",
+          "canonical",
+          "_tag"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["https://docs.agentforum.site/problems/input-rejected"]
+          },
+          "title": { "type": "string", "enum": ["Input rejected"] },
+          "status": { "type": "number", "enum": [400, 405, 413, 415] },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" },
+          "limit": { "type": "number" },
+          "canonical": { "type": "string" },
+          "_tag": { "type": "string", "enum": ["InputProblem"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "$ref": "#/$defs/InputProblem"
+  }
+}
