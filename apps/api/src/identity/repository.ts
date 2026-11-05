@@ -16,6 +16,10 @@ import {
   DatabaseTransactionClosedError,
 } from "../database/database.js";
 import { agents } from "../database/schema.js";
+import {
+  OperationalTracing,
+  nativeOperationalTracingLayer,
+} from "../telemetry/operational-tracing.js";
 
 export class IdentityRecordInvalidError extends Data.TaggedError(
   "IdentityRecordInvalidError",
@@ -78,71 +82,83 @@ export class IdentityRepository extends Context.Tag(
 
 export const identityRepositoryLayer = Layer.effect(
   IdentityRepository,
-  Effect.map(DirectDatabase, (database) => ({
-    create: (input: unknown) =>
-      Schema.decodeUnknown(PreparedIdentity)(input).pipe(
-        // Never retain ParseError input/cause: it may contain credential material.
-        Effect.mapError(() => new IdentityRecordInvalidError()),
-        Effect.flatMap((record) =>
-          database.transaction((session) =>
-            session
-              .execute(
+  Effect.gen(function* () {
+    const database = yield* DirectDatabase;
+    const tracing = yield* OperationalTracing;
+    return {
+      create: (input: unknown) =>
+        tracing.operation(
+          "identity.insert",
+          Schema.decodeUnknown(PreparedIdentity)(input).pipe(
+            // Never retain ParseError input/cause: it may contain credential material.
+            Effect.mapError(() => new IdentityRecordInvalidError()),
+            Effect.flatMap((record) =>
+              database.transaction((session) =>
+                session
+                  .execute(
+                    (builder) =>
+                      builder
+                        .insert(agents)
+                        .values({
+                          name: record.name,
+                          keyVersion: record.keyVersion,
+                          lookupId: record.lookupId,
+                          keyDigest: Redacted.value(record.keyDigest),
+                          pepperVersion: record.pepperVersion,
+                        })
+                        .onConflictDoNothing({ target: agents.canonicalName })
+                        .returning({ id: agents.id, name: agents.name }),
+                    AgentRecord,
+                  )
+                  .pipe(
+                    Effect.filterOrFail(
+                      (rows) => rows.length !== 0,
+                      () => new AgentNameUnavailableError(),
+                    ),
+                    Effect.flatMap((rows) =>
+                      Schema.decodeUnknown(Schema.Tuple(AgentRecord))(
+                        rows,
+                      ).pipe(
+                        Effect.mapError(() => new DatabaseDecodeError()),
+                        Effect.map((value) => value[0]),
+                      ),
+                    ),
+                  ),
+              ),
+            ),
+          ),
+        ),
+      findCredential: (input: unknown) =>
+        tracing.operation(
+          "credential.lookup",
+          Schema.decodeUnknown(Lookup)(input).pipe(
+            Effect.mapError(() => new IdentityRecordInvalidError()),
+            Effect.flatMap((lookup) =>
+              database.execute(
                 (builder) =>
                   builder
-                    .insert(agents)
-                    .values({
-                      name: record.name,
-                      keyVersion: record.keyVersion,
-                      lookupId: record.lookupId,
-                      keyDigest: Redacted.value(record.keyDigest),
-                      pepperVersion: record.pepperVersion,
+                    .select({
+                      id: agents.id,
+                      name: agents.name,
+                      key_version: agents.keyVersion,
+                      lookup_id: agents.lookupId,
+                      key_digest: agents.keyDigest,
+                      pepper_version: agents.pepperVersion,
                     })
-                    .onConflictDoNothing({ target: agents.canonicalName })
-                    .returning({ id: agents.id, name: agents.name }),
-                AgentRecord,
-              )
-              .pipe(
-                Effect.filterOrFail(
-                  (rows) => rows.length !== 0,
-                  () => new AgentNameUnavailableError(),
-                ),
-                Effect.flatMap((rows) =>
-                  Schema.decodeUnknown(Schema.Tuple(AgentRecord))(rows).pipe(
-                    Effect.mapError(() => new DatabaseDecodeError()),
-                    Effect.map((value) => value[0]),
-                  ),
-                ),
+                    .from(agents)
+                    .where(
+                      and(
+                        eq(agents.keyVersion, lookup.keyVersion),
+                        eq(agents.lookupId, lookup.lookupId),
+                      ),
+                    )
+                    .limit(1),
+                CredentialRecord,
               ),
+            ),
+            Effect.map(Array.head),
           ),
         ),
-      ),
-    findCredential: (input: unknown) =>
-      Schema.decodeUnknown(Lookup)(input).pipe(
-        Effect.mapError(() => new IdentityRecordInvalidError()),
-        Effect.flatMap((lookup) =>
-          database.execute(
-            (builder) =>
-              builder
-                .select({
-                  id: agents.id,
-                  name: agents.name,
-                  key_version: agents.keyVersion,
-                  lookup_id: agents.lookupId,
-                  key_digest: agents.keyDigest,
-                  pepper_version: agents.pepperVersion,
-                })
-                .from(agents)
-                .where(
-                  and(
-                    eq(agents.keyVersion, lookup.keyVersion),
-                    eq(agents.lookupId, lookup.lookupId),
-                  ),
-                )
-                .limit(1),
-            CredentialRecord,
-          ),
-        ),
-        Effect.map(Array.head),
-      ),
-  })),
-);
+    };
+  }),
+).pipe(Layer.provide(nativeOperationalTracingLayer));

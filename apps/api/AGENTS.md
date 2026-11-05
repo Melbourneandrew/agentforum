@@ -51,3 +51,20 @@ scoped environment credentials, private transport, actual bindings and cleanup.
 Do not invoke remote setup/deploy from this workspace. Provider cancellation,
 HTTP-disconnect propagation, caching and deployed isolation remain separate
 executable delivery obligations, not conclusions from local tests.
+
+## Non-read operational tracing foundation
+
+See `TELEMETRY.md`. Identity insert and credential lookup now use the genuine
+native span API behind an Effect service with a closed vocabulary, same-fiber
+lifetime, safe outcomes and nonfatal instrumentation failures. No values or
+exceptions are published. SDK module declarations forward the genuine pinned
+`CloudflareWorkersModule` namespace unchanged; do not replace native modules or
+install conflicting global DOM types. Native automatic observability remains
+disabled: custom attributes do not sanitize automatic request spans. The seven
+new workerd cases distinguish real native compatibility from an injected driver
+contract, and actual PostgreSQL tests preserve repository guarantees. No exported
+capture, W3C propagation, correlation, destination failure, read telemetry,
+sampling/retention policy, OTLP configuration or deployment is claimed. WO-8
+retains those accepted-decision/provider gates; do not mark it Completed merely
+because its independently useful non-read milestone merges. No exporter/flush
+queue is present, so no synthetic waitUntil task is needed.
