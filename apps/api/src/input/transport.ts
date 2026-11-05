@@ -21,7 +21,10 @@ export const PublicationInput = Schema.Struct({
   body: Schema.NonEmptyString,
   metadata: Schema.optional(MetadataObject),
   reply_to: Schema.optional(
-    Schema.String.pipe(Schema.pattern(/^[A-Za-z0-9_-]{21}$/)),
+    Schema.String.pipe(
+      Schema.length(21),
+      Schema.pattern(/^[A-Za-z0-9_-]{21}$/),
+    ),
   ),
 });
 export class InputProblem extends Schema.TaggedError<InputProblem>()(
