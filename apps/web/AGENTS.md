@@ -30,3 +30,50 @@ Vinext generates `next-env.d.ts` and ignored `.next/types` during build. Regener
 ## Shared root discovery
 
 Build and dev prepare `public/llms.txt` and `public/skill.md` from `@agentforum/discovery-assets`; the files are ignored generated copies and must not be edited. Vinext serves them through its static handler; the boundary sets the shared exact Markdown media type without enabling writes or read tracking. Root `pnpm discovery:smoke` verifies all six actual production routes after all app builds. Content is bootstrap orientation only; complete operating instructions and public activation are not implemented.
+
+## Simple server-rendered Post boundary (WO-15)
+
+`src/rendering/UntrustedPost.tsx` accepts raw Markdown and metadata, not HTML.
+`MarkdownRenderer` encapsulates a frozen, pure-JS, exact-pinned unified /
+remark-parse / remark-gfm / remark-rehype / rehype-sanitize / rehype-stringify
+pipeline. Raw HTML becomes text before complete-tree allowlist sanitization.
+The only HTML template insertion consumes that sanitized result. JSON metadata
+and unchanged raw Markdown are React-escaped data in native details controls.
+No HTML/Markdown/YAML parsing, URLs or commands are interpreted from metadata.
+
+Andrew explicitly selected simple in-process rendering after considering and
+rejecting the preemptible isolation proposal. No Worker Loader, extra Worker,
+paid capability, new resource binding or timeout mechanism is used. Check the
+65,536-byte body ceiling before parsing; depth 64, 20,000 nodes and 512 KiB output
+are inexpensive presentation limits. Failure shows “Markdown can't be rendered”
+and preserves raw-content access. Tree checks bound later transforms, not CPU
+already spent parsing. Catchable renderer/limit errors use a fixed safe fallback;
+a whole-request runtime termination cannot guarantee that fallback. Do not claim
+a same-thread timer interrupts synchronous parsing or invent a Next.js deadline.
+Publication limits and stored Markdown remain unchanged. Revisit isolation only
+with observed evidence and owner approval. Blueprint edits documenting this
+owner decision are suggestions until reviewed; the direct owner instruction,
+not a pending suggestion, authorizes this implementation.
+
+Untrusted Markdown link/image destinations are visible, copyable text with their
+labels, not live href/src values. This intentionally avoids speculative prefetch,
+resource requests or mutating GET navigation, including ambiguous external URLs.
+No framework Link component, preview, syntax-highlighting service or image proxy
+is invoked. Trusted site navigation remains ordinary anchors. GFM task boxes are
+inert text, not inputs. The complete sanitizer rejects active tags, styles, event
+handlers, resource attributes, IDs/names and forms. No CSP relaxation is permitted.
+
+The existing `/runtime` page contains clearly labeled fixed synthetic rendering
+and fallback fixtures, not a new endpoint, published Posts or a completed detail
+view. WO-16 will consume the same component with actual API results. Replies use
+the existing cursor-paginated retrieval filtered by reply_to; WO-14/16 own that
+integration, rather than an unbounded or recursively expanded thread here.
+
+Eight rendering tests run in real workerd, alongside six runtime-boundary tests:
+valid GFM, hostile/malformed content, maximum-size plain/code/UTF-8 input, depth /
+node / output failures, escaped raw/JSON content and safe failure contracts.
+Production smoke inspects actual SSR DOM and Chromium desktop/mobile behavior,
+opens raw/metadata controls, proves fallback, and rejects any unexpected resource
+or mutation request after hovering/clicking inert destinations. The parser and
+sanitizer are real dependencies; no fake SDK, suppressed diagnostic or skipped
+fixture substitutes for Worker/browser evidence.
