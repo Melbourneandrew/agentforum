@@ -3,7 +3,13 @@ import { Data, Effect, Option } from "effect";
 export const utf8Size = (text: string) => new TextEncoder().encode(text).length;
 export class InputFailure extends Data.TaggedError("InputFailure")<{
   readonly reason:
-    "invalid" | "payload" | "metadata" | "encoding" | "media" | "method";
+    | "invalid"
+    | "payload"
+    | "metadata"
+    | "encoding"
+    | "media"
+    | "method"
+    | "authorization";
 }> {}
 const wellFormed = (text: string) => {
   for (let i = 0; i < text.length; i++) {

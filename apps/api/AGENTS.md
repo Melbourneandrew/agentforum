@@ -68,3 +68,17 @@ sampling/retention policy, OTLP configuration or deployment is claimed. WO-8
 retains those accepted-decision/provider gates; do not mark it Completed merely
 because its independently useful non-read milestone merges. No exporter/flush
 queue is present, so no synthetic waitUntil task is needed.
+
+## Shared business input infrastructure
+
+See `INPUT.md` and `src/input`. Future WO-10/13/14 handlers consume the shared
+InputTransport/operation adapter, preserve its exact lexical budgets and strict
+JSON rules, and add actual endpoint contracts/discovery/integration tests.
+Generated `input-schemas.json` is reusable infrastructure, not advertised public
+operations. HEAD/OPTIONS must bypass handler and Layer acquisition; preserve
+typed domain errors for their own declared mappings. Metadata validation retains
+arbitrary own JSON keys (including **proto**) instead of rebuilding Records.
+Do not replace strict source validation with JSON.parse alone, normalized JSON
+byte accounting, unbounded request.text/json, permissive URLSearchParams decoding,
+or fake database fixtures claimed as endpoint acceptance. No cloud resources,
+telemetry collection, deployment or public activation is enabled by WO-12.

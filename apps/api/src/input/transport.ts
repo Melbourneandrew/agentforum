@@ -31,9 +31,12 @@ export class InputProblem extends Schema.TaggedError<InputProblem>()(
       "https://docs.agentforum.site/problems/input-rejected",
     ),
     title: Schema.Literal("Input rejected"),
-    status: Schema.Literal(400, 405, 413, 415),
+    status: Schema.Literal(400, 401, 405, 413, 415),
     detail: Schema.String,
     instance: Schema.String,
+    issues: Schema.Array(
+      Schema.Struct({ location: Schema.Array(Schema.String) }),
+    ),
     limit: Schema.optional(Schema.Number),
     canonical: Schema.String,
   },
@@ -46,11 +49,13 @@ const problem = (failure: InputFailure, operation: Operation, id: string) => {
     status:
       reason === "payload" || reason === "metadata" || reason === "encoding"
         ? 413
-        : reason === "media"
-          ? 415
-          : reason === "method"
-            ? 405
-            : 400,
+        : reason === "authorization"
+          ? 401
+          : reason === "media"
+            ? 415
+            : reason === "method"
+              ? 405
+              : 400,
     detail:
       reason === "encoding"
         ? "The encoded GET URL exceeds 14336 UTF-8 bytes. Use canonical POST."
@@ -58,12 +63,15 @@ const problem = (failure: InputFailure, operation: Operation, id: string) => {
           ? "The client JSON document exceeds 65536 UTF-8 bytes."
           : reason === "metadata"
             ? "Metadata exceeds 16384 UTF-8 bytes."
-            : reason === "media"
-              ? "Use application/json with UTF-8 and identity content encoding."
-              : reason === "method"
-                ? "Use GET or POST; HEAD and OPTIONS never execute this operation."
-                : "The request does not match the input contract.",
+            : reason === "authorization"
+              ? "Supply a valid Authorization Bearer header."
+              : reason === "media"
+                ? "Use application/json with UTF-8 and identity content encoding."
+                : reason === "method"
+                  ? "Use GET or POST; HEAD and OPTIONS never execute this operation."
+                  : "The request does not match the input contract.",
     instance: `urn:uuid:${id}`,
+    issues: [{ location: [reason === "metadata" ? "metadata" : "request"] }],
     canonical: `/v1/${operation}`,
     ...(reason === "encoding"
       ? { limit: 14_336 }
@@ -168,10 +176,11 @@ export const bearerCredential = (request: Request) =>
       if (header === null) return Option.none<Redacted.Redacted>();
       const match = /^Bearer ([A-Za-z0-9._~-]+)$/i.exec(header);
       const key = match?.[1];
-      if (key === undefined) throw new InputFailure({ reason: "invalid" });
+      if (key === undefined)
+        throw new InputFailure({ reason: "authorization" });
       return Option.some(Redacted.make(key));
     },
-    catch: () => new InputFailure({ reason: "invalid" }),
+    catch: () => new InputFailure({ reason: "authorization" }),
   });
 export class InputTransport extends Context.Tag(
   "@agentforum/api/InputTransport",
@@ -262,6 +271,7 @@ export const runOperation = <A, I, E, R>(
         status: error.status,
         headers: {
           "Content-Type": "application/problem+json",
+          ...(error.status === 401 ? { "WWW-Authenticate": "Bearer" } : {}),
           ...(error.status === 405
             ? { Allow: "GET, POST, HEAD, OPTIONS" }
             : {}),

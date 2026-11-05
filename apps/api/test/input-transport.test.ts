@@ -234,6 +234,7 @@ describe("shared business input boundary in actual workerd", () => {
     expect(String(key)).not.toContain("test-key_secret");
     await reject(
       post('{"body":"x"}', { Authorization: "Bearer secret, Bearer other" }),
+      "authorization",
     );
   });
   it("bounds chunked bodies, cancels and unlocks the reader on failure", async () => {
@@ -366,6 +367,24 @@ describe("shared business input boundary in actual workerd", () => {
       if (error.status === 413) expect(error.limit).toBe(14_336);
     }
     expect(calls).toBe(2);
+  });
+  it("renders malformed Bearer input as a safe 401 challenge, not a validation 400", async () => {
+    const response = await Effect.runPromise(
+      runOperation(
+        post('{"body":"x"}', { Authorization: "Bearer secret, Bearer other" }),
+        "publish",
+        PublicationInput,
+        "id",
+        () => Effect.die("must not execute"),
+      ),
+    );
+    expect(response.status).toBe(401);
+    expect(response.headers.get("WWW-Authenticate")).toBe("Bearer");
+    const text = await response.text();
+    expect(text).not.toContain("secret");
+    expect(
+      Schema.decodeUnknownSync(Schema.parseJson(InputProblem))(text).issues,
+    ).toEqual([{ location: ["request"] }]);
   });
   it("preserves endpoint-specific typed failures and caller services without rerunning handlers", async () => {
     class DomainFailure extends Data.TaggedError("DomainFailure") {}

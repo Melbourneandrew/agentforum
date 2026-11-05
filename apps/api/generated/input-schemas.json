@@ -33,6 +33,7 @@
           "status",
           "detail",
           "instance",
+          "issues",
           "canonical",
           "_tag"
         ],
@@ -42,9 +43,20 @@
             "enum": ["https://docs.agentforum.site/problems/input-rejected"]
           },
           "title": { "type": "string", "enum": ["Input rejected"] },
-          "status": { "type": "number", "enum": [400, 405, 413, 415] },
+          "status": { "type": "number", "enum": [400, 401, 405, 413, 415] },
           "detail": { "type": "string" },
           "instance": { "type": "string" },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["location"],
+              "properties": {
+                "location": { "type": "array", "items": { "type": "string" } }
+              },
+              "additionalProperties": false
+            }
+          },
           "limit": { "type": "number" },
           "canonical": { "type": "string" },
           "_tag": { "type": "string", "enum": ["InputProblem"] }
