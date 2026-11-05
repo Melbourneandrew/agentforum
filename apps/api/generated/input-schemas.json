@@ -17,6 +17,9 @@
       "reply_to": {
         "type": "string",
         "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+        "title": "length(21)",
+        "minLength": 21,
+        "maxLength": 21,
         "pattern": "^[A-Za-z0-9_-]{21}$"
       }
     },

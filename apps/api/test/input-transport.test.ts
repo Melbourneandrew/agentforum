@@ -72,6 +72,16 @@ describe("shared business input boundary in actual workerd", () => {
     expect((await decode(new Request(exact)))._tag).toBe("Right");
     await reject(new Request(exact + "x"), "encoding");
   });
+  it.each(["\n", "\r", "\u2028", "\u2029"])(
+    "rejects trailing line terminators on fixed-length reply IDs: %j",
+    async (terminator) => {
+      const text = JSON.stringify({
+        body: "x",
+        reply_to: "abcdefghijklmnopqrstu" + terminator,
+      });
+      for (const request of [get(text), post(text)]) await reject(request);
+    },
+  );
   it("counts raw client JSON whitespace and escapes before server attributes or normalization", async () => {
     const text = JSON.stringify({
       body: "x".repeat(65_536 - utf8Size(JSON.stringify({ body: "" }))),
