@@ -1,3 +1,4 @@
+import { PostRecord } from "../../src/posts/contract.js";
 import { SearchResult } from "../../src/retrieval/contract.js";
 import { RegistrationSuccess } from "../../src/identity/contract.js";
 import { createServer } from "node:net";
@@ -107,6 +108,8 @@ describe("actual owned-local commands", () => {
               schedule: Schedule.spaced("100 millis"),
             }),
           );
+          const issued: Schema.Schema.Type<typeof RegistrationSuccess>[] = [];
+          const checkpoints: string[] = [];
           for (const method of ["GET", "POST"]) {
             const name = `OwnedLocal${method}Agent`;
             const result = yield* Effect.tryPromise({
@@ -138,6 +141,7 @@ describe("actual owned-local commands", () => {
               },
               catch: () => new LocalCliFailure(),
             }).pipe(Effect.flatMap(Schema.decodeUnknown(RegistrationSuccess)));
+            issued.push(result);
             expect(result.name).toBe(name);
             expect(Redacted.value(result.api_key).length).toBe(103);
           }
@@ -170,10 +174,106 @@ describe("actual owned-local commands", () => {
               },
               catch: () => new LocalCliFailure(),
             }).pipe(Effect.flatMap(Schema.decodeUnknown(SearchResult)));
+            checkpoints.push(value.read_cursor);
             expect(value.posts).toEqual([]);
             expect(value.has_more).toBe(false);
             expect(Option.isNone(value.page_cursor)).toBe(true);
           }
+          const required = <A>(value: A | undefined) =>
+            Option.match(Option.fromNullable(value), {
+              onNone: () => Effect.fail(new LocalCliFailure()),
+              onSome: Effect.succeed,
+            });
+          const first = yield* required(issued[0]),
+            second = yield* required(issued[1]);
+          const checkpoint = yield* required(checkpoints[0]);
+          const call = <A, I>(
+            operation: "publish" | "search",
+            method: "GET" | "POST",
+            document: Record<string, unknown>,
+            schema: Schema.Schema<A, I>,
+            credential: Option.Option<Redacted.Redacted> = Option.none(),
+          ) =>
+            Effect.tryPromise({
+              try: async (signal) => {
+                const json = JSON.stringify(document);
+                const response = await fetch(
+                  `${origin}/v1/${operation}` +
+                    (method === "GET"
+                      ? "?payload=" + encodeURIComponent(json)
+                      : ""),
+                  {
+                    method,
+                    signal: AbortSignal.any([
+                      signal,
+                      AbortSignal.timeout(5000),
+                    ]),
+                    headers: {
+                      ...(method === "POST"
+                        ? { "Content-Type": "application/json" }
+                        : {}),
+                      ...Option.match(credential, {
+                        onNone: () => ({}),
+                        onSome: (key) => ({
+                          Authorization: `Bearer ${Redacted.value(key)}`,
+                        }),
+                      }),
+                    },
+                    ...(method === "POST" ? { body: json } : {}),
+                  },
+                );
+                expect(response.status).toBe(
+                  operation === "publish" ? 201 : 200,
+                );
+                expect(response.headers.get("Cache-Control")).toBe(
+                  "no-store, private",
+                );
+                const result: unknown = await response.json();
+                return result;
+              },
+              catch: () => new LocalCliFailure(),
+            }).pipe(Effect.flatMap(Schema.decodeUnknown(schema)));
+          const post = yield* call(
+            "publish",
+            "GET",
+            { body: "owned network Post", metadata: { n: 1, b: false } },
+            PostRecord,
+            Option.some(first.api_key),
+          );
+          const reply = yield* call(
+            "publish",
+            "POST",
+            { body: "owned network Reply", reply_to: post.id },
+            PostRecord,
+            Option.some(second.api_key),
+          );
+          expect(post.author_id).toBe(first.id);
+          expect(reply.author_id).toBe(second.id);
+          expect(Option.getOrThrow(reply.reply_to_id)).toBe(post.id);
+          const one = yield* call(
+            "search",
+            "GET",
+            { read_cursor: checkpoint, limit: 1 },
+            SearchResult,
+          );
+          expect(one.posts.map((value) => value.id)).toEqual([post.id]);
+          expect(one.has_more).toBe(true);
+          const two = yield* call(
+            "search",
+            "POST",
+            { read_cursor: one.read_cursor, limit: 1 },
+            SearchResult,
+          );
+          expect(two.posts.map((value) => value.id)).toEqual([reply.id]);
+          expect(two.has_more).toBe(false);
+          const empty = yield* call(
+            "search",
+            "GET",
+            { read_cursor: two.read_cursor },
+            SearchResult,
+          );
+          expect(empty.posts).toEqual([]);
+          expect(empty.read_cursor).toBe(two.read_cursor);
           const descriptor = yield* Effect.tryPromise({
             try: () => readFile(localDescriptorPath, "utf8"),
             catch: () => new LocalCliFailure(),

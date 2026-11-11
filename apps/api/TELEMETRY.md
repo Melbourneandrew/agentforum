@@ -6,7 +6,7 @@
 existing identity repository wraps `create` and `findCredential` with
 `identity.insert` and `credential.lookup` spans. These are implemented material
 persistence/authentication dependencies, not invented endpoint spans. HTTP
-registration/authentication remain WO-10/12. No public Post/Agent read is
+registration/authentication and publishing now consume these real operations. No public Post/Agent read is
 instrumented, and no successful request/view log or metrics dimension is added.
 
 The operation vocabulary is closed and runtime-validated. Attributes contain
@@ -29,6 +29,17 @@ network exporter, batch queue or flush task; therefore there is no invented
 `waitUntil` job. Future actual async telemetry work must use the real execution
 context and must not delay the response. Instrumentation overhead is not a
 zero-latency guarantee or a whole-request termination guarantee.
+
+## Publication write extension (WO-13)
+
+The closed vocabulary additionally covers `publication.edge_signal`,
+`publication.rate_limit` and `publication.transaction`. The edge category is
+explicitly non-PostgreSQL; compound window/transaction operations use a fixed
+TRANSACTION dimension. Actual SQL/clock/order and same-fiber lifetime are preserved.
+No reads/queries for observation, result values or credential-derived hashes are
+span attributes. Native binding compatibility and real SQL decisions are tested
+separately from injected lifecycle contracts. Automatic observability remains off;
+no export/retention/propagation or provider acceptance is newly claimed.
 
 ## Genuine SDK types, not a replacement SDK
 

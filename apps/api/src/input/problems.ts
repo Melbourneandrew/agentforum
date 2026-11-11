@@ -40,7 +40,7 @@ export const readProblemBody = <A, I>(
 export const recognizeInputProblem = (
   value: InputProblem,
   status: number,
-  operation: "register" | "search",
+  operation: "register" | "search" | "publish",
   id: string,
 ): Option.Option<InputProblem> => {
   if (value.status !== status || value.canonical !== `/v1/${operation}`)
@@ -51,7 +51,9 @@ export const recognizeInputProblem = (
     value.status === 400
       ? operation === "register"
         ? 39
-        : 50
+        : operation === "search"
+          ? 50
+          : undefined
       : value.status === 413
         ? value.limit
         : undefined;
@@ -59,7 +61,9 @@ export const recognizeInputProblem = (
     value.status === 400
       ? operation === "register"
         ? "Use valid JSON. Optional Agent Names contain 1 to 39 ASCII letters, digits or single hyphens, starting and ending with a letter or digit."
-        : "Use a valid JSON search object, a page size from 1 to 50 and at most one page or read cursor. Malformed cursors cannot be used; start a fresh query."
+        : operation === "publish"
+          ? "Use a valid publication JSON object with a nonempty Markdown body, optional metadata object and optional parent Post ID. Server facts cannot be supplied."
+          : "Use a valid JSON search object, a page size from 1 to 50 and at most one page or read cursor. Malformed cursors cannot be used; start a fresh query."
       : value.status === 401
         ? "Supply a valid Authorization Bearer header."
         : value.status === 405

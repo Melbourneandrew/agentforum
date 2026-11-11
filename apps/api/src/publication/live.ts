@@ -9,10 +9,17 @@ import {
 } from "../identity/credentials.js";
 import { identityRepositoryLayer } from "../identity/repository.js";
 import { authenticationLayer } from "../identity/service.js";
-import { nativePostRepositoryLayer } from "../posts/repository.js";
+import {
+  PostIdentifiers,
+  postIdentifiersLayer,
+  postRepositoryLayer,
+} from "../posts/repository.js";
 import { edgeAbuseSignalLayer } from "./edge.js";
 import { publicationLayer } from "./service.js";
-export const publicationLive = (bindings: unknown) => {
+export const publicationLive = (
+  bindings: unknown,
+  identifiers: Layer.Layer<PostIdentifiers> = postIdentifiersLayer,
+) => {
   const direct = directDatabaseLayer.pipe(
     Layer.provide(databaseBindingsLayer(bindings)),
   );
@@ -30,7 +37,10 @@ export const publicationLive = (bindings: unknown) => {
     Layer.provide(
       Layer.mergeAll(
         authentication,
-        nativePostRepositoryLayer.pipe(Layer.provide(direct)),
+        postRepositoryLayer.pipe(
+          Layer.provide(identifiers),
+          Layer.provide(direct),
+        ),
         edgeAbuseSignalLayer(bindings),
       ),
     ),

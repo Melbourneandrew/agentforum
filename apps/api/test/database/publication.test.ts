@@ -1,3 +1,9 @@
+import worker, {
+  makeWorker,
+  type WorkerExecutionContext,
+} from "../../src/worker.js";
+import { PostIdentifiers } from "../../src/posts/repository.js";
+import { RegistrationSuccess } from "../../src/identity/contract.js";
 import { env as nativeEnv } from "cloudflare:workers";
 import { env } from "node:process";
 import { sql } from "drizzle-orm";
@@ -227,5 +233,246 @@ describe("authenticated publication orchestration in genuine PostgreSQL/workerd"
     );
     expect(denied.retryAfter).toBeGreaterThan(0);
     expect(await snapshot(issued.id)).toEqual(before);
+  });
+});
+
+const execution: WorkerExecutionContext = {
+  waitUntil: () => undefined,
+  passThroughOnException: () => undefined,
+  props: {},
+};
+const runtimeBindings = {
+  ...bindings,
+  ENVIRONMENT: "local",
+  CURSOR_CURRENT_KEY: "r1",
+  CURSOR_KEYS: JSON.stringify({ r1: "33".repeat(32) }),
+};
+const httpRequest = (
+  method: string,
+  document: string,
+  credential?: string,
+  operation = "publish",
+) =>
+  new Request(
+    "https://api.agentforum.test/v1/" +
+      operation +
+      (method === "GET" ? "?payload=" + encodeURIComponent(document) : ""),
+    {
+      method,
+      headers: {
+        ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+        ...(credential === undefined
+          ? {}
+          : { Authorization: `Bearer ${credential}` }),
+      },
+      ...(method === "POST" ? { body: document } : {}),
+    },
+  );
+const http = (
+  method: string,
+  document: string,
+  credential?: string,
+  operation = "publish",
+) =>
+  worker.fetch(
+    httpRequest(method, document, credential, operation),
+    runtimeBindings,
+    execution,
+  );
+const httpIdentity = async (method = "POST") => {
+  const response = await http(method, "{}", undefined, "register");
+  expect(response.status).toBe(201);
+  return Effect.runPromise(
+    Schema.decodeUnknown(Schema.parseJson(RegistrationSuccess))(
+      await response.text(),
+    ),
+  );
+};
+const decodePost = async (response: Response) =>
+  Effect.runPromise(
+    Schema.decodeUnknown(Schema.parseJson(PostRecord))(await response.text()),
+  );
+describe("actual anonymous signup and authenticated publication HTTP against PostgreSQL", () => {
+  it("implements identical GET/POST semantics, unchanged content, replies and public readback", async () => {
+    for (const method of ["GET", "POST"]) {
+      const issued = await httpIdentity(method),
+        key = Redacted.value(issued.api_key);
+      const document = JSON.stringify({
+        body: "---\nauthor_name: forged\n---\n# raw",
+        metadata: {
+          n: 1,
+          b: false,
+          items: [{ x: null }],
+          author_name: "forged",
+        },
+      });
+      const response = await http(method, document, key);
+      expect(response.status).toBe(201);
+      expect(response.headers.get("Cache-Control")).toBe("no-store, private");
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      const post = await decodePost(response);
+      expect(post.author_id).toBe(issued.id);
+      expect(post.author_name).toBe(issued.name);
+      expect(post.metadata).toEqual({
+        n: 1,
+        b: false,
+        items: [{ x: null }],
+        author_name: "forged",
+      });
+      const lookup = await http(
+        method,
+        JSON.stringify({ id: post.id }),
+        undefined,
+        "search",
+      );
+      expect(lookup.status).toBe(200);
+      const encoded = await Effect.runPromise(Schema.encode(PostRecord)(post));
+      expect(
+        Schema.decodeUnknownSync(
+          Schema.Struct({ posts: Schema.Array(Schema.Unknown) }),
+        )(await lookup.json()).posts,
+      ).toEqual([encoded]);
+      const replyResponse = await http(
+        method,
+        JSON.stringify({ body: "correction", reply_to: post.id }),
+        key,
+      );
+      expect(replyResponse.status).toBe(201);
+      expect(
+        Option.getOrThrow((await decodePost(replyResponse)).reply_to_id),
+      ).toBe(post.id);
+    }
+  });
+  it("rejects invalid credentials, missing parents and spoofed platform fields without writes", async () => {
+    const issued = await httpIdentity(),
+      key = Redacted.value(issued.api_key),
+      before = await snapshot(issued.id);
+    for (const method of ["GET", "POST"]) {
+      for (const credential of [
+        undefined,
+        "invalid",
+        `af_v1.${"0".repeat(32)}.${"0".repeat(64)}`,
+      ]) {
+        const response = await http(
+          method,
+          '{"body":"unauthorized"}',
+          credential,
+        );
+        expect(response.status).toBe(401);
+        expect(response.headers.get("WWW-Authenticate")).toBe("Bearer");
+      }
+      expect(
+        (
+          await http(
+            method,
+            JSON.stringify({ body: "missing", reply_to: "_".repeat(21) }),
+            key,
+          )
+        ).status,
+      ).toBe(404);
+      for (const fields of [
+        { author_id: issued.id },
+        { author_name: issued.name },
+        { published_at: "1900-01-01" },
+        { publication_order: "1" },
+        { id: "x".repeat(21) },
+      ])
+        expect(
+          (
+            await http(
+              method,
+              JSON.stringify({ body: "spoof", ...fields }),
+              key,
+            )
+          ).status,
+        ).toBe(400);
+    }
+    expect(await snapshot(issued.id)).toEqual(before);
+  });
+  it("returns exact integer Retry-After on real SQL denial across both HTTP transports", async () => {
+    const issued = await httpIdentity(),
+      key = Redacted.value(issued.api_key);
+    for (let n = 0; n < 60; n++)
+      await Effect.runPromise(
+        publish({ body: `window ${String(n)}` }, Option.some(issued.api_key)),
+      );
+    const before = await snapshot(issued.id);
+    for (const method of ["GET", "POST"]) {
+      const response = await http(method, '{"body":"denied"}', key);
+      expect(response.status).toBe(429);
+      const problem = Schema.decodeUnknownSync(
+        Schema.Struct({
+          status: Schema.Literal(429),
+          retry_after: Schema.Number.pipe(Schema.int(), Schema.greaterThan(0)),
+        }),
+      )(await response.json());
+      expect(response.headers.get("Retry-After")).toBe(
+        String(problem.retry_after),
+      );
+      expect(response.headers.get("Cache-Control")).toBe("no-store, private");
+    }
+    expect(await snapshot(issued.id)).toEqual(before);
+  });
+  it("rolls back real insert failures and bounded ID collisions, then recovers without leaking details", async () => {
+    const issued = await httpIdentity(),
+      key = Redacted.value(issued.api_key),
+      before = await snapshot(issued.id);
+    const execute = (query: ReturnType<typeof sql>) =>
+      Effect.runPromise(
+        Effect.flatMap(DirectDatabase, (db) =>
+          db.execute(() => query, Schema.Never),
+        ).pipe(Effect.provide(direct)),
+      );
+    await execute(
+      sql`CREATE FUNCTION test_reject_http_publication() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'private database fixture failure'; END $$`,
+    );
+    await execute(
+      sql`CREATE TRIGGER test_reject_http_publication BEFORE INSERT ON posts FOR EACH ROW EXECUTE FUNCTION test_reject_http_publication()`,
+    );
+    try {
+      for (const method of ["GET", "POST"]) {
+        const response = await http(method, '{"body":"rolled back"}', key);
+        expect(response.status).toBe(500);
+        expect(await response.text()).not.toContain(
+          "private database fixture failure",
+        );
+      }
+      expect(await snapshot(issued.id)).toEqual(before);
+    } finally {
+      await execute(sql`DROP TRIGGER test_reject_http_publication ON posts`);
+      await execute(sql`DROP FUNCTION test_reject_http_publication()`);
+    }
+    const existing = await decodePost(
+      await http("POST", '{"body":"original"}', key),
+    );
+    const beforeCollision = await snapshot(issued.id);
+    let calls = 0;
+    const recoveryId =
+      "c" + crypto.randomUUID().replaceAll("-", "").slice(0, 20);
+    const identifiers = Layer.succeed(PostIdentifiers, {
+      next: Effect.sync(() => {
+        calls++;
+        return calls <= 4 ? existing.id : recoveryId;
+      }),
+    });
+    const app = makeWorker(undefined, undefined, undefined, (b) =>
+      publicationLive(b, identifiers),
+    );
+    const failed = await app.fetch(
+      httpRequest("POST", '{"body":"collision"}', key),
+      runtimeBindings,
+      execution,
+    );
+    expect(failed.status).toBe(500);
+    expect(calls).toBe(4);
+    expect(await snapshot(issued.id)).toEqual(beforeCollision);
+    const recovered = await app.fetch(
+      httpRequest("GET", '{"body":"recovered"}', key),
+      runtimeBindings,
+      execution,
+    );
+    expect(recovered.status).toBe(201);
+    expect((await decodePost(recovered)).id).toBe(recoveryId);
+    expect(calls).toBe(5);
   });
 });

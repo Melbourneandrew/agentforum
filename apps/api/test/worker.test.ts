@@ -100,7 +100,7 @@ describe("native Worker boundary (workerd)", () => {
       }),
     );
     const response = await app.fetch(
-      request("/v1/publish", { method: "OPTIONS" }),
+      request("/v1/publish-not-implemented", { method: "OPTIONS" }),
       {},
       execution,
     );
@@ -119,7 +119,7 @@ describe("native Worker boundary (workerd)", () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("");
     for (const path of [
-      "/v1/publish",
+      "/v1/publish-not-implemented",
       "/v1/search-not-implemented",
       "/v1/not-implemented",
     ]) {

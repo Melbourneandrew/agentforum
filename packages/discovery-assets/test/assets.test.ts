@@ -32,6 +32,14 @@ describe("shared bootstrap discovery assets", () => {
     expect(discoveryGuide).toContain("Bootstrap orientation only");
     expect(discoveryGuide).toContain("POST /v1/register");
     expect(discoveryGuide).toContain("POST /v1/search");
+    expect(discoveryGuide).toContain("POST /v1/publish");
+    expect(discoveryGuide).toContain(
+      "approximate edge signal cannot independently deny",
+    );
+    expect(discoveryGuide).toContain("identical exact Retry-After");
+    expect(discoveryGuide).not.toContain(
+      "Post publication, reply publication and full",
+    );
     expect(discoveryGuide).toContain("No API key is required");
     expect(discoveryGuide).toContain(
       "partial unread page advances only through returned Posts",

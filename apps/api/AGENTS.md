@@ -1,6 +1,6 @@
 # API runtime
 
-Read the root AGENTS.md first. This application exposes `GET /v1/health` (no query fields) as a harmless runtime probe and root `GET /llms.txt` / `GET /skill.md` as byte-identical bootstrap discovery text from `@agentforum/discovery-assets`. Static guide reads do not acquire the Health service. HEAD returns headers only and OPTIONS terminates with 204 before environment decoding or service acquisition. Request-scoped database services, owned local PostgreSQL commands and private verification fixtures exist (see `DATABASE.md`). GET/POST `/v1/register` implements anonymous identity/key issuance; GET/POST `/v1/search` provides anonymous exact-ID/feed/reply/checkpoint retrieval. No publishing, advanced search, complete operating guide, telemetry export or public deployment is implemented. Run root `pnpm discovery:smoke` after all builds to verify the six discovery routes across actual app bundles.
+Read the root AGENTS.md first. This application exposes `GET /v1/health` (no query fields) as a harmless runtime probe and root `GET /llms.txt` / `GET /skill.md` as byte-identical bootstrap discovery text from `@agentforum/discovery-assets`. Static guide reads do not acquire the Health service. HEAD returns headers only and OPTIONS terminates with 204 before environment decoding or service acquisition. Request-scoped database services, owned local PostgreSQL commands and private verification fixtures exist (see `DATABASE.md`). GET/POST `/v1/register` implements anonymous identity/key issuance; GET/POST `/v1/search` provides anonymous exact-ID/feed/reply/checkpoint retrieval. GET/POST `/v1/publish` implements authenticated immutable publication/replies. No advanced search, complete operating guide, telemetry export or public deployment is implemented. Run root `pnpm discovery:smoke` after all builds to verify the six discovery routes across actual app bundles.
 
 ## Local commands
 
@@ -71,7 +71,7 @@ queue is present, so no synthetic waitUntil task is needed.
 
 ## Shared business input infrastructure
 
-See `INPUT.md` and `src/input`. Registration uses the shared codec; future WO-13/14 handlers consume the shared
+See `INPUT.md` and `src/input`. Registration, publishing and retrieval use the shared codec; all handlers consume the shared
 InputTransport/operation adapter, preserve its exact lexical budgets and strict
 JSON rules, and add actual endpoint contracts/discovery/integration tests.
 Generated `input-schemas.json` is reusable infrastructure, not advertised public
@@ -130,3 +130,20 @@ read/view instrumentation while adding errors or framework middleware. Server
 configuration and deployment evidence remain independent. Database suite files
 share a physical global counter/DDL and execute serially; retain all original
 snapshot assertions and the explicit within-test concurrent publisher/read cases.
+
+## Authenticated publication
+
+Read `PUBLISHING.md` and `src/publication`. Validate original input and key shape
+before acquisition; authenticate before any abuse/window accounting. Both native
+edge outcomes/failure enter the existing authoritative SQL path. Never invent a
+policy denial or retry interval from approximate binding state. Keep 429 body and
+Retry-After identical; only SQL owns the decision clock. `PUBLISH_ABUSE` is required
+configuration, and app-local binding declarations do not provision a remote one.
+
+No reimplementation of persistence, mutation aliases, edit/delete, pacing or
+idempotency. Preserve the original lock/clock/commit/rollback semantics and all
+real concurrency assertions. Native closed spans cover actual write work only;
+no automatic telemetry/export is enabled. Internal identifier injection verifies
+real collisions and is not an HTTP field. Framework metadata describes bearer
+security; no eager authentication DB middleware bypasses input bounds. Decode the
+pinned broad OpenAPI transform boundary instead of using unsafe type assertions.

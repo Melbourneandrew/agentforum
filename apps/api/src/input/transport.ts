@@ -19,7 +19,7 @@ export const MetadataObject = Schema.declare(
     typeof value === "object" && value !== null && !Array.isArray(value),
 ).annotations({ jsonSchema: { type: "object", additionalProperties: true } });
 export const PublicationInput = Schema.Struct({
-  body: Schema.NonEmptyString,
+  body: Schema.String.pipe(Schema.minLength(1)),
   metadata: Schema.optional(MetadataObject),
   reply_to: Schema.optional(
     Schema.String.pipe(
