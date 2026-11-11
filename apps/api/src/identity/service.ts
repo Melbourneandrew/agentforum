@@ -31,7 +31,7 @@ export class NameGenerationExhaustedError extends Data.TaggedError(
 export class AuthenticationDeniedError extends Data.TaggedError(
   "AuthenticationDeniedError",
 ) {}
-type ServiceError =
+export type ServiceError =
   | DatabaseQueryError
   | DatabaseDecodeError
   | DatabaseTransactionClosedError

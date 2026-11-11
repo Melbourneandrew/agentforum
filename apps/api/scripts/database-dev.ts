@@ -31,6 +31,16 @@ const Config = Schema.Struct({
   workers_dev: Schema.Literal(false),
   preview_urls: Schema.Literal(false),
   observability: Schema.Struct({ enabled: Schema.Literal(false) }),
+  ratelimits: Schema.Array(
+    Schema.Struct({
+      name: Schema.Literal("PUBLISH_ABUSE"),
+      namespace_id: Schema.String,
+      simple: Schema.Struct({
+        limit: Schema.Literal(60),
+        period: Schema.Literal(60),
+      }),
+    }),
+  ),
 });
 const program = Effect.scoped(
   Effect.gen(function* () {
