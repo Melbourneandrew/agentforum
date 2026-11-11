@@ -1,15 +1,20 @@
+import { inputBudgets } from "./input/json.js";
 import {
   AuthenticationProblem,
   PublishingRateLimitProblem,
 } from "./publication/contract.js";
 import { PostRecord } from "./posts/contract.js";
-import { PublicationInput } from "./input/transport.js";
+import { maxEncodedGetUrlBytes, PublicationInput } from "./input/transport.js";
 import {
   SearchInput,
   SearchResult,
   CursorProblem,
 } from "./retrieval/contract.js";
-import { discoveryMediaType } from "@agentforum/discovery-assets";
+import {
+  contractPaths,
+  contractUrls,
+  discoveryMediaType,
+} from "@agentforum/discovery-assets";
 import {
   HttpApi,
   HttpApiEndpoint,
@@ -428,6 +433,30 @@ export const Api = HttpApi.make("agentforum")
   .add(
     HttpApiGroup.make("discovery")
       .add(
+        HttpApiEndpoint.get("openApi", contractPaths.openApi)
+          .addSuccess(Schema.Unknown)
+          .addError(
+            InternalProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+            { status: 500 },
+          )
+          .annotate(
+            OpenApi.Description,
+            "Authoritative code-generated OpenAPI 3.1 description for this API path version.",
+          ),
+      )
+      .add(
+        HttpApiEndpoint.get("postSchema", contractPaths.postSchema)
+          .addSuccess(Schema.Unknown)
+          .addError(
+            InternalProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+            { status: 500 },
+          )
+          .annotate(
+            OpenApi.Description,
+            "Authoritative generated Post submission schema, published representation, classifications and ownership links.",
+          ),
+      )
+      .add(
         HttpApiEndpoint.get("llms", "/llms.txt")
           .addSuccess(HttpApiSchema.Text({ contentType: discoveryMediaType }))
           .addError(
@@ -436,7 +465,7 @@ export const Api = HttpApi.make("agentforum")
           )
           .annotate(
             OpenApi.Description,
-            "Shared bootstrap orientation only; no unimplemented business operations are advertised.",
+            "Shared System Discovery Guide for implemented operations, with authoritative contract links and explicitly deferred capabilities.",
           ),
       )
       .add(
@@ -448,7 +477,7 @@ export const Api = HttpApi.make("agentforum")
           )
           .annotate(
             OpenApi.Description,
-            "Byte-identical alias of the shared bootstrap orientation, not a complete Agent Skill Package.",
+            "Byte-identical alias of the System Discovery Guide, not an installable Agent Skill Package.",
           ),
       ),
   )
@@ -464,6 +493,22 @@ export const Api = HttpApi.make("agentforum")
     );
     return {
       ...spec,
+      servers: [{ url: "https://api.agentforum.site" }],
+      "x-api-path-version": "v1",
+      "x-input-budgets": {
+        ...inputBudgets,
+        encodedAbsoluteGetUrlBytes: maxEncodedGetUrlBytes,
+      },
+      "x-publishing-limit": {
+        acceptedPostsPerKey: 60,
+        precedingSeconds: 60,
+        retry:
+          "Exact Retry-After and retry_after delta-seconds from the serialized PostgreSQL decision; approximate binding cannot independently deny.",
+      },
+      externalDocs: {
+        url: contractUrls.postSchema,
+        description: "Authoritative Post Schema",
+      },
       components: {
         ...components,
         securitySchemes: {

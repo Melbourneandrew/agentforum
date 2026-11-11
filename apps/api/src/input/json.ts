@@ -1,5 +1,14 @@
 import { Data, Effect, Option } from "effect";
 
+export const inputBudgets = {
+  decodedJsonBytes: 65_536,
+  metadataJsonBytes: 16_384,
+  metadataDepth: 8,
+  metadataEntries: 64,
+  metadataNodes: 256,
+  metadataStringBytes: 4_096,
+  metadataKeyBytes: 128,
+} as const;
 export const utf8Size = (text: string) => new TextEncoder().encode(text).length;
 export class InputFailure extends Data.TaggedError("InputFailure")<{
   readonly reason:
@@ -76,12 +85,16 @@ const scan = (source: string, publication: boolean): unknown => {
   const value = (depth: number, metadataDepth: Option.Option<number>): void => {
     whitespace();
     if (depth > 64) throw invalid();
-    if (Option.isSome(metadataDepth) && ++nodes > 256) throw invalid();
+    if (Option.isSome(metadataDepth) && ++nodes > inputBudgets.metadataNodes)
+      throw invalid();
     const char = source[position];
     if (char === "{" || char === "[") {
       const object = char === "{";
       const containerDepth = Option.map(metadataDepth, (d) => d + 1);
-      if (Option.isSome(containerDepth) && containerDepth.value > 8)
+      if (
+        Option.isSome(containerDepth) &&
+        containerDepth.value > inputBudgets.metadataDepth
+      )
         throw invalid();
       position++;
       whitespace();
@@ -90,7 +103,11 @@ const scan = (source: string, publication: boolean): unknown => {
       let count = 0;
       if (source[position] !== end)
         for (;;) {
-          if (++count > 64 && Option.isSome(metadataDepth)) throw invalid();
+          if (
+            ++count > inputBudgets.metadataEntries &&
+            Option.isSome(metadataDepth)
+          )
+            throw invalid();
           whitespace();
           let key = Option.none<string>();
           if (object) {
@@ -98,7 +115,10 @@ const scan = (source: string, publication: boolean): unknown => {
             const name = string();
             if (keys.has(name)) throw invalid();
             keys.add(name);
-            if (Option.isSome(metadataDepth) && utf8Size(name) > 128)
+            if (
+              Option.isSome(metadataDepth) &&
+              utf8Size(name) > inputBudgets.metadataKeyBytes
+            )
               throw invalid();
             key = Option.some(name);
             whitespace();
@@ -110,7 +130,11 @@ const scan = (source: string, publication: boolean): unknown => {
             publication && depth === 0 && Option.contains("metadata")(key);
           if (isMetadata && source[position] !== "{") throw invalid();
           value(depth + 1, isMetadata ? Option.some(0) : containerDepth);
-          if (isMetadata && utf8Size(source.slice(start, position)) > 16_384)
+          if (
+            isMetadata &&
+            utf8Size(source.slice(start, position)) >
+              inputBudgets.metadataJsonBytes
+          )
             throw new InputFailure({ reason: "metadata" });
           whitespace();
           if (source[position] !== ",") break;
@@ -119,7 +143,10 @@ const scan = (source: string, publication: boolean): unknown => {
       if (source[position++] !== end) throw invalid();
     } else if (char === '"') {
       const text = string();
-      if (Option.isSome(metadataDepth) && utf8Size(text) > 4_096)
+      if (
+        Option.isSome(metadataDepth) &&
+        utf8Size(text) > inputBudgets.metadataStringBytes
+      )
         throw invalid();
     } else {
       const rest = source.slice(position);
@@ -145,7 +172,7 @@ export const parseInputJson = (source: string, publication: boolean) =>
   Effect.try({
     try: () => {
       if (!wellFormed(source)) throw invalid();
-      if (utf8Size(source) > 65_536)
+      if (utf8Size(source) > inputBudgets.decodedJsonBytes)
         throw new InputFailure({ reason: "payload" });
       return scan(source, publication);
     },

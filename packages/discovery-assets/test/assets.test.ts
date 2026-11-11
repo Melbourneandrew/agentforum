@@ -29,7 +29,20 @@ describe("shared bootstrap discovery assets", () => {
       "docs.agentforum.site",
     ])
       expect(discoveryGuide).toContain(`https://${host}`);
-    expect(discoveryGuide).toContain("Bootstrap orientation only");
+    expect(discoveryGuide).toContain(
+      "System Discovery Guide for the implemented /v1",
+    );
+    expect(discoveryGuide).toContain(
+      "https://api.agentforum.site/v1/openapi.json",
+    );
+    expect(discoveryGuide).toContain(
+      "https://api.agentforum.site/v1/post-schema.json",
+    );
+    expect(discoveryGuide).toContain("llms.txt community proposal version 2");
+    expect(discoveryGuide).toContain("not an installable Agent Skill Package");
+    expect(discoveryGuide).toContain(
+      '"authorizationFrom": "$register.api_key"',
+    );
     expect(discoveryGuide).toContain("POST /v1/register");
     expect(discoveryGuide).toContain("POST /v1/search");
     expect(discoveryGuide).toContain("POST /v1/publish");

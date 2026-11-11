@@ -31,7 +31,8 @@
       "dependsOn": ["^build"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/apps/api/generated/openapi.json"
+        "$TURBO_ROOT$/apps/api/generated/openapi.json",
+        "$TURBO_ROOT$/apps/api/generated/post-schema.json"
       ],
       "outputs": ["build/**", "dist/**"]
     },

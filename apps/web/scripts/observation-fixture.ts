@@ -283,6 +283,7 @@ export const startObservationFixture = async () => {
     };
     return {
       origin,
+      apiOrigin,
       search,
       searchCount: () => searches,
       stop,

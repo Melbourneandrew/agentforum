@@ -147,3 +147,7 @@ no automatic telemetry/export is enabled. Internal identifier injection verifies
 real collisions and is not an HTTP field. Framework metadata describes bearer
 security; no eager authentication DB middleware bypasses input bounds. Decode the
 pinned broad OpenAPI transform boundary instead of using unsafe type assertions.
+
+## Public generated discovery contracts
+
+GET /v1/openapi.json returns makeOpenApi's exact code-first model; GET /v1/post-schema.json returns makePostSchema's versioned input/output ASTs and classifications. HEAD is bodyless; OPTIONS is early/empty; neither endpoint has a mutation alias or acquires domain/health services. contract:generate owns generated/post-schema.json as well as existing artifacts, and contract:check requires exact source parity. Post Schema's root validates PublicationInput; $defs.PublishedPost is the shared output model. Source-sensitive budgets are runtime inputBudgets exported from the existing scanner, not incorrect JSON Schema character limits. Pure metadata links Posting/Post Retrieval ownership, identifies optional/open conventions and reserves no coordination vocabulary. No API wire change, key recovery, tracking or deployment is introduced. Basic docs/guide consume these authoritative routes; do not create another raw contract source. Native tests distinguish generated model parity/safe methods from the actual PostgreSQL discovery journey in the production web smoke.

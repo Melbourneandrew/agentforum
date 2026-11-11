@@ -6,6 +6,7 @@ import { access, readFile } from "node:fs/promises";
 import { setTimeout } from "node:timers/promises";
 import { gzipSync } from "node:zlib";
 import { chromium } from "playwright";
+import { contractInfo } from "../app/generated/contract-info.js";
 import { documents } from "../app/content.js";
 
 assert.ok(
@@ -87,11 +88,19 @@ try {
       const html = await response.text();
       assert.match(html, /<h1[^>]*>/);
       assert.doesNotMatch(html, /<script\b|<form\b|<iframe\b/i);
-      if (path === "/docs/contract")
+      if (path === "/docs/contract") {
         assert.ok(
           html.includes(identity),
           "Generated contract identity drifted",
         );
+        const postIdentity = createHash("sha256")
+          .update(await readFile("../api/generated/post-schema.json"))
+          .digest("hex");
+        assert.ok(
+          html.includes(postIdentity),
+          "Generated Post Schema identity drifted",
+        );
+      }
       await page.goto(`${base}${path}`);
       const expected = documents.find(
         (entry) => path === `/docs/${entry.slug}`,
@@ -113,9 +122,30 @@ try {
         }
       } else {
         assert.ok(
-          html.includes("The documentation application is under construction."),
+          html.includes("Read the implemented agent-loop guide"),
           "Landing page must contain meaningful static content",
         );
+      }
+      if (path === "/docs/contract") {
+        const rows = await page
+          .locator(".contract-table tbody tr")
+          .allTextContents();
+        assert.equal(
+          rows.length,
+          contractInfo.operations.length,
+          "Generated operation table omitted/added operations",
+        );
+        for (const [index, operation] of contractInfo.operations.entries()) {
+          assert.equal(
+            normalize(rows[index] ?? ""),
+            normalize(
+              operation.method +
+                operation.path +
+                operation.authentication +
+                operation.success,
+            ),
+          );
+        }
       }
       assert.equal(
         await page.evaluate(
@@ -123,6 +153,18 @@ try {
         ),
         true,
       );
+      for (const href of await page
+        .locator("a[href]")
+        .evaluateAll((elements) =>
+          elements
+            .map((element) => element.getAttribute("href"))
+            .filter((href) => href !== null),
+        )) {
+        assert.ok(
+          !/\/v1\/(register|publish)$/.test(new URL(href, base).pathname),
+          "Docs created a crawlable mutation URL",
+        );
+      }
       const links = await page
         .locator('a[href^="/"]')
         .evaluateAll((elements) =>

@@ -154,3 +154,7 @@ retained. Browser and proxy cleanup precede API teardown, including failed
 assertions. The gate deliberately fails if Docker, native runtime, browser,
 contracts or real data behavior is unavailable. Local evidence is not provider
 HTTP-disconnect/telemetry, staging, rollout or public activation evidence.
+
+### Shared-guide fresh-agent verification
+
+The production bundle smoke also runs discovery-journey.ts against the same already-owned API/PostgreSQL lifecycle, after observer before/after-state assertions. It fetches root guide and raw contracts, parses the public JSON recipe, verifies operation/auth and runtime-derived budget consistency, and executes the documented loop independently via POST and GET. Only canonical API paths are mapped to the local origin; redirects and cross-origin credential destinations are rejected. One-time keys are Redacted and used only in Authorization headers. No business handler/private examples or fabricated successful responses drive the journey. This grows CI evidence without claiming the separately gated deployed/integrated phase checkpoint.

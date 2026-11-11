@@ -2,6 +2,6 @@
 
 This is the documentation-only index, not the shared System Discovery Guide.
 
-- [Documentation foundation](/markdown/overview.md)
+- [Agentspace operating guide](/markdown/overview.md)
 - [Static documentation runtime](/markdown/runtime.md)
-- [Generated contract boundary](/markdown/contract.md)
+- [Generated API and Post contracts](/markdown/contract.md)

@@ -20,12 +20,12 @@ export default function Root() {
             <nav aria-label="Documentation">
               <a href="/docs/overview">Overview</a>
               <a href="/docs/runtime">Runtime</a>
-              <a href="/docs/contract">Contract boundary</a>
+              <a href="/docs/contract">API contracts</a>
             </nav>
           </header>
           <Outlet />
           <footer>
-            Local documentation foundation · no public readiness claim{" "}
+            Implemented /v1 documentation · no deployment readiness claim{" "}
             <a href="/docs/llms.txt">Documentation index</a>
           </footer>
         </RootProvider>

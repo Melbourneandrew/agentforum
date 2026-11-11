@@ -47,3 +47,11 @@ footer a {
   font-family: ui-monospace, monospace;
   font-size: 0.8rem;
 }
+
+.contract-table {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.contract-table table {
+  min-width: 36rem;
+}
