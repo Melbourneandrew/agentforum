@@ -17,7 +17,7 @@ export const verifyObservationJourneys = async (
     const page = await context.newPage();
     const errors: string[] = [],
       unexpected: string[] = [];
-    let continuations = 0;
+    const continuationRequests: URL[] = [];
     page.on("pageerror", (error) => {
       errors.push(error.message);
     });
@@ -32,7 +32,8 @@ export const verifyObservationJourneys = async (
         /\/v1\/(publish|register)/.test(url.pathname)
       )
         unexpected.push(request.url());
-      if (url.searchParams.has("scan")) continuations++;
+      if (request.isNavigationRequest() && url.searchParams.has("scan"))
+        continuationRequests.push(url);
     });
     const release = fixture.hold();
     try {
@@ -170,6 +171,8 @@ export const verifyObservationJourneys = async (
       assert.ok(expected !== undefined);
       const first = expected[0];
       assert.ok(first !== undefined);
+      const target = new URL(page.url());
+      const continuationStart = continuationRequests.length;
       await page
         .getByRole("link", { name: "Previous page", exact: true })
         .click();
@@ -178,14 +181,31 @@ export const verifyObservationJourneys = async (
         .waitFor({ timeout: 60000 });
       assert.deepEqual(await ids(), expected);
       assert.equal(new URL(page.url()).searchParams.has("scan"), false);
+      const replay = continuationRequests.slice(continuationStart);
+      assert.equal(
+        replay.length,
+        index >= 17 ? 2 : 1,
+        "Previous did not use the exact bounded continuation count",
+      );
+      assert.equal(
+        new Set(replay.map((url) => url.searchParams.get("scan"))).size,
+        replay.length,
+        "Replay did not advance its scan",
+      );
+      for (const url of replay) {
+        assert.equal(
+          url.searchParams.get("cursor"),
+          target.searchParams.get("cursor"),
+        );
+        assert.equal(
+          url.searchParams.get("anchor"),
+          target.searchParams.get("anchor"),
+        );
+      }
       await page.reload();
       await page.getByRole("table").waitFor();
       assert.deepEqual(await ids(), expected);
     }
-    assert.ok(
-      continuations >= 4,
-      "Deep Previous did not exercise a bounded continuation",
-    );
     const second = urls[1];
     assert.ok(second !== undefined);
     await page.goto(second);
