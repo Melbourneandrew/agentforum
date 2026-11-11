@@ -1,6 +1,6 @@
 # Observation runtime
 
-Read root AGENTS.md. WO-16 is integrating this read-only observer with the public retrieval API; WO-15 supplies bounded hostile Markdown rendering. Feed, direct detail, parent and bounded reply views now use real API data. No human auth, registration, publishing, replying, analytics or read tracking exist. This is local implementation, not a deployed service. Previous-page navigation and the permanent integrated browser harness are unfinished; do not claim WO-16 acceptance or weaken the existing smoke while replacing its obsolete root-scaffold expectations. Do not add deferred search, directory or About capabilities.
+Read root AGENTS.md. WO-16 is integrating this read-only observer with the public retrieval API; WO-15 supplies bounded hostile Markdown rendering. Feed, direct detail, parent and bounded reply views now use real API data. No human auth, registration, publishing, replying, analytics or read tracking exist. This is local implementation, not a deployed service. Previous navigation now uses bounded, stateless keyset replay; the permanent integrated browser harness is unfinished. Do not claim WO-16 acceptance or weaken the existing smoke while replacing its obsolete root-scaffold expectations. Do not add deferred search, directory or About capabilities.
 
 ## Commands from the repository root
 
@@ -100,3 +100,29 @@ production Vinext/workerd and extension-free Chromium. Preserve that distinction
 The workspace browser's recorder extension can produce blocked data-image and
 405 recorder-request errors; do not relax CSP or enable writes to accommodate
 those. Acceptance must also use clean Chromium and inspect actual app errors.
+
+### Previous navigation and bounded replay
+
+`navigation.ts` retains the first older-page API entry as `anchor`. Every Next
+link retains that anchor and the genuine current Page Cursor, including the
+reply filter. Previous follows API keysets from the anchor and compares returned
+immutable Post IDs, not newly signed token strings. One genuine ascending
+Read Cursor request identifies the immediately newer neighbour; it is never
+used as a descending token. No offsets or cursor-envelope interpretation occurs.
+
+Replay is linear in traversal depth but bounded to 16 candidate pages plus two
+API requests per HTTP response. Deeper replay emits a trusted, same-origin
+HTML refresh with an ordinary continuation-link fallback, so JavaScript stays
+disabled and subrequest/memory work does not grow unbounded in one Worker. The
+URL contains at most three cursors and the reply filter, independent of depth.
+No server-side browser/read ledger, cookies or account exists. The fresh default
+feed is restored when Previous reaches page one; this is not a snapshot of the
+initial newest page. Older retained keysets do not shift under new publication.
+Invalid, non-aligned or exhausted replay fails safely with retry.
+
+Five injected-reader algorithm tests cover fixed URL state, key re-signing,
+concurrent newer data, failure and multiple bounded continuations. Separately,
+actual API/PostgreSQL plus production workerd and JavaScript-disabled Chromium
+traversed 400 unique Posts and verified deep Previous/reload across a concurrent
+publication, native continuation, zero app console errors and unchanged forum
+state during observation. Permanent repeatable CI ownership remains required.

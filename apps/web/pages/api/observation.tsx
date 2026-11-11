@@ -1,5 +1,4 @@
 import { env } from "cloudflare:workers";
-import { CursorToken, PostId } from "@agentforum/contracts";
 import { Effect, Option, Schema } from "effect";
 import {
   ForumRead,
@@ -9,12 +8,12 @@ import {
 import { streamForumPage } from "../../src/forum/stream.js";
 import { ForumFailure, PostDetail, PostsTable } from "../../src/forum/views.js";
 
+import {
+  ForumQuery,
+  feedHref,
+  locatePrevious,
+} from "../../src/forum/navigation.js";
 export const runtime = "edge";
-const Query = Schema.Struct({
-  post_id: Schema.optional(PostId),
-  reply_to: Schema.optional(PostId),
-  cursor: Schema.optional(CursorToken),
-});
 export default function observation(request: Request) {
   if (request.method === "HEAD") return new Response(null);
   if (request.method !== "GET")
@@ -32,20 +31,39 @@ export default function observation(request: Request) {
       () => new ForumReadError({ kind: "invalid-request" }),
     ),
     Effect.flatMap((values) =>
-      Schema.decodeUnknown(Query)(Object.fromEntries(values), {
+      Schema.decodeUnknown(ForumQuery)(Object.fromEntries(values), {
         onExcessProperty: "error",
       }),
     ),
     Effect.filterOrFail(
       (query) =>
-        query.post_id === undefined ||
-        (query.cursor === undefined && query.reply_to === undefined),
+        (query.post_id === undefined ||
+          (query.cursor === undefined &&
+            query.reply_to === undefined &&
+            query.anchor === undefined &&
+            query.scan === undefined)) &&
+        (query.cursor === undefined
+          ? query.anchor === undefined && query.scan === undefined
+          : query.anchor !== undefined),
       () => new ForumReadError({ kind: "invalid-request" }),
     ),
     Effect.mapError(() => new ForumReadError({ kind: "invalid-request" })),
   );
   const content = Effect.gen(function* () {
     const query = yield* preparedQuery;
+    if (query.scan !== undefined) {
+      const destination = yield* locatePrevious(query);
+      return (
+        <section className="forum-card forum-empty" role="status">
+          <meta httpEquiv="refresh" content={"0;url=" + destination} />
+          <h1>Locating previous page</h1>
+          <p>
+            Following the original API keysets without storing browsing history.
+          </p>
+          <a href={destination}>Continue to previous page</a>
+        </section>
+      );
+    }
     const reader = yield* ForumRead;
     if (query.post_id !== undefined) {
       const detail = yield* reader.search({ id: query.post_id });
@@ -63,17 +81,25 @@ export default function observation(request: Request) {
       ...selection,
       ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
     });
-    const next = Option.map(results.page_cursor, (cursor) => {
-      const parameters = new URLSearchParams({ ...selection, cursor });
-      return "/?" + parameters.toString();
-    });
-    // Previous-page resolution is integrated in the next navigation milestone;
-    // do not invent offsets, forge tokens or persist a history/read ledger.
+    const next = Option.map(results.page_cursor, (cursor) =>
+      feedHref({ ...selection, cursor, anchor: query.anchor ?? cursor }),
+    );
+    const previous =
+      query.cursor === undefined || query.anchor === undefined
+        ? Option.none<string>()
+        : Option.some(
+            feedHref({
+              ...selection,
+              cursor: query.cursor,
+              anchor: query.anchor,
+              scan: query.anchor,
+            }),
+          );
     return (
       <PostsTable
         posts={results.posts}
         next={next}
-        previous={Option.none()}
+        previous={previous}
         parent={Option.fromNullable(query.reply_to)}
       />
     );
