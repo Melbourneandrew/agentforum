@@ -1,6 +1,7 @@
 import { Deferred, Effect, Fiber, Layer, Option } from "effect";
 import { describe, expect, it } from "vitest";
 import {
+  forumGetRequest,
   ForumRead,
   ForumTransport,
   forumReadLayer,
@@ -30,6 +31,18 @@ const search = (
     ),
   );
 describe("observer shared reader in workerd (injected HTTP transport contract)", () => {
+  it("constructs a genuine native GET with manual redirects and no credential forwarding", () => {
+    const request = forumGetRequest(
+      "https://api.agentforum.test/v1/search",
+      new AbortController().signal,
+    );
+    expect(request.method).toBe("GET");
+    expect(request.redirect).toBe("manual");
+    expect(request.headers.get("Accept")).toBe("application/json");
+    expect(request.headers.get("Authorization")).toBeNull();
+    expect(request.headers.get("Cookie")).toBeNull();
+    expect(request.body).toBeNull();
+  });
   it("uses the API's exact model with an encoded public search request and nullable cursor decoding", async () => {
     expect(navigator.userAgent).toContain("Cloudflare-Workers");
     const seen: URL[] = [];
@@ -76,6 +89,7 @@ describe("observer shared reader in workerd (injected HTTP transport contract)",
   });
   it("contains status/media/schema failures without reading or publishing dependency details", async () => {
     for (const [status, kind] of [
+      [302, "unavailable"],
       [400, "invalid-request"],
       [404, "not-found"],
       [500, "unavailable"],
@@ -130,6 +144,37 @@ describe("observer shared reader in workerd (injected HTTP transport contract)",
     });
     expect(cancelled).toBe(1);
     expect(body.locked).toBe(false);
+  });
+  it("interrupts a stalled pre-header acquisition rather than masking request cancellation", async () => {
+    const entered = await Effect.runPromise(Deferred.make<boolean>());
+    let finalized = false;
+    const program = Effect.flatMap(ForumRead, (service) =>
+      service.search({}),
+    ).pipe(
+      Effect.provide(
+        forumReadLayer(config).pipe(
+          Layer.provide(
+            Layer.succeed(ForumTransport, {
+              get: () =>
+                Deferred.succeed(entered, true).pipe(
+                  Effect.zipRight(Effect.never),
+                  Effect.ensuring(
+                    Effect.sync(() => {
+                      finalized = true;
+                    }),
+                  ),
+                ),
+            }),
+          ),
+        ),
+      ),
+    );
+    const fiber = Effect.runFork(program);
+    await Effect.runPromise(Deferred.await(entered));
+    await Effect.runPromise(
+      Fiber.interrupt(fiber).pipe(Effect.timeout("1 second")),
+    );
+    expect(finalized).toBe(true);
   });
   it("awaits owned reader cancellation and releases its lock on interruption during a stalled read", async () => {
     const entered = await Effect.runPromise(Deferred.make<boolean>());

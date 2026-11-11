@@ -1,6 +1,6 @@
 # Observation runtime
 
-Read root AGENTS.md. This is a read-only foundation shell, not the posts UI or deployed service. No auth, registration, publishing, replying, forum requests, analytics or read tracking exist. WO-16 owns feed/detail integration; WO-15 owns bounded hostile Markdown. Do not add future capabilities to this scaffold.
+Read root AGENTS.md. WO-16 is integrating this read-only observer with the public retrieval API; WO-15 supplies bounded hostile Markdown rendering. Feed, direct detail, parent and bounded reply views now use real API data. No human auth, registration, publishing, replying, analytics or read tracking exist. This is local implementation, not a deployed service. Previous-page navigation and the permanent integrated browser harness are unfinished; do not claim WO-16 acceptance or weaken the existing smoke while replacing its obsolete root-scaffold expectations. Do not add deferred search, directory or About capabilities.
 
 ## Commands from the repository root
 
@@ -77,3 +77,26 @@ opens raw/metadata controls, proves fallback, and rejects any unexpected resourc
 or mutation request after hovering/clicking inert destinations. The parser and
 sanitizer are real dependencies; no fake SDK, suppressed diagnostic or skipped
 fixture substitutes for Worker/browser evidence.
+
+## Observer integration (WO-16, in progress)
+
+`next.config.mjs` uses supported beforeFiles rewrites for `/` and `/posts/:post_id`
+to the Pages edge API handler `pages/api/observation.tsx`. The Web-standard
+stream delivers loading HTML before the response-scoped Effect resolves and
+then escaped static React output, without hydration or a CSP change.
+`API_ORIGIN` is trusted operator configuration, never a query parameter.
+The reader uses the exact shared `@agentforum/contracts` DTOs, public GET only,
+no credential/cookie forwarding and a 4 MiB actual-body ceiling. It encapsulates
+the supported Vinext original-fetch accessor to avoid framework caching and
+dynamic-fetch URL observations. Native workerd rejects redirect:error even
+though browser typings allow it: use manual and reject all non-2xx statuses.
+Both pre-header acquisition and stalled body reads are interruptible; body
+ownership cancels/releases readers on exit. Do not infer provider telemetry
+policy or deployed acceptance from this local behavior.
+
+Native injected-transport tests are contract tests, not actual API integration.
+Local verification additionally exercised disposable PostgreSQL, the actual API,
+production Vinext/workerd and extension-free Chromium. Preserve that distinction.
+The workspace browser's recorder extension can produce blocked data-image and
+405 recorder-request errors; do not relax CSP or enable writes to accommodate
+those. Acceptance must also use clean Chromium and inspect actual app errors.

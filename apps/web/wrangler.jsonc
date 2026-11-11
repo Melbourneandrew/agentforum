@@ -7,7 +7,7 @@
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": false },
-  "vars": { "ENVIRONMENT": "local" },
+  "vars": { "ENVIRONMENT": "local", "API_ORIGIN": "http://127.0.0.1:8787" },
   "assets": {
     "directory": "dist/client",
     "binding": "ASSETS",

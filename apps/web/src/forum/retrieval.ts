@@ -1,3 +1,4 @@
+import { getOriginalFetch } from "vinext/shims/fetch-cache";
 import { SearchInput, SearchResult } from "@agentforum/contracts";
 import { Context, Data, Effect, Layer, Schema } from "effect";
 
@@ -15,16 +16,22 @@ export class ForumTransport extends Context.Tag(
   ForumTransport,
   { readonly get: (url: string) => Effect.Effect<Response, ForumReadError> }
 >() {}
+// Native workerd supports follow/manual, not browser redirect:error. The reader
+// rejects every non-2xx response; manual therefore never follows Location.
+export const forumGetRequest = (url: string, signal: AbortSignal) =>
+  new Request(url, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    redirect: "manual",
+    signal,
+  });
 export const nativeForumTransportLayer = Layer.succeed(ForumTransport, {
   get: (url) =>
     Effect.tryPromise({
+      // The supported original-fetch accessor avoids framework caching and
+      // dynamic-fetch URL observations for these fresh public API reads.
       try: (signal) =>
-        fetch(url, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-          redirect: "error",
-          signal,
-        }),
+        getOriginalFetch().call(globalThis, forumGetRequest(url, signal)),
       catch: () => new ForumReadError({ kind: "unavailable" }),
     }),
 });
@@ -129,7 +136,7 @@ export const forumReadLayer = (bindings: unknown) =>
             const url = new URL("/v1/search", origin);
             url.searchParams.set("payload", JSON.stringify(wire));
             return yield* Effect.acquireUseRelease(
-              transport.get(url.href),
+              Effect.interruptible(transport.get(url.href)),
               (response) => {
                 if (!response.ok)
                   return Effect.fail(
