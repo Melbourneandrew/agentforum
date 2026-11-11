@@ -5,6 +5,7 @@ import {
   feedHref,
   locatePrevious,
   previousScanBatch,
+  prepareForumQuery,
 } from "../src/forum/navigation.js";
 import { ForumRead } from "../src/forum/retrieval.js";
 const id = (order: number) => "p" + String(order).padStart(20, "0");
@@ -144,6 +145,87 @@ describe("Previous navigation algorithm in workerd (injected reader, not API int
         ),
       ).toMatchObject({ _tag: "Left", left: { kind: "invalid-request" } });
     }
+  });
+  it("finishes at the exact scan boundary and continues once just beyond it", async () => {
+    for (const [cursor, expected, continued] of [
+      ["old-661", "rotated-681", false],
+      ["old-641", "rotated-661", true],
+    ] as const) {
+      const test = fixture(1000);
+      const first = await Effect.runPromise(
+        locatePrevious({ anchor: "old-981", cursor, scan: "old-981" }).pipe(
+          Effect.provide(test.layer),
+        ),
+      );
+      expect(test.calls).toHaveLength(18);
+      const url = new URL(first, "https://observer.test");
+      expect(url.searchParams.has("scan")).toBe(continued);
+      const scan = url.searchParams.get("scan");
+      const last =
+        scan === null
+          ? first
+          : await Effect.runPromise(
+              locatePrevious({ anchor: "old-981", cursor, scan }).pipe(
+                Effect.provide(test.layer),
+              ),
+            );
+      expect(
+        new URL(last, "https://observer.test").searchParams.get("cursor"),
+      ).toBe(expected);
+    }
+  });
+  it("stops when a target or its immediate newer neighbour is empty", async () => {
+    for (const [cursor, count] of [
+      ["old-1", 1],
+      ["old-66", 2],
+    ] as const) {
+      const test = fixture(65);
+      expect(
+        await Effect.runPromise(
+          Effect.either(
+            locatePrevious({ anchor: "old-46", cursor, scan: "old-46" }).pipe(
+              Effect.provide(test.layer),
+            ),
+          ),
+        ),
+      ).toMatchObject({ _tag: "Left", left: { kind: "invalid-request" } });
+      expect(test.calls).toHaveLength(count);
+    }
+  });
+  it("validates query shape, duplicate fields, exact URL bounds and detail/feed exclusion before I/O", async () => {
+    for (const suffix of [
+      "?unknown=value",
+      "?cursor=a&cursor=b&anchor=a",
+      "?scan=a",
+      "?anchor=a",
+      "?cursor=a",
+      "?post_id=" + id(1) + "&reply_to=" + id(2),
+      "?post_id=" + id(1) + "&cursor=a&anchor=a",
+      "?cursor=" + "a".repeat(4097) + "&anchor=a",
+    ]) {
+      expect(
+        await Effect.runPromise(
+          Effect.either(
+            prepareForumQuery(new URL("https://observer.test/" + suffix)),
+          ),
+        ),
+      ).toMatchObject({ _tag: "Left", left: { kind: "invalid-request" } });
+    }
+    const base = "https://observer.test/";
+    const exact = new URL(base + "a".repeat(14_336 - base.length));
+    expect(await Effect.runPromise(prepareForumQuery(exact))).toEqual({});
+    expect(
+      await Effect.runPromise(
+        Effect.either(prepareForumQuery(new URL(exact.href + "a"))),
+      ),
+    ).toMatchObject({ _tag: "Left" });
+    expect(
+      await Effect.runPromise(
+        prepareForumQuery(
+          new URL(base + "?reply_to=" + id(1) + "&cursor=a&anchor=b&scan=c"),
+        ),
+      ),
+    ).toEqual({ reply_to: id(1), cursor: "a", anchor: "b", scan: "c" });
   });
   it("builds only same-origin fixed-field URLs", () => {
     expect(feedHref({})).toBe("/");

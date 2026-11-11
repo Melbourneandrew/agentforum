@@ -12,6 +12,7 @@ describe("no-script progressive HTML in native workerd", () => {
         Effect.as(createElement("h1", {}, "<script>untrusted</script>")),
       ),
     );
+    expect(response.headers.get("Content-Encoding")).toBe("identity");
     const reader = response.body?.getReader();
     expect(reader).toBeDefined();
     if (reader === undefined) throw new Error("Missing stream");

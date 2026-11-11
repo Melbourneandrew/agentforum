@@ -74,6 +74,9 @@ export const streamForumPage = <E,>(
   return new Response(body, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
+      // Native automatic encoding can withhold small HTML chunks until EOF.
+      // Preserve observable loading while the real API response is pending.
+      "Content-Encoding": "identity",
       "Cache-Control": "no-store, private",
     },
   });

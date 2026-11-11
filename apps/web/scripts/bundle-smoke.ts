@@ -5,6 +5,8 @@ import { readFile, readdir } from "node:fs/promises";
 import { setTimeout } from "node:timers/promises";
 import { gzipSync } from "node:zlib";
 import { chromium } from "playwright";
+import { startObservationFixture } from "./observation-fixture.js";
+import { verifyObservationJourneys } from "./observation-journeys.js";
 
 const modules = (await readdir("dist/ssr", { recursive: true })).filter(
   (path) => /\.m?js$/.test(path),
@@ -21,6 +23,7 @@ assert.ok(
   compressed <= 3 * 1024 * 1024,
   "Web Worker exceeds the 3 MiB compressed script budget",
 );
+const fixture = await startObservationFixture();
 const server = spawn(
   "pnpm",
   [
@@ -31,6 +34,10 @@ const server = spawn(
     "dist/ssr/wrangler.json",
     "--local",
     "--no-bundle",
+    "--var",
+    "API_ORIGIN:" + fixture.origin,
+    "--inspector-port",
+    "0",
     "--ip",
     "127.0.0.1",
     "--port",
@@ -76,10 +83,7 @@ try {
     const html = await response.text();
     assert.match(html, /<main/);
     if (path === "/runtime") assert.match(html, /Cloudflare-Workers/);
-    assert.match(
-      html,
-      path === "/" ? /A public view of agent activity/ : /Read-only by design/,
-    );
+    assert.match(html, path === "/" ? /Agent posts/ : /Read-only by design/);
     assert.doesNotMatch(
       html,
       /<script\b|<form\b|<iframe\b|<[a-z][^>]*\son\w+=/i,
@@ -99,6 +103,7 @@ try {
   }
   const browser = await chromium.launch({ args: ["--no-sandbox"] });
   try {
+    await verifyObservationJourneys(browser, base, fixture);
     for (const width of [390, 1440]) {
       const page = await browser.newPage({ viewport: { width, height: 900 } });
       const failures: string[] = [];
@@ -124,9 +129,7 @@ try {
           unexpectedRequests.push(request.url());
       });
       await page.goto(base);
-      await page
-        .getByRole("heading", { name: "A public view of agent activity." })
-        .waitFor();
+      await page.getByRole("heading", { name: "Agent posts" }).waitFor();
       assert.equal(
         await page.locator("script, form, input, textarea, button").count(),
         0,
@@ -141,13 +144,13 @@ try {
         await page
           .locator("main")
           .evaluate(
-            (element) => getComputedStyle(element).marginLeft !== "0px",
+            (element) =>
+              getComputedStyle(element).marginLeft !== "0px" ||
+              getComputedStyle(element).paddingLeft !== "0px",
           ),
         true,
       );
-      await page
-        .getByRole("link", { name: "View runtime information" })
-        .click();
+      await page.goto(base + "/runtime");
       await page
         .getByRole("heading", { name: "Read-only by design." })
         .waitFor();
@@ -195,9 +198,7 @@ try {
       await page
         .getByRole("link", { name: "Return to observation site" })
         .click();
-      await page
-        .getByRole("heading", { name: "A public view of agent activity." })
-        .waitFor();
+      await page.getByRole("heading", { name: "Agent posts" }).waitFor();
       assert.deepEqual(failures, []);
       assert.deepEqual(mutations, []);
       assert.deepEqual(unexpectedRequests, []);
@@ -219,8 +220,13 @@ try {
     `Production web workerd/browser smoke passed; compressed Worker modules: ${String(compressed)} bytes`,
   );
 } finally {
-  if (server.pid !== undefined && server.exitCode === null) {
-    process.kill(-server.pid, "SIGTERM");
-    await once(server, "exit");
+  try {
+    if (server.pid !== undefined && server.exitCode === null) {
+      const exited = once(server, "exit");
+      process.kill(-server.pid, "SIGTERM");
+      await exited;
+    }
+  } finally {
+    await fixture.stop();
   }
 }

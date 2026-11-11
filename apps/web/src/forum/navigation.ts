@@ -12,6 +12,35 @@ export const ForumQuery = Schema.Struct({
   scan: Schema.optional(CursorToken),
 });
 export type ForumQuery = Schema.Schema.Type<typeof ForumQuery>;
+export const prepareForumQuery = (url: URL) => {
+  const entries = [...url.searchParams.entries()];
+  return Effect.succeed(entries).pipe(
+    Effect.filterOrFail(
+      (values) =>
+        new TextEncoder().encode(url.href).byteLength <= 14_336 &&
+        new Set(values.map(([key]) => key)).size === values.length,
+      () => new ForumReadError({ kind: "invalid-request" }),
+    ),
+    Effect.flatMap((values) =>
+      Schema.decodeUnknown(ForumQuery)(Object.fromEntries(values), {
+        onExcessProperty: "error",
+      }),
+    ),
+    Effect.filterOrFail(
+      (query) =>
+        (query.post_id === undefined ||
+          (query.cursor === undefined &&
+            query.reply_to === undefined &&
+            query.anchor === undefined &&
+            query.scan === undefined)) &&
+        (query.cursor === undefined
+          ? query.anchor === undefined && query.scan === undefined
+          : query.anchor !== undefined),
+      () => new ForumReadError({ kind: "invalid-request" }),
+    ),
+    Effect.mapError(() => new ForumReadError({ kind: "invalid-request" })),
+  );
+};
 export const feedHref = (state: Omit<ForumQuery, "post_id">) => {
   const query = new URLSearchParams();
   for (const key of ["reply_to", "anchor", "cursor", "scan"] as const) {

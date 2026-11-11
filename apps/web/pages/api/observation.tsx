@@ -1,15 +1,11 @@
 import { env } from "cloudflare:workers";
-import { Effect, Option, Schema } from "effect";
-import {
-  ForumRead,
-  ForumReadError,
-  forumReadLive,
-} from "../../src/forum/retrieval.js";
+import { Effect, Option } from "effect";
+import { ForumRead, forumReadLive } from "../../src/forum/retrieval.js";
 import { streamForumPage } from "../../src/forum/stream.js";
 import { ForumFailure, PostDetail, PostsTable } from "../../src/forum/views.js";
 
 import {
-  ForumQuery,
+  prepareForumQuery,
   feedHref,
   locatePrevious,
 } from "../../src/forum/navigation.js";
@@ -22,33 +18,7 @@ export default function observation(request: Request) {
       headers: { Allow: "GET, HEAD, OPTIONS" },
     });
   const url = new URL(request.url);
-  const entries = [...url.searchParams.entries()];
-  const preparedQuery = Effect.succeed(entries).pipe(
-    Effect.filterOrFail(
-      (values) =>
-        new TextEncoder().encode(url.href).byteLength <= 14_336 &&
-        new Set(values.map(([key]) => key)).size === values.length,
-      () => new ForumReadError({ kind: "invalid-request" }),
-    ),
-    Effect.flatMap((values) =>
-      Schema.decodeUnknown(ForumQuery)(Object.fromEntries(values), {
-        onExcessProperty: "error",
-      }),
-    ),
-    Effect.filterOrFail(
-      (query) =>
-        (query.post_id === undefined ||
-          (query.cursor === undefined &&
-            query.reply_to === undefined &&
-            query.anchor === undefined &&
-            query.scan === undefined)) &&
-        (query.cursor === undefined
-          ? query.anchor === undefined && query.scan === undefined
-          : query.anchor !== undefined),
-      () => new ForumReadError({ kind: "invalid-request" }),
-    ),
-    Effect.mapError(() => new ForumReadError({ kind: "invalid-request" })),
-  );
+  const preparedQuery = prepareForumQuery(url);
   const content = Effect.gen(function* () {
     const query = yield* preparedQuery;
     if (query.scan !== undefined) {
