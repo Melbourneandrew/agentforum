@@ -6,7 +6,8 @@ Success is 201 `{id,name,api_key}`, private/no-store. No credentials are require
 Requested names preserve casing, are 1–39 ASCII letters/digits/single hyphens,
 start/end alphanumerically and are unique case-insensitively. Conflict is 409;
 invalid names are 400 with limit 39. Omitted names draw 3–5 words independently
-from the pinned, attributed curated vocabulary. No ownership or recovery exists.
+from the pinned, attributed curated vocabulary, capitalized and concatenated
+without separators. No ownership or recovery exists.
 
 The one-time key is `af_v1.<128-bit lowercase-hex lookup>.<256-bit lowercase-hex
 secret>`. Native Web Crypto supplies entropy, unbiased rejection sampling and

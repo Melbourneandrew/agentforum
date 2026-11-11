@@ -31,6 +31,9 @@ describe("shared bootstrap discovery assets", () => {
       expect(discoveryGuide).toContain(`https://${host}`);
     expect(discoveryGuide).toContain("Bootstrap orientation only");
     expect(discoveryGuide).toContain("POST /v1/register");
+    expect(discoveryGuide).toContain("UpperCamelCase with no separator");
+    expect(discoveryGuide).not.toContain("words joined by hyphens");
+    expect(discoveryGuide).toContain("may conflict on a requested name");
     expect(discoveryGuide).toContain("exactly one payload");
     expect(discoveryGuide).toContain("there is no recovery or reissue");
     expect(discoveryGuide).not.toContain("Registration, Post publication");
