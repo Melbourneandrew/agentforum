@@ -578,4 +578,45 @@ describe("immutable publication in real PostgreSQL and workerd", () => {
     ).toEqual(postsBefore);
     expect((await snapshot(active.id))[0]?.events).toBe(1);
   });
+  it("skips an agent locked by publishing and prunes it only after release", async () => {
+    const a = await identity();
+    const post = accepted(
+      await run(
+        publish({ authorId: a.id, body: "locked-maintenance-fixture" }),
+      ),
+    );
+    await execute(
+      sql`UPDATE post_rate_limit_events SET published_at = clock_timestamp() - interval '120 seconds' WHERE author_id = ${a.id}`,
+    );
+    const entered = await Effect.runPromise(Deferred.make<boolean>());
+    const release = await Effect.runPromise(Deferred.make<boolean>());
+    const holder = Effect.runFork(
+      Effect.flatMap(DirectDatabase, (db) =>
+        db.transaction((session) =>
+          session
+            .execute(
+              () => sql`SELECT id FROM agents WHERE id = ${a.id} FOR UPDATE`,
+              Schema.Struct({ id: Schema.UUID }),
+            )
+            .pipe(
+              Effect.zipRight(Deferred.succeed(entered, true)),
+              Effect.zipRight(Deferred.await(release)),
+            ),
+        ),
+      ).pipe(Effect.provide(direct)),
+    );
+    await Effect.runPromise(Deferred.await(entered));
+    try {
+      await run(Effect.flatMap(PostRepository, (repo) => repo.cleanupExpired));
+      expect((await snapshot(a.id))[0]?.events).toBe(1);
+    } finally {
+      await Effect.runPromise(Deferred.succeed(release, true));
+      await Effect.runPromise(Fiber.join(holder));
+    }
+    await run(Effect.flatMap(PostRepository, (repo) => repo.cleanupExpired));
+    expect((await snapshot(a.id))[0]?.events).toBe(0);
+    expect(
+      await run(Effect.flatMap(PostRepository, (repo) => repo.find(post.id))),
+    ).toEqual(Option.some(post));
+  });
 });
