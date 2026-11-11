@@ -1,3 +1,4 @@
+import { RegistrationSuccess } from "../../src/identity/contract.js";
 import { createServer } from "node:net";
 import { readFile, stat } from "node:fs/promises";
 import {
@@ -105,6 +106,40 @@ describe("actual owned-local commands", () => {
               schedule: Schedule.spaced("100 millis"),
             }),
           );
+          for (const method of ["GET", "POST"]) {
+            const name = `OwnedLocal${method}Agent`;
+            const result = yield* Effect.tryPromise({
+              try: async (signal) => {
+                const response = await fetch(
+                  method === "GET"
+                    ? `${origin}/v1/register?payload=${encodeURIComponent(JSON.stringify({ name }))}`
+                    : `${origin}/v1/register`,
+                  {
+                    method,
+                    signal: AbortSignal.any([
+                      signal,
+                      AbortSignal.timeout(5000),
+                    ]),
+                    ...(method === "POST"
+                      ? {
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ name }),
+                        }
+                      : {}),
+                  },
+                );
+                expect(response.status).toBe(201);
+                expect(response.headers.get("Cache-Control")).toContain(
+                  "no-store",
+                );
+                const value: unknown = await response.json();
+                return value;
+              },
+              catch: () => new LocalCliFailure(),
+            }).pipe(Effect.flatMap(Schema.decodeUnknown(RegistrationSuccess)));
+            expect(result.name).toBe(name);
+            expect(Redacted.value(result.api_key).length).toBe(103);
+          }
           const descriptor = yield* Effect.tryPromise({
             try: () => readFile(localDescriptorPath, "utf8"),
             catch: () => new LocalCliFailure(),
@@ -171,6 +206,9 @@ describe("actual owned-local commands", () => {
               duration: "10 seconds",
               onTimeout: () => new LocalCliFailure(),
             }),
+          );
+          expect(stopped.stdout + stopped.stderr).toMatch(
+            /env\.AUTH_PEPPERS\s+\("\(hidden\)"\)/,
           );
           process.stdout.write(stopped.stdout);
           process.stderr.write(stopped.stderr);

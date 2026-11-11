@@ -6,7 +6,11 @@ import {
   HttpApiSchema,
   OpenApi,
 } from "@effect/platform";
-import { Schema } from "effect";
+import { JSONSchema, Schema } from "effect";
+import { InputProblem } from "./input/transport.js";
+import { RegistrationInput, RegistrationSuccess } from "./identity/contract.js";
+import { NameUnavailableProblem } from "./identity/contract.js";
+import { DatabaseConnectionTimeoutProblem } from "./database/problems.js";
 
 const occurrence = {
   detail: Schema.String,
@@ -57,7 +61,112 @@ const problemEncoding = {
   kind: "Json",
   contentType: "application/problem+json",
 } as const;
+// GET transports the identical JSON model as POST. setPayload on GET generates
+// a query parameter; raw handlers skip framework parsing and use InputTransport.
+const RegistrationGet = Schema.Struct({
+  payload: Schema.String.annotations({
+    jsonSchema: {
+      type: "string",
+      contentMediaType: "application/json",
+      contentSchema: JSONSchema.make(RegistrationInput, {
+        target: "jsonSchema2020-12",
+      }),
+    },
+    description:
+      "The RegistrationInput JSON document, UTF-8 percent-encoded once. Full encoded URL limit: 14336 bytes.",
+  }),
+});
+const registrationGet = HttpApiEndpoint.get(
+  "registerGet",
+  "/v1/register",
+).setPayload(RegistrationGet);
+const registrationPost = HttpApiEndpoint.post(
+  "registerPost",
+  "/v1/register",
+).setPayload(RegistrationInput);
+const registrationGroup = HttpApiGroup.make("registration")
+  .add(
+    registrationGet
+      .addSuccess(RegistrationSuccess, { status: 201 })
+      .addError(
+        NameUnavailableProblem.pipe(
+          HttpApiSchema.withEncoding(problemEncoding),
+        ),
+        { status: 409 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 400 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 401 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 405 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 413 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 415 },
+      )
+      .addError(
+        DatabaseConnectionTimeoutProblem.pipe(
+          HttpApiSchema.withEncoding(problemEncoding),
+        ),
+        { status: 503 },
+      )
+      .addError(
+        InternalProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 500 },
+      ),
+  )
+  .add(
+    registrationPost
+      .addSuccess(RegistrationSuccess, { status: 201 })
+      .addError(
+        NameUnavailableProblem.pipe(
+          HttpApiSchema.withEncoding(problemEncoding),
+        ),
+        { status: 409 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 400 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 401 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 405 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 413 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 415 },
+      )
+      .addError(
+        DatabaseConnectionTimeoutProblem.pipe(
+          HttpApiSchema.withEncoding(problemEncoding),
+        ),
+        { status: 503 },
+      )
+      .addError(
+        InternalProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 500 },
+      ),
+  );
 export const Api = HttpApi.make("agentforum")
+  .add(registrationGroup)
   .add(
     HttpApiGroup.make("runtime").add(
       HttpApiEndpoint.get("health", "/v1/health")
@@ -111,14 +220,22 @@ export const makeOpenApi = () => {
   const spec = OpenApi.fromApi(Api);
   // HttpApi includes its default decode error in every operation. Our boundary
   // replaces it with the declared RFC 9457 schema, never its internal message.
-  for (const path of Object.values(spec.paths)) {
+  for (const [pathname, path] of Object.entries(spec.paths)) {
     for (const operation of Object.values(path)) {
       Object.assign(operation.responses, {
         "400": {
           description: "Invalid request",
           content: {
             "application/problem+json": {
-              schema: { $ref: "#/components/schemas/ValidationProblem" },
+              schema:
+                pathname === "/v1/register"
+                  ? {
+                      anyOf: [
+                        { $ref: "#/components/schemas/ValidationProblem" },
+                        { $ref: "#/components/schemas/InputProblem" },
+                      ],
+                    }
+                  : { $ref: "#/components/schemas/ValidationProblem" },
             },
           },
         },

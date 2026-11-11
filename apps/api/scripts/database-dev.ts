@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parse, type ParseError } from "jsonc-parser";
@@ -70,6 +71,18 @@ const program = Effect.scoped(
         Effect.promise(() => rm(directory, { recursive: true, force: true })),
     );
     const configPath = join(directory, "wrangler.json");
+    // This pepper belongs only to this fresh, disposable local database session.
+    // Wrangler masks .dev.vars values; never put these in printed vars/config.
+    yield* Effect.tryPromise({
+      try: () =>
+        writeFile(
+          join(directory, ".dev.vars"),
+          `AUTH_CURRENT_PEPPER="local-v1"\nAUTH_PEPPERS='${JSON.stringify({ "local-v1": randomBytes(32).toString("hex") })}'\n`,
+          { mode: 0o600 },
+        ),
+      catch: () => new LocalDatabaseCommandError(),
+    });
+
     yield* Effect.tryPromise({
       try: () =>
         writeFile(

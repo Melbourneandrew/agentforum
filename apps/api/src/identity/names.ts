@@ -3,7 +3,7 @@ import {
   CredentialCryptography,
   CredentialCryptoError,
 } from "./credentials.js";
-import { AgentName } from "./repository.js";
+import { AgentName } from "./contract.js";
 import { vocabulary } from "./vocabulary/english-v1.js";
 export class GeneratedNames extends Context.Tag(
   "@agentforum/api/GeneratedNames",

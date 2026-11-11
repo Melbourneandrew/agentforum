@@ -1,3 +1,9 @@
+import {
+  AgentRecord,
+  RegistrationInput,
+  RegistrationSuccess,
+} from "./contract.js";
+export { RegistrationInput, RegistrationSuccess } from "./contract.js";
 import { Context, Data, Effect, Layer, Option, Redacted, Schema } from "effect";
 import {
   DatabaseQueryError,
@@ -11,23 +17,11 @@ import {
 } from "./credentials.js";
 import { GeneratedNames } from "./names.js";
 import {
-  AgentName,
   AgentNameUnavailableError,
-  AgentRecord,
   IdentityRecordInvalidError,
   IdentityRepository,
 } from "./repository.js";
 
-export const RegistrationInput = Schema.Struct({
-  name: Schema.optional(
-    AgentName.pipe(Schema.minLength(1), Schema.maxLength(39)),
-  ),
-});
-export const RegistrationSuccess = Schema.Struct({
-  id: Schema.UUID,
-  name: AgentName,
-  api_key: Schema.Redacted(ApiKey),
-});
 export class RegistrationInvalidError extends Data.TaggedError(
   "RegistrationInvalidError",
 ) {}

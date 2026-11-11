@@ -1,14 +1,11 @@
+import { keyVersion } from "./contract.js";
+export { ApiKey, keyVersion } from "./contract.js";
 import { timingSafeEqual } from "node:crypto";
 import { Context, Data, Effect, Layer, Option, Redacted, Schema } from "effect";
 
-export const keyVersion = "af_v1";
 const HexDigest = Schema.String.pipe(
   Schema.length(64),
   Schema.pattern(/^[0-9a-f]{64}$/),
-);
-export const ApiKey = Schema.String.pipe(
-  Schema.length(103),
-  Schema.pattern(/^af_v1\.[0-9a-f]{32}\.[0-9a-f]{64}$/),
 );
 const Version = Schema.String.pipe(
   Schema.minLength(1),

@@ -1,3 +1,4 @@
+import worker, { type WorkerExecutionContext } from "../../src/worker.js";
 import { env } from "node:process";
 import { sql } from "drizzle-orm";
 import { Cause, Effect, Exit, Layer, Option, Redacted, Schema } from "effect";
@@ -307,5 +308,180 @@ describe("registration/authentication services in real PostgreSQL/workerd", () =
       await execute(sql`DROP FUNCTION test_reject_signup()`);
     }
     expect((await run(register({ name: candidate }))).name).toBe(candidate);
+  });
+  it("executes actual GET and POST registration with identical contracts, header safety and one-time keys", async () => {
+    const execution: WorkerExecutionContext = {
+      waitUntil: () => undefined,
+      passThroughOnException: () => undefined,
+      props: {},
+    };
+    const bindings = {
+      ENVIRONMENT: "local",
+      AUTH_CURRENT_PEPPER: "p2",
+      AUTH_PEPPERS: JSON.stringify({ p2: "02".repeat(32) }),
+      HYPERDRIVE_DIRECT: {
+        connectionString: Redacted.value(config.DATABASE_TEST_DIRECT_URL),
+      },
+      HYPERDRIVE_CACHED: {
+        connectionString: Redacted.value(config.DATABASE_TEST_CACHED_URL),
+      },
+    };
+    for (const method of ["GET", "POST"]) {
+      const requested = name();
+      const document = JSON.stringify({ name: requested });
+      const request =
+        method === "GET"
+          ? new Request(
+              "https://api.agentforum.test/v1/register?payload=" +
+                encodeURIComponent(document),
+            )
+          : new Request("https://api.agentforum.test/v1/register", {
+              method,
+              headers: { "Content-Type": "application/json" },
+              body: document,
+            });
+      const response = await worker.fetch(request, bindings, execution);
+      expect(response.status).toBe(201);
+      expect(response.headers.get("Cache-Control")).toBe("no-store, private");
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      const decoded = await Effect.runPromise(
+        Schema.decodeUnknown(Schema.parseJson(RegistrationSuccess))(
+          await response.text(),
+        ),
+      );
+      expect(decoded.name).toBe(requested);
+      expect(await run(authenticate(Option.some(decoded.api_key)))).toEqual({
+        id: decoded.id,
+        name: requested,
+      });
+      const duplicate =
+        method === "GET"
+          ? new Request(request.url)
+          : new Request(request.url, {
+              method,
+              headers: { "Content-Type": "application/json" },
+              body: document,
+            });
+      const conflict = await worker.fetch(duplicate, bindings, execution);
+      expect(conflict.status).toBe(409);
+      expect(conflict.headers.get("Content-Type")).toBe(
+        "application/problem+json",
+      );
+      expect(await conflict.text()).not.toContain(
+        Redacted.value(decoded.api_key),
+      );
+    }
+  });
+  it("keeps actual HEAD/OPTIONS safe even without bindings and reports name limits without allocating", async () => {
+    const execution: WorkerExecutionContext = {
+      waitUntil: () => undefined,
+      passThroughOnException: () => undefined,
+      props: {},
+    };
+    for (const method of ["HEAD", "OPTIONS"]) {
+      const response = await worker.fetch(
+        new Request("https://api.agentforum.test/v1/register", { method }),
+        undefined,
+        execution,
+      );
+      expect(response.status).toBe(method === "HEAD" ? 200 : 204);
+      expect(await response.text()).toBe("");
+    }
+    const bindings = { ENVIRONMENT: "local" };
+    for (const method of ["GET", "POST"]) {
+      const document = JSON.stringify({ name: "a".repeat(40) });
+      const request =
+        method === "GET"
+          ? new Request(
+              "https://api.agentforum.test/v1/register?payload=" +
+                encodeURIComponent(document),
+            )
+          : new Request("https://api.agentforum.test/v1/register", {
+              method,
+              headers: { "Content-Type": "application/json" },
+              body: document,
+            });
+      const response = await worker.fetch(request, bindings, execution);
+      expect(response.status).toBe(400);
+      const problem = Schema.decodeUnknownSync(
+        Schema.Struct({
+          limit: Schema.Literal(39),
+          status: Schema.Literal(400),
+          canonical: Schema.Literal("/v1/register"),
+        }),
+      )(await response.json());
+      expect(problem.limit).toBe(39);
+    }
+  });
+  it("preserves declared transport failures and Bearer challenges through the real outer normalizer", async () => {
+    const execution: WorkerExecutionContext = {
+      waitUntil: () => undefined,
+      passThroughOnException: () => undefined,
+      props: {},
+    };
+    const requests = [
+      {
+        request: new Request(
+          "https://api.agentforum.test/v1/register?payload=%7B%7D&payload=%7B%7D",
+        ),
+        status: 400,
+      },
+      {
+        request: new Request(
+          "https://api.agentforum.test/v1/register?payload=%ff",
+        ),
+        status: 400,
+      },
+      {
+        request: new Request("https://api.agentforum.test/v1/register", {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: "{}",
+        }),
+        status: 415,
+      },
+      {
+        request: new Request("https://api.agentforum.test/v1/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "not-a-Bearer-secret",
+          },
+          body: "{}",
+        }),
+        status: 401,
+      },
+      {
+        request: new Request(
+          "https://api.agentforum.test/v1/register?payload=" +
+            "x".repeat(14336),
+        ),
+        status: 413,
+      },
+      {
+        request: new Request("https://api.agentforum.test/v1/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: " ".repeat(65537),
+        }),
+        status: 413,
+      },
+    ];
+    for (const { request, status } of requests) {
+      const response = await worker.fetch(
+        request,
+        { ENVIRONMENT: "local" },
+        execution,
+      );
+      expect(response.status).toBe(status);
+      expect(response.headers.get("Content-Type")).toBe(
+        "application/problem+json",
+      );
+      if (status === 401)
+        expect(response.headers.get("WWW-Authenticate")).toBe("Bearer");
+      const text = await response.text();
+      expect(text).not.toContain("not-a-Bearer-secret");
+      if (status === 413) expect(text).toContain('"canonical":"/v1/register"');
+    }
   });
 });
