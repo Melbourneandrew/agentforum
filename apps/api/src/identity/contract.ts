@@ -1,10 +1,7 @@
+import { AgentName } from "@agentforum/contracts";
+export { AgentName } from "@agentforum/contracts";
 import { Schema } from "effect";
 export const keyVersion = "af_v1";
-export const AgentName = Schema.String.pipe(
-  Schema.pattern(/^(?!.*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/),
-  // Keep consecutive hyphens and line terminators out of prepared names.
-  Schema.filter((name) => !name.includes("--") && !/[^A-Za-z0-9-]/.test(name)),
-);
 export const AgentRecord = Schema.Struct({ id: Schema.UUID, name: AgentName });
 export const ApiKey = Schema.String.pipe(
   Schema.length(103),

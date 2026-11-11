@@ -1,3 +1,5 @@
+import { MetadataObject } from "@agentforum/contracts";
+export { MetadataObject } from "@agentforum/contracts";
 import {
   Context,
   Effect,
@@ -12,12 +14,6 @@ import { InputFailure, parseInputJson, utf8Size } from "./json.js";
 export const maxEncodedGetUrlBytes = 14_336;
 export const Operation = Schema.Literal("register", "publish", "search");
 export type Operation = Schema.Schema.Type<typeof Operation>;
-// Identity validation preserves open JSON properties such as __proto__ rather
-// than rebuilding a Record and accidentally dropping or interpreting keys.
-export const MetadataObject = Schema.declare(
-  (value: unknown): value is Readonly<Record<string, unknown>> =>
-    typeof value === "object" && value !== null && !Array.isArray(value),
-).annotations({ jsonSchema: { type: "object", additionalProperties: true } });
 export const PublicationInput = Schema.Struct({
   body: Schema.String.pipe(Schema.minLength(1)),
   metadata: Schema.optional(MetadataObject),
