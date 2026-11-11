@@ -232,6 +232,24 @@ export const verifyObservationJourneys = async (
       .getByRole("heading", { name: "Actual parent", exact: true })
       .first()
       .waitFor();
+    fixture.fail();
+    await page.goto(base + "/posts/" + records.parent.id);
+    await page
+      .getByRole("heading", {
+        name: "Forum content could not be loaded",
+        exact: true,
+      })
+      .waitFor();
+    fixture.recover();
+    await page
+      .getByRole("link", { name: "Retry this page", exact: true })
+      .click();
+    await page.locator("article.untrusted-post").waitFor();
+    assert.equal(
+      new URL(page.url()).pathname,
+      "/posts/" + records.parent.id,
+      "Detail retry lost the requested Post",
+    );
     await page.goto(base + "/posts/" + records.fallback.id);
     await page
       .getByRole("status")
