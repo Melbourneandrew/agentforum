@@ -118,6 +118,10 @@ describe("repository toolchain", () => {
         path: `${process.cwd()}/apps/web`,
       }),
       expect.objectContaining({
+        name: "@agentforum/contracts",
+        path: `${process.cwd()}/packages/contracts`,
+      }),
+      expect.objectContaining({
         name: "@agentforum/discovery-assets",
         path: `${process.cwd()}/packages/discovery-assets`,
       }),
@@ -141,6 +145,7 @@ describe("repository toolchain", () => {
     expect(graph).toMatchObject({
       packages: [
         "@agentforum/api",
+        "@agentforum/contracts",
         "@agentforum/discovery-assets",
         "@agentforum/docs",
         "@agentforum/web",
@@ -151,6 +156,8 @@ describe("repository toolchain", () => {
       expect.arrayContaining([
         expect.objectContaining({ taskId: "@agentforum/api#build" }),
         expect.objectContaining({ taskId: "@agentforum/api#test" }),
+        expect.objectContaining({ taskId: "@agentforum/contracts#build" }),
+        expect.objectContaining({ taskId: "@agentforum/contracts#test" }),
         expect.objectContaining({ taskId: "@agentforum/web#build" }),
         expect.objectContaining({ taskId: "@agentforum/web#test" }),
         expect.objectContaining({ taskId: "@agentforum/docs#build" }),
@@ -166,6 +173,7 @@ describe("repository toolchain", () => {
     expect(json("turbo.json")).toMatchObject({
       tasks: {
         build: { dependsOn: ["^build"] },
+        "@agentforum/contracts#build": { dependsOn: ["^build"], outputs: [] },
         lint: { dependsOn: ["^build"] },
         typecheck: { dependsOn: ["^build"] },
         test: { dependsOn: ["^build"] },

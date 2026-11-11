@@ -34,6 +34,10 @@
         "$TURBO_ROOT$/apps/api/generated/openapi.json"
       ],
       "outputs": ["build/**", "dist/**"]
+    },
+    "@agentforum/contracts#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
     }
   }
 }
