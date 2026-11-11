@@ -1,7 +1,24 @@
 import { discoveryGuide } from "@agentforum/discovery-assets";
 import type { ExecutionContext } from "@cloudflare/workers-types/index.ts";
-import { HttpApiBuilder, HttpServer } from "@effect/platform";
+import {
+  HttpApiBuilder,
+  HttpServer,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "@effect/platform";
 import { Context, Effect, Layer, Option, Schema } from "effect";
+import {
+  InputProblem,
+  inputProblem,
+  maxEncodedGetUrlBytes,
+} from "./input/transport.js";
+import { InputFailure, utf8Size } from "./input/json.js";
+import {
+  NameUnavailableProblem,
+  recognizeRegistrationProblem,
+  registrationLive,
+  registrationOperation,
+} from "./identity/http.js";
 import {
   Api,
   HealthResponse,
@@ -77,19 +94,31 @@ const Problem = Schema.Union(
   InternalProblem,
   NotFoundProblem,
   DatabaseConnectionTimeoutProblem,
+  InputProblem,
+  NameUnavailableProblem,
 );
-export const normalizeProblem = (response: Response, correlationId: string) =>
-  recognizeDatabaseTimeout(response, correlationId).pipe(
-    Effect.map((timeout) =>
-      Option.getOrElse(timeout, () =>
-        response.status === 400
-          ? validationProblem(correlationId)
-          : response.status === 404
-            ? notFoundProblem(correlationId)
-            : genericProblem(correlationId),
-      ),
-    ),
-  );
+export const normalizeProblem = (
+  response: Response,
+  correlationId: string,
+  registration = false,
+  declaredDatabaseTimeout = true,
+) =>
+  Effect.gen(function* () {
+    const timeout = yield* declaredDatabaseTimeout
+      ? recognizeDatabaseTimeout(response, correlationId)
+      : Effect.succeed(Option.none<DatabaseConnectionTimeoutProblem>());
+    if (Option.isSome(timeout)) return timeout.value;
+    const business = yield* registration
+      ? recognizeRegistrationProblem(response, correlationId)
+      : Effect.succeed(Option.none<InputProblem | NameUnavailableProblem>());
+    return Option.getOrElse(business, () =>
+      response.status === 400
+        ? validationProblem(correlationId)
+        : response.status === 404
+          ? notFoundProblem(correlationId)
+          : genericProblem(correlationId),
+    );
+  });
 export const renderProblem = (
   problem: Schema.Schema.Type<typeof Problem>,
   method: string,
@@ -98,6 +127,9 @@ export const renderProblem = (
   const outputHeaders = new Headers(headers);
   outputHeaders.set("Content-Type", "application/problem+json");
   outputHeaders.delete("Retry-After");
+  if (problem.status === 401) outputHeaders.set("WWW-Authenticate", "Bearer");
+  if (problem.status === 405)
+    outputHeaders.set("Allow", "GET, POST, HEAD, OPTIONS");
   if (problem.status === 503) outputHeaders.set("Retry-After", "1");
   const response = Response.json(Schema.encodeSync(Problem)(problem), {
     status: problem.status,
@@ -123,6 +155,7 @@ const recordDefect = (correlationId: string) =>
 
 export const makeWorker = (
   health: Layer.Layer<Health, never, RequestContext> = healthLive,
+  registration: typeof registrationLive = registrationLive,
 ) => ({
   async fetch(
     request: Request,
@@ -141,8 +174,36 @@ export const makeWorker = (
     };
     const problemResponse = (problem: Schema.Schema.Type<typeof Problem>) =>
       renderProblem(problem, request.method, headers);
+    const registrationPath = new URL(request.url).pathname === "/v1/register";
+    if (registrationPath && request.method === "HEAD")
+      return new Response(null, { status: 200, headers });
     if (request.method === "OPTIONS")
       return new Response(null, { status: 204, headers });
+    // Reject before the router builds/decodes its unused query-parameter view.
+    if (
+      registrationPath &&
+      request.method === "GET" &&
+      utf8Size(request.url) > maxEncodedGetUrlBytes
+    )
+      return problemResponse(
+        inputProblem(
+          new InputFailure({ reason: "encoding" }),
+          "register",
+          correlationId,
+        ),
+      );
+    if (
+      registrationPath &&
+      request.method !== "GET" &&
+      request.method !== "POST"
+    )
+      return problemResponse(
+        inputProblem(
+          new InputFailure({ reason: "method" }),
+          "register",
+          correlationId,
+        ),
+      );
     const env = Schema.decodeUnknownEither(Environment)(bindings);
     if (env._tag === "Left") {
       await Effect.runPromise(recordDefect(correlationId));
@@ -159,6 +220,32 @@ export const makeWorker = (
     const app = HttpApiBuilder.toWebHandler(
       HttpApiBuilder.api(Api).pipe(
         Layer.provide(runtimeGroup(health)),
+        Layer.provide(
+          HttpApiBuilder.group(Api, "registration", (handlers) => {
+            const handle = ({
+              request: incoming,
+            }: {
+              readonly request: HttpServerRequest.HttpServerRequest;
+            }) =>
+              Effect.gen(function* () {
+                const native = yield* HttpServerRequest.toWeb(incoming).pipe(
+                  Effect.orDie,
+                );
+                const response = yield* registrationOperation(
+                  native,
+                  correlationId,
+                  () => registration(bindings),
+                  recordDefect(correlationId).pipe(
+                    Effect.as(problemResponse(genericProblem(correlationId))),
+                  ),
+                );
+                return HttpServerResponse.fromWeb(response);
+              });
+            return handlers
+              .handleRaw("registerGet", handle)
+              .handleRaw("registerPost", handle);
+          }),
+        ),
         Layer.provide(
           HttpApiBuilder.group(Api, "discovery", (handlers) =>
             handlers
@@ -177,7 +264,12 @@ export const makeWorker = (
       let result = response;
       if (response.status >= 400) {
         const problem = await Effect.runPromise(
-          normalizeProblem(response, correlationId),
+          normalizeProblem(
+            response,
+            correlationId,
+            registrationPath,
+            registrationPath,
+          ),
         );
         if (problem.status === 500)
           await Effect.runPromise(recordDefect(correlationId));

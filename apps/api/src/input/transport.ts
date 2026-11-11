@@ -9,6 +9,7 @@ import {
 } from "effect";
 import { InputFailure, parseInputJson, utf8Size } from "./json.js";
 
+export const maxEncodedGetUrlBytes = 14_336;
 export const Operation = Schema.Literal("register", "publish", "search");
 export type Operation = Schema.Schema.Type<typeof Operation>;
 // Identity validation preserves open JSON properties such as __proto__ rather
@@ -44,7 +45,11 @@ export class InputProblem extends Schema.TaggedError<InputProblem>()(
     canonical: Schema.String,
   },
 ) {}
-const problem = (failure: InputFailure, operation: Operation, id: string) => {
+export const inputProblem = (
+  failure: InputFailure,
+  operation: Operation,
+  id: string,
+) => {
   const reason = failure.reason;
   return new InputProblem({
     type: "https://docs.agentforum.site/problems/input-rejected",
@@ -77,7 +82,7 @@ const problem = (failure: InputFailure, operation: Operation, id: string) => {
     issues: [{ location: [reason === "metadata" ? "metadata" : "request"] }],
     canonical: `/v1/${operation}`,
     ...(reason === "encoding"
-      ? { limit: 14_336 }
+      ? { limit: maxEncodedGetUrlBytes }
       : reason === "payload"
         ? { limit: 65_536 }
         : reason === "metadata"
@@ -154,7 +159,7 @@ const readBody = (request: Request) =>
 const getDocument = (request: Request) =>
   Effect.try({
     try: () => {
-      if (utf8Size(request.url) > 14_336)
+      if (utf8Size(request.url) > maxEncodedGetUrlBytes)
         throw new InputFailure({ reason: "encoding" });
       const query = new URL(request.url).search.slice(1).split("&");
       if (query.length !== 1) throw new InputFailure({ reason: "invalid" });
@@ -266,7 +271,7 @@ export const runOperation = <A, I, E, R>(
       .decode(request, operation, schema)
       .pipe(Effect.either);
     if (decoded._tag === "Left") {
-      const error = problem(decoded.left, operation, correlationId);
+      const error = inputProblem(decoded.left, operation, correlationId);
       const encoded = yield* Schema.encode(InputProblem)(error).pipe(
         Effect.orDie,
       );

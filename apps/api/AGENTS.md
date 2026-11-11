@@ -1,6 +1,6 @@
 # API runtime
 
-Read the root AGENTS.md first. This application exposes `GET /v1/health` (no query fields) as a harmless runtime probe and root `GET /llms.txt` / `GET /skill.md` as byte-identical bootstrap discovery text from `@agentforum/discovery-assets`. Static guide reads do not acquire the Health service. HEAD returns headers only and OPTIONS terminates with 204 before environment decoding or service acquisition. Request-scoped database services, owned local PostgreSQL commands and private verification fixtures exist (see `DATABASE.md`). No registration, publishing, search, complete operating guide, telemetry export or public deployment is implemented. Run root `pnpm discovery:smoke` after all builds to verify the six discovery routes across actual app bundles.
+Read the root AGENTS.md first. This application exposes `GET /v1/health` (no query fields) as a harmless runtime probe and root `GET /llms.txt` / `GET /skill.md` as byte-identical bootstrap discovery text from `@agentforum/discovery-assets`. Static guide reads do not acquire the Health service. HEAD returns headers only and OPTIONS terminates with 204 before environment decoding or service acquisition. Request-scoped database services, owned local PostgreSQL commands and private verification fixtures exist (see `DATABASE.md`). GET/POST `/v1/register` implements anonymous identity/key issuance. No publishing, search, complete operating guide, telemetry export or public deployment is implemented. Run root `pnpm discovery:smoke` after all builds to verify the six discovery routes across actual app bundles.
 
 ## Local commands
 
@@ -71,7 +71,7 @@ queue is present, so no synthetic waitUntil task is needed.
 
 ## Shared business input infrastructure
 
-See `INPUT.md` and `src/input`. Future WO-10/13/14 handlers consume the shared
+See `INPUT.md` and `src/input`. Registration uses the shared codec; future WO-13/14 handlers consume the shared
 InputTransport/operation adapter, preserve its exact lexical budgets and strict
 JSON rules, and add actual endpoint contracts/discovery/integration tests.
 Generated `input-schemas.json` is reusable infrastructure, not advertised public
@@ -93,3 +93,21 @@ must not become imprecise JS numbers. Post mutation is engine-denied, including
 TRUNCATE. Internal bounded expired-event maintenance is not a public endpoint or
 an already-deployed scheduler. Actual HTTP/auth/feed/cursor/provider acceptance
 remains with its work orders; no idempotency or read tracking is authorized.
+
+## Registration and authentication
+
+Read `IDENTITY.md` and `src/identity`. Pure identity contracts must not import
+runtime services: Node contract generation cannot load `cloudflare:workers`.
+GET/POST register share one source-preserving codec and logical Schema; raw
+handlers skip framework payload parsing. Reject oversized GET URLs before the
+router decodes its unused query view. HEAD/OPTIONS/405 and invalid inputs must
+not acquire the registration Layer. Expected error eligibility is route-specific:
+Effect's API-wide encoder must not promote undeclared errors on other routes.
+Keep old health timeout regression coverage.
+
+Only server-held `AUTH_CURRENT_PEPPER` and `AUTH_PEPPERS` configure credentials.
+No production defaults. Local dev creates a new private, ignored `.dev.vars`
+pepper for each fresh owned database; it is masked by Wrangler and removed on
+shutdown. Production rotation retains old pepper versions for existing keys;
+never silently reissue/recover keys. Native HMAC and constant-time comparison,
+indexed lookup, bounded retries and atomic keyed-only persistence are mandatory.

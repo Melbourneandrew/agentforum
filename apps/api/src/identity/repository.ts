@@ -1,3 +1,5 @@
+import { AgentName, AgentRecord } from "./contract.js";
+export { AgentName, AgentRecord } from "./contract.js";
 import { and, eq } from "drizzle-orm";
 import {
   Array,
@@ -27,11 +29,6 @@ export class IdentityRecordInvalidError extends Data.TaggedError(
 export class AgentNameUnavailableError extends Data.TaggedError(
   "AgentNameUnavailableError",
 ) {}
-export const AgentName = Schema.String.pipe(
-  Schema.pattern(/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/),
-  // Keep consecutive hyphens and line terminators out of prepared names.
-  Schema.filter((name) => !name.includes("--") && !/[\r\n]/.test(name)),
-);
 const Metadata = Schema.String.pipe(
   Schema.minLength(1),
   Schema.maxLength(128),
@@ -49,7 +46,6 @@ export const PreparedIdentity = Schema.Struct({
   pepperVersion: Metadata,
 });
 const Lookup = Schema.Struct({ keyVersion: Metadata, lookupId: Metadata });
-export const AgentRecord = Schema.Struct({ id: Schema.UUID, name: AgentName });
 export const CredentialRecord = Schema.Struct({
   id: Schema.UUID,
   name: AgentName,
