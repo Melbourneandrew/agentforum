@@ -189,4 +189,30 @@ describe("non-read operational tracing in actual workerd", () => {
       "db.operation.name": "SELECT",
     });
   });
+  it("keeps new material publication spans bounded and distinguishes edge from database work", async () => {
+    const recorder = new Recorder();
+    await Effect.runPromise(
+      Effect.flatMap(OperationalTracing, (service) =>
+        Effect.all([
+          service.operation("publication.edge_signal", Effect.void),
+          service.operation("publication.rate_limit", Effect.void),
+          service.operation("publication.transaction", Effect.void),
+        ]),
+      ).pipe(Effect.provide(operationalTracingLayer(recorder))),
+    );
+    expect(recorder.names).toEqual([
+      "publication.edge_signal",
+      "publication.rate_limit",
+      "publication.transaction",
+    ]);
+    expect(recorder.attributes[0]).toMatchObject({
+      "agentforum.dependency": "edge-rate-limit",
+    });
+    expect(recorder.attributes[0]).not.toHaveProperty("db.system.name");
+    expect(recorder.attributes[2]).toMatchObject({
+      "db.system.name": "postgresql",
+      "db.operation.name": "TRANSACTION",
+    });
+    expect(recorder.ended).toBe(3);
+  });
 });

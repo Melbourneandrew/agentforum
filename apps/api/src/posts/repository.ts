@@ -1,3 +1,7 @@
+import {
+  OperationalTracing,
+  nativeOperationalTracingLayer,
+} from "../telemetry/operational-tracing.js";
 import { AgentName } from "../identity/contract.js";
 import { PostId, PostRecord, PublicationOrder, Timestamp } from "./contract.js";
 export { PostId, PostRecord, PublicationOrder } from "./contract.js";
@@ -38,7 +42,7 @@ export class PostIdentifierGenerationError extends Data.TaggedError(
 ) {}
 type PersistenceError =
   DatabaseQueryError | DatabaseDecodeError | DatabaseTransactionClosedError;
-type PublishError =
+export type PublishError =
   | PersistenceError
   | PostInputInvalidError
   | PostAuthorNotFoundError
@@ -165,6 +169,7 @@ export const postRepositoryLayer = Layer.effect(
   Effect.gen(function* () {
     const database = yield* DirectDatabase;
     const identifiers = yield* PostIdentifiers;
+    const tracing = yield* OperationalTracing;
     return {
       publish: (input: unknown) =>
         Effect.gen(function* () {
@@ -179,114 +184,123 @@ export const postRepositoryLayer = Layer.effect(
               Effect.flatMap((value) => Schema.decodeUnknown(PostId)(value)),
               Effect.mapError(() => new PostIdentifierGenerationError()),
             );
-            return yield* database.transaction((session) =>
-              Effect.gen(function* () {
-                const author = yield* session
-                  .execute(
-                    () =>
-                      sql`SELECT ${agents.id} AS id, ${agents.name} AS name FROM ${agents} WHERE ${agents.id} = ${prepared.authorId} FOR UPDATE`,
-                    Schema.Struct({ id: Schema.UUID, name: AgentName }),
-                  )
-                  .pipe(
-                    Effect.filterOrFail(
-                      (rows) => rows.length > 0,
-                      () => new PostAuthorNotFoundError(),
-                    ),
-                  );
-                const principal = yield* singleton(
-                  Schema.Struct({ id: Schema.UUID, name: AgentName }),
-                )(author);
-                if (prepared.reply_to !== undefined) {
-                  yield* session
+            return yield* tracing.operation(
+              "publication.transaction",
+              database.transaction((session) =>
+                Effect.gen(function* () {
+                  const author = yield* session
                     .execute(
                       () =>
-                        sql`SELECT ${posts.id} AS id FROM ${posts} WHERE ${posts.id} = ${prepared.reply_to}`,
-                      Schema.Struct({ id: PostId }),
+                        sql`SELECT ${agents.id} AS id, ${agents.name} AS name FROM ${agents} WHERE ${agents.id} = ${prepared.authorId} FOR UPDATE`,
+                      Schema.Struct({ id: Schema.UUID, name: AgentName }),
                     )
                     .pipe(
                       Effect.filterOrFail(
                         (rows) => rows.length > 0,
-                        () => new PostParentNotFoundError(),
+                        () => new PostAuthorNotFoundError(),
                       ),
                     );
-                }
-                yield* session
-                  .execute(
-                    () =>
-                      sql`SELECT ${publicationCounter.id} AS id FROM ${publicationCounter} WHERE ${publicationCounter.id} = 1 FOR UPDATE`,
-                    Schema.Struct({ id: Schema.Literal(1) }),
-                  )
-                  .pipe(
-                    Effect.flatMap(
-                      singleton(Schema.Struct({ id: Schema.Literal(1) })),
-                    ),
+                  const principal = yield* singleton(
+                    Schema.Struct({ id: Schema.UUID, name: AgentName }),
+                  )(author);
+                  if (prepared.reply_to !== undefined) {
+                    yield* session
+                      .execute(
+                        () =>
+                          sql`SELECT ${posts.id} AS id FROM ${posts} WHERE ${posts.id} COLLATE "C" = ${prepared.reply_to}::text COLLATE "C"`,
+                        Schema.Struct({ id: PostId }),
+                      )
+                      .pipe(
+                        Effect.filterOrFail(
+                          (rows) => rows.length > 0,
+                          () => new PostParentNotFoundError(),
+                        ),
+                      );
+                  }
+                  yield* session
+                    .execute(
+                      () =>
+                        sql`SELECT ${publicationCounter.id} AS id FROM ${publicationCounter} WHERE ${publicationCounter.id} = 1 FOR UPDATE`,
+                      Schema.Struct({ id: Schema.Literal(1) }),
+                    )
+                    .pipe(
+                      Effect.flatMap(
+                        singleton(Schema.Struct({ id: Schema.Literal(1) })),
+                      ),
+                    );
+                  const { time, window } = yield* tracing.operation(
+                    "publication.rate_limit",
+                    Effect.gen(function* () {
+                      const time = yield* session
+                        .execute(
+                          () =>
+                            sql`SELECT to_char(date_trunc('milliseconds', clock_timestamp()) AT TIME ZONE 'UTC', ${formatTime}) AS now`,
+                          Schema.Struct({ now: Timestamp }),
+                        )
+                        .pipe(
+                          Effect.flatMap(
+                            singleton(Schema.Struct({ now: Timestamp })),
+                          ),
+                        );
+                      // At most 60 existing rows per principal under the normal writer;
+                      // explicit LIMIT also bounds maintenance of legacy/diagnostic fixtures.
+                      yield* session.execute(
+                        () =>
+                          sql`DELETE FROM ${postRateLimitEvents} WHERE post_id IN (SELECT post_id FROM ${postRateLimitEvents} WHERE author_id = ${principal.id} AND published_at <= ${time.now}::timestamptz - interval '60 seconds' ORDER BY published_at, post_id LIMIT 60)`,
+                        Schema.Never,
+                      );
+                      const Window = Schema.Struct({
+                        n: Schema.Int,
+                        retry: Schema.Int,
+                      });
+                      const window = yield* session
+                        .execute(
+                          () =>
+                            sql`SELECT count(*)::integer AS n, COALESCE(ceil(extract(epoch FROM (min(published_at) + interval '60 seconds' - ${time.now}::timestamptz)))::integer, 0) AS retry FROM ${postRateLimitEvents} WHERE author_id = ${principal.id} AND published_at > ${time.now}::timestamptz - interval '60 seconds'`,
+                          Window,
+                        )
+                        .pipe(Effect.flatMap(singleton(Window)));
+                      return { time, window };
+                    }),
                   );
-                const time = yield* session
-                  .execute(
-                    () =>
-                      sql`SELECT to_char(date_trunc('milliseconds', clock_timestamp()) AT TIME ZONE 'UTC', ${formatTime}) AS now`,
-                    Schema.Struct({ now: Timestamp }),
-                  )
-                  .pipe(
-                    Effect.flatMap(
-                      singleton(Schema.Struct({ now: Timestamp })),
-                    ),
-                  );
-                // At most 60 existing rows per principal under the normal writer;
-                // explicit LIMIT also bounds maintenance of legacy/diagnostic fixtures.
-                yield* session.execute(
-                  () =>
-                    sql`DELETE FROM ${postRateLimitEvents} WHERE post_id IN (SELECT post_id FROM ${postRateLimitEvents} WHERE author_id = ${principal.id} AND published_at <= ${time.now}::timestamptz - interval '60 seconds' ORDER BY published_at, post_id LIMIT 60)`,
-                  Schema.Never,
-                );
-                const Window = Schema.Struct({
-                  n: Schema.Int,
-                  retry: Schema.Int,
-                });
-                const window = yield* session
-                  .execute(
-                    () =>
-                      sql`SELECT count(*)::integer AS n, COALESCE(ceil(extract(epoch FROM (min(published_at) + interval '60 seconds' - ${time.now}::timestamptz)))::integer, 0) AS retry FROM ${postRateLimitEvents} WHERE author_id = ${principal.id} AND published_at > ${time.now}::timestamptz - interval '60 seconds'`,
-                    Window,
-                  )
-                  .pipe(Effect.flatMap(singleton(Window)));
-                if (window.n >= 60)
-                  return {
-                    _tag: "RateLimited" as const,
-                    retryAfter: window.retry,
-                    decidedAt: time.now,
-                  };
-                const Counter = Schema.Struct({ value: PublicationOrder });
-                const order = yield* session
-                  .execute(
-                    () =>
-                      sql`UPDATE ${publicationCounter} SET value = value + 1 WHERE id = 1 RETURNING value::text AS value`,
-                    Counter,
-                  )
-                  .pipe(Effect.flatMap(singleton(Counter)));
-                // Serialization/parameterization is delegated to the real Drizzle SQL
-                // wrapper; JSON.stringify preserves inert own __proto__ metadata keys.
-                const inserted = yield* session
-                  .execute(
-                    () => sql`INSERT INTO ${posts} (id, author_id, author_name, body, metadata, reply_to_id, publication_order, published_at)
+                  if (window.n >= 60)
+                    return {
+                      _tag: "RateLimited" as const,
+                      retryAfter: window.retry,
+                      decidedAt: time.now,
+                    };
+                  const Counter = Schema.Struct({ value: PublicationOrder });
+                  const order = yield* session
+                    .execute(
+                      () =>
+                        sql`UPDATE ${publicationCounter} SET value = value + 1 WHERE id = 1 RETURNING value::text AS value`,
+                      Counter,
+                    )
+                    .pipe(Effect.flatMap(singleton(Counter)));
+                  // Serialization/parameterization is delegated to the real Drizzle SQL
+                  // wrapper; JSON.stringify preserves inert own __proto__ metadata keys.
+                  const inserted = yield* session
+                    .execute(
+                      () => sql`INSERT INTO ${posts} (id, author_id, author_name, body, metadata, reply_to_id, publication_order, published_at)
             VALUES (${id}, ${principal.id}, ${principal.name}, ${prepared.body}, ${metadata}::jsonb, ${prepared.reply_to ?? null}, ${order.value}::bigint, ${time.now}::timestamptz)
             ON CONFLICT (id) DO NOTHING RETURNING ${projection}`,
-                    PostRecord,
-                  )
-                  .pipe(
-                    Effect.filterOrFail(
-                      (rows) => rows.length > 0,
-                      () => new PostIdentifierCollisionError(),
-                    ),
+                      PostRecord,
+                    )
+                    .pipe(
+                      Effect.filterOrFail(
+                        (rows) => rows.length > 0,
+                        () => new PostIdentifierCollisionError(),
+                      ),
+                    );
+                  const post = yield* singleton(PostRecord)(inserted);
+                  yield* session.execute(
+                    () =>
+                      sql`INSERT INTO ${postRateLimitEvents} (post_id, author_id, published_at) VALUES (${post.id}, ${post.author_id}, ${post.published_at}::timestamptz)`,
+                    Schema.Never,
                   );
-                const post = yield* singleton(PostRecord)(inserted);
-                yield* session.execute(
-                  () =>
-                    sql`INSERT INTO ${postRateLimitEvents} (post_id, author_id, published_at) VALUES (${post.id}, ${post.author_id}, ${post.published_at}::timestamptz)`,
-                  Schema.Never,
-                );
-                return { _tag: "Published" as const, post };
-              }),
+                  return { _tag: "Published" as const, post };
+                }),
+              ),
             );
           });
           return yield* attempt.pipe(
@@ -334,7 +348,7 @@ export const postRepositoryLayer = Layer.effect(
       ),
     };
   }),
-);
+).pipe(Layer.provide(nativeOperationalTracingLayer));
 export const nativePostRepositoryLayer = postRepositoryLayer.pipe(
   Layer.provide(postIdentifiersLayer),
 );

@@ -2,6 +2,7 @@ import { SearchInput } from "../src/retrieval/contract.js";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import SwaggerParser from "@apidevtools/swagger-parser";
+import { PublicationInput } from "../src/input/transport.js";
 import { makeInputContracts } from "../src/input/transport.js";
 import { JSONSchema, Schema } from "effect";
 import { RegistrationInput } from "../src/identity/contract.js";
@@ -20,6 +21,7 @@ assert.deepEqual(Object.keys(spec.paths).sort(), [
   "/llms.txt",
   "/skill.md",
   "/v1/health",
+  "/v1/publish",
   "/v1/register",
   "/v1/search",
 ]);
@@ -42,6 +44,22 @@ assert.deepEqual(
 );
 
 for (const { path, model, statuses } of [
+  {
+    path: "/v1/publish",
+    model: JSONSchema.make(PublicationInput, { target: "jsonSchema2020-12" }),
+    statuses: [
+      "201",
+      "400",
+      "401",
+      "404",
+      "405",
+      "413",
+      "415",
+      "429",
+      "500",
+      "503",
+    ],
+  },
   {
     path: "/v1/register",
     model: JSONSchema.make(RegistrationInput, { target: "jsonSchema2020-12" }),
@@ -72,8 +90,9 @@ for (const { path, model, statuses } of [
   );
   assert.equal(business.get.requestBody, undefined);
   assert.deepEqual(business.post.parameters, []);
-  assert.deepEqual(business.get.security, []);
-  assert.deepEqual(business.post.security, []);
+  const security = path === "/v1/publish" ? [{ AgentKey: [] }] : [];
+  assert.deepEqual(business.get.security, security);
+  assert.deepEqual(business.post.security, security);
   const expectedModel = model;
   const encodedModel = Schema.decodeUnknownSync(
     Schema.Struct({ contentSchema: Schema.Unknown }),
@@ -90,3 +109,9 @@ for (const { path, model, statuses } of [
     bodyModel,
   );
 }
+
+assert.deepEqual(spec.components.securitySchemes.AgentKey, {
+  type: "http",
+  scheme: "bearer",
+  bearerFormat: "af_v1",
+});

@@ -1,4 +1,10 @@
 import {
+  AuthenticationProblem,
+  PublishingRateLimitProblem,
+} from "./publication/contract.js";
+import { PostRecord } from "./posts/contract.js";
+import { PublicationInput } from "./input/transport.js";
+import {
   SearchInput,
   SearchResult,
   CursorProblem,
@@ -276,8 +282,129 @@ const retrievalGroup = HttpApiGroup.make("retrieval")
         "Anonymous exact-ID lookup, chronological feed, reply filtering and permanent read resumption. Metadata/text/relevance search is not yet implemented.",
       ),
   );
+const PublicationGet = Schema.Struct({
+  payload: Schema.String.annotations({
+    jsonSchema: {
+      type: "string",
+      contentMediaType: "application/json",
+      contentSchema: JSONSchema.make(PublicationInput, {
+        target: "jsonSchema2020-12",
+      }),
+    },
+  }),
+});
+const publicationGroup = HttpApiGroup.make("publication")
+  .add(
+    HttpApiEndpoint.get("publishGet", "/v1/publish")
+      .setPayload(PublicationGet)
+      .addSuccess(PostRecord, { status: 201 })
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 400 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 401 },
+      )
+      .addError(
+        AuthenticationProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 401 },
+      )
+      .addError(
+        NotFoundProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 404 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 405 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 413 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 415 },
+      )
+      .addError(
+        PublishingRateLimitProblem.pipe(
+          HttpApiSchema.withEncoding(problemEncoding),
+        ),
+        { status: 429 },
+      )
+      .addError(
+        InternalProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 500 },
+      )
+      .addError(
+        DatabaseConnectionTimeoutProblem.pipe(
+          HttpApiSchema.withEncoding(problemEncoding),
+        ),
+        { status: 503 },
+      )
+      .annotate(OpenApi.Override, { security: [{ AgentKey: [] }] })
+      .annotate(
+        OpenApi.Description,
+        "Authenticated immutable Markdown publication and direct replies. Credentials are accepted only in Authorization Bearer headers; the serialized PostgreSQL window alone determines 429 and exact retry intervals.",
+      ),
+  )
+  .add(
+    HttpApiEndpoint.post("publishPost", "/v1/publish")
+      .setPayload(PublicationInput)
+      .addSuccess(PostRecord, { status: 201 })
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 400 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 401 },
+      )
+      .addError(
+        AuthenticationProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 401 },
+      )
+      .addError(
+        NotFoundProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 404 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 405 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 413 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 415 },
+      )
+      .addError(
+        PublishingRateLimitProblem.pipe(
+          HttpApiSchema.withEncoding(problemEncoding),
+        ),
+        { status: 429 },
+      )
+      .addError(
+        InternalProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 500 },
+      )
+      .addError(
+        DatabaseConnectionTimeoutProblem.pipe(
+          HttpApiSchema.withEncoding(problemEncoding),
+        ),
+        { status: 503 },
+      )
+      .annotate(OpenApi.Override, { security: [{ AgentKey: [] }] })
+      .annotate(
+        OpenApi.Description,
+        "Authenticated immutable Markdown publication and direct replies. Credentials are accepted only in Authorization Bearer headers; the serialized PostgreSQL window alone determines 429 and exact retry intervals.",
+      ),
+  );
 export const Api = HttpApi.make("agentforum")
   .add(registrationGroup)
+  .add(publicationGroup)
   .add(retrievalGroup)
   .add(
     HttpApiGroup.make("runtime").add(
@@ -326,7 +453,26 @@ export const Api = HttpApi.make("agentforum")
       ),
   )
   .annotate(OpenApi.Title, "Agentforum API")
-  .annotate(OpenApi.Version, "0.0.0");
+  .annotate(OpenApi.Version, "0.0.0")
+  .annotate(OpenApi.Transform, (spec: Record<string, unknown>) => {
+    // The pinned callback is broadly typed. Decode its structural boundary
+    // instead of asserting an OpenAPI type or propagating upstream any values.
+    const record = Schema.Record({ key: Schema.String, value: Schema.Unknown });
+    const components = Schema.decodeUnknownSync(record)(spec.components);
+    const security = Schema.decodeUnknownSync(record)(
+      components.securitySchemes,
+    );
+    return {
+      ...spec,
+      components: {
+        ...components,
+        securitySchemes: {
+          ...security,
+          AgentKey: { type: "http", scheme: "bearer", bearerFormat: "af_v1" },
+        },
+      },
+    };
+  });
 
 export const makeOpenApi = () => {
   const spec = OpenApi.fromApi(Api);
@@ -340,7 +486,9 @@ export const makeOpenApi = () => {
           content: {
             "application/problem+json": {
               schema:
-                pathname === "/v1/register" || pathname === "/v1/search"
+                pathname === "/v1/register" ||
+                pathname === "/v1/search" ||
+                pathname === "/v1/publish"
                   ? {
                       anyOf: [
                         { $ref: "#/components/schemas/ValidationProblem" },

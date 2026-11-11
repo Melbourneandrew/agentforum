@@ -11,14 +11,29 @@ import {
   Schema,
 } from "effect";
 
-const Operation = Schema.Literal("identity.insert", "credential.lookup");
+const Operation = Schema.Literal(
+  "identity.insert",
+  "credential.lookup",
+  "publication.edge_signal",
+  "publication.rate_limit",
+  "publication.transaction",
+);
 type Operation = Schema.Schema.Type<typeof Operation>;
 // This private vocabulary cannot receive SQL, identifiers, inputs or errors.
 const operationAttributes = (operation: Operation) => ({
   "service.name": "agentforum-api",
-  "db.system.name": "postgresql",
-  "db.operation.name": operation === "identity.insert" ? "INSERT" : "SELECT",
   "agentforum.operation": operation,
+  ...(operation === "publication.edge_signal"
+    ? { "agentforum.dependency": "edge-rate-limit" }
+    : {
+        "db.system.name": "postgresql",
+        "db.operation.name":
+          operation === "identity.insert"
+            ? "INSERT"
+            : operation === "credential.lookup"
+              ? "SELECT"
+              : "TRANSACTION",
+      }),
 });
 class InstrumentationFailure extends Data.TaggedError(
   "InstrumentationFailure",

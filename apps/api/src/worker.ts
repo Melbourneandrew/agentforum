@@ -1,3 +1,12 @@
+import {
+  AuthenticationProblem,
+  PublishingRateLimitProblem,
+} from "./publication/contract.js";
+import { publicationLive } from "./publication/live.js";
+import {
+  publishOperation,
+  recognizePublicationProblem,
+} from "./publication/http.js";
 import { CursorProblem } from "./retrieval/contract.js";
 import {
   retrievalLive,
@@ -106,6 +115,8 @@ const Problem = Schema.Union(
   InputProblem,
   NameUnavailableProblem,
   CursorProblem,
+  AuthenticationProblem,
+  PublishingRateLimitProblem,
 );
 export const normalizeProblem = (
   response: Response,
@@ -120,18 +131,32 @@ export const normalizeProblem = (
     if (Option.isSome(timeout)) return timeout.value;
     const business = yield* operation === true || operation === "register"
       ? recognizeRegistrationProblem(response, correlationId)
-      : operation === "search"
-        ? recognizeSearchProblem(response, correlationId)
-        : Effect.succeed(
-            Option.none<
-              InputProblem | NameUnavailableProblem | CursorProblem
-            >(),
-          );
+      : operation === "publish"
+        ? recognizePublicationProblem(response, correlationId)
+        : operation === "search"
+          ? recognizeSearchProblem(response, correlationId)
+          : Effect.succeed(
+              Option.none<
+                | InputProblem
+                | NameUnavailableProblem
+                | CursorProblem
+                | AuthenticationProblem
+                | PublishingRateLimitProblem
+              >(),
+            );
     return Option.getOrElse(business, () =>
       response.status === 400
         ? validationProblem(correlationId)
         : response.status === 404
-          ? notFoundProblem(correlationId, operation === "search")
+          ? operation === "publish"
+            ? new NotFoundProblem({
+                type: "https://docs.agentforum.site/problems/not-found",
+                title: "Not found",
+                status: 404,
+                detail: "No Parent Post matches this request.",
+                instance: `urn:uuid:${correlationId}`,
+              })
+            : notFoundProblem(correlationId, operation === "search")
           : genericProblem(correlationId),
     );
   });
@@ -147,6 +172,8 @@ export const renderProblem = (
   if (problem.status === 405)
     outputHeaders.set("Allow", "GET, POST, HEAD, OPTIONS");
   if (problem.status === 503) outputHeaders.set("Retry-After", "1");
+  if (problem._tag === "PublishingRateLimitProblem")
+    outputHeaders.set("Retry-After", String(problem.retry_after));
   const response = Response.json(Schema.encodeSync(Problem)(problem), {
     status: problem.status,
     headers: outputHeaders,
@@ -173,6 +200,7 @@ export const makeWorker = (
   health: Layer.Layer<Health, never, RequestContext> = healthLive,
   registration: typeof registrationLive = registrationLive,
   retrieval: typeof retrievalLive = retrievalLive,
+  publication: typeof publicationLive = publicationLive,
 ) => ({
   async fetch(
     request: Request,
@@ -193,12 +221,15 @@ export const makeWorker = (
       renderProblem(problem, request.method, headers);
     const pathname = new URL(request.url).pathname;
     const registrationPath = pathname === "/v1/register",
-      searchPath = pathname === "/v1/search";
+      searchPath = pathname === "/v1/search",
+      publicationPath = pathname === "/v1/publish";
     const operation = registrationPath
       ? "register"
-      : searchPath
-        ? "search"
-        : undefined;
+      : publicationPath
+        ? "publish"
+        : searchPath
+          ? "search"
+          : undefined;
     if (operation !== undefined && request.method === "HEAD")
       return new Response(null, { status: 200, headers });
     if (request.method === "OPTIONS")
@@ -268,6 +299,32 @@ export const makeWorker = (
             return handlers
               .handleRaw("registerGet", handle)
               .handleRaw("registerPost", handle);
+          }),
+        ),
+        Layer.provide(
+          HttpApiBuilder.group(Api, "publication", (handlers) => {
+            const handle = ({
+              request: incoming,
+            }: {
+              readonly request: HttpServerRequest.HttpServerRequest;
+            }) =>
+              Effect.gen(function* () {
+                const native = yield* HttpServerRequest.toWeb(incoming).pipe(
+                  Effect.orDie,
+                );
+                const response = yield* publishOperation(
+                  native,
+                  correlationId,
+                  () => publication(bindings),
+                  Effect.succeed(
+                    problemResponse(genericProblem(correlationId)),
+                  ),
+                );
+                return HttpServerResponse.fromWeb(response);
+              });
+            return handlers
+              .handleRaw("publishGet", handle)
+              .handleRaw("publishPost", handle);
           }),
         ),
         Layer.provide(

@@ -3,5 +3,5 @@ export const contractInfo = {
   title: "Agentforum API",
   version: "0.0.0",
   openapi: "3.1.0",
-  sha256: "9432609cd92b7defbb121f0e841fad89a44f215f1c41bf18d066dc76b0777afb",
+  sha256: "772d488c1fa020aa90b5a87de3970b5ef28e3f661d41f8f1ffe4ea44547854e0",
 } as const;
