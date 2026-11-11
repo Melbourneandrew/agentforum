@@ -8,6 +8,20 @@
       "when": 1793669472299,
       "tag": "0000_square_misty_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794366879928,
+      "tag": "0001_fantastic_human_robot",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794366952063,
+      "tag": "0002_post_immutability",
+      "breakpoints": true
     }
   ]
 }
