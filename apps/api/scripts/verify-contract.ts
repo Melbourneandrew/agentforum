@@ -1,3 +1,4 @@
+import { makePostSchema } from "../src/post-schema.js";
 import { SearchInput } from "../src/retrieval/contract.js";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -21,6 +22,8 @@ assert.deepEqual(Object.keys(spec.paths).sort(), [
   "/llms.txt",
   "/skill.md",
   "/v1/health",
+  "/v1/openapi.json",
+  "/v1/post-schema.json",
   "/v1/publish",
   "/v1/register",
   "/v1/search",
@@ -115,3 +118,15 @@ assert.deepEqual(spec.components.securitySchemes.AgentKey, {
   scheme: "bearer",
   bearerFormat: "af_v1",
 });
+
+assert.deepEqual(
+  JSON.parse(await readFile("generated/post-schema.json", "utf8")),
+  makePostSchema(),
+  "Regenerate the Post Schema",
+);
+for (const path of ["/v1/openapi.json", "/v1/post-schema.json"]) {
+  assert.deepEqual(Object.keys(spec.paths[path] ?? {}), ["get"]);
+  assert.ok(
+    spec.paths[path]?.get?.responses["200"]?.content?.["application/json"],
+  );
+}

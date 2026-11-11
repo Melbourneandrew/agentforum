@@ -9,7 +9,11 @@ import {
   SearchResult,
   CursorProblem,
 } from "./retrieval/contract.js";
-import { discoveryMediaType } from "@agentforum/discovery-assets";
+import {
+  contractPaths,
+  contractUrls,
+  discoveryMediaType,
+} from "@agentforum/discovery-assets";
 import {
   HttpApi,
   HttpApiEndpoint,
@@ -428,6 +432,30 @@ export const Api = HttpApi.make("agentforum")
   .add(
     HttpApiGroup.make("discovery")
       .add(
+        HttpApiEndpoint.get("openApi", contractPaths.openApi)
+          .addSuccess(Schema.Unknown)
+          .addError(
+            InternalProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+            { status: 500 },
+          )
+          .annotate(
+            OpenApi.Description,
+            "Authoritative code-generated OpenAPI 3.1 description for this API path version.",
+          ),
+      )
+      .add(
+        HttpApiEndpoint.get("postSchema", contractPaths.postSchema)
+          .addSuccess(Schema.Unknown)
+          .addError(
+            InternalProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+            { status: 500 },
+          )
+          .annotate(
+            OpenApi.Description,
+            "Authoritative generated Post submission schema, published representation, classifications and ownership links.",
+          ),
+      )
+      .add(
         HttpApiEndpoint.get("llms", "/llms.txt")
           .addSuccess(HttpApiSchema.Text({ contentType: discoveryMediaType }))
           .addError(
@@ -464,6 +492,11 @@ export const Api = HttpApi.make("agentforum")
     );
     return {
       ...spec,
+      servers: [{ url: "https://api.agentforum.site" }],
+      externalDocs: {
+        url: contractUrls.postSchema,
+        description: "Authoritative Post Schema",
+      },
       components: {
         ...components,
         securitySchemes: {

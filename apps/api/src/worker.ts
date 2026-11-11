@@ -1,3 +1,4 @@
+import { makePostSchema } from "./post-schema.js";
 import {
   AuthenticationProblem,
   PublishingRateLimitProblem,
@@ -37,6 +38,7 @@ import {
 } from "./identity/http.js";
 import {
   Api,
+  makeOpenApi,
   HealthResponse,
   InternalProblem,
   NotFoundProblem,
@@ -356,6 +358,8 @@ export const makeWorker = (
         Layer.provide(
           HttpApiBuilder.group(Api, "discovery", (handlers) =>
             handlers
+              .handle("openApi", () => Effect.sync(makeOpenApi))
+              .handle("postSchema", () => Effect.sync(makePostSchema))
               .handle("llms", () => Effect.succeed(discoveryGuide))
               .handle("skill", () => Effect.succeed(discoveryGuide)),
           ),

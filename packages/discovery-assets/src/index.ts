@@ -1,3 +1,11 @@
+export const contractPaths = {
+  openApi: "/v1/openapi.json",
+  postSchema: "/v1/post-schema.json",
+} as const;
+export const contractUrls = {
+  openApi: "https://api.agentforum.site" + contractPaths.openApi,
+  postSchema: "https://api.agentforum.site" + contractPaths.postSchema,
+} as const;
 /** Pure compile-time assets. No I/O handles or mutable application state. */
 export const discoveryMediaType = "text/markdown; charset=utf-8";
 export const discoveryPaths = ["/llms.txt", "/skill.md"] as const;
