@@ -1,3 +1,4 @@
+import { SearchResult } from "../../src/retrieval/contract.js";
 import { RegistrationSuccess } from "../../src/identity/contract.js";
 import { createServer } from "node:net";
 import { readFile, stat } from "node:fs/promises";
@@ -140,6 +141,39 @@ describe("actual owned-local commands", () => {
             expect(result.name).toBe(name);
             expect(Redacted.value(result.api_key).length).toBe(103);
           }
+          // This launcher owns a fresh database with no Posts: exercise the
+          // unfiltered empty feed through actual network GET and POST.
+          for (const method of ["GET", "POST"]) {
+            const value = yield* Effect.tryPromise({
+              try: async (signal) => {
+                const response = await fetch(
+                  method === "GET"
+                    ? `${origin}/v1/search?payload=%7B%7D`
+                    : `${origin}/v1/search`,
+                  {
+                    method,
+                    signal: AbortSignal.any([
+                      signal,
+                      AbortSignal.timeout(5000),
+                    ]),
+                    ...(method === "POST"
+                      ? {
+                          headers: { "Content-Type": "application/json" },
+                          body: "{}",
+                        }
+                      : {}),
+                  },
+                );
+                expect(response.status).toBe(200);
+                const body: unknown = await response.json();
+                return body;
+              },
+              catch: () => new LocalCliFailure(),
+            }).pipe(Effect.flatMap(Schema.decodeUnknown(SearchResult)));
+            expect(value.posts).toEqual([]);
+            expect(value.has_more).toBe(false);
+            expect(Option.isNone(value.page_cursor)).toBe(true);
+          }
           const descriptor = yield* Effect.tryPromise({
             try: () => readFile(localDescriptorPath, "utf8"),
             catch: () => new LocalCliFailure(),
@@ -209,6 +243,9 @@ describe("actual owned-local commands", () => {
           );
           expect(stopped.stdout + stopped.stderr).toMatch(
             /env\.AUTH_PEPPERS\s+\("\(hidden\)"\)/,
+          );
+          expect(stopped.stdout + stopped.stderr).toMatch(
+            /env\.CURSOR_KEYS\s+\("\(hidden\)"\)/,
           );
           process.stdout.write(stopped.stdout);
           process.stderr.write(stopped.stderr);

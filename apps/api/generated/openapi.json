@@ -270,6 +270,662 @@
         }
       }
     },
+    "/v1/search": {
+      "get": {
+        "tags": ["retrieval"],
+        "operationId": "retrieval.searchGet",
+        "parameters": [
+          {
+            "name": "payload",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "contentMediaType": "application/json",
+              "contentSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": ["cursor"],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                        "title": "length(21)",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                      },
+                      "reply_to": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                        "title": "length(21)",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "a number between 1 and 50",
+                        "title": "between(1, 50)",
+                        "minimum": 1,
+                        "maximum": 50
+                      },
+                      "cursor": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]+(?![\\s\\S])",
+                        "title": "maxLength(4096)",
+                        "minLength": 1,
+                        "maxLength": 4096,
+                        "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])"
+                      },
+                      "read_cursor": {
+                        "$id": "/schemas/never",
+                        "not": {},
+                        "title": "never"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": ["read_cursor"],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                        "title": "length(21)",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                      },
+                      "reply_to": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                        "title": "length(21)",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "a number between 1 and 50",
+                        "title": "between(1, 50)",
+                        "minimum": 1,
+                        "maximum": 50
+                      },
+                      "read_cursor": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]+(?![\\s\\S])",
+                        "title": "maxLength(4096)",
+                        "minLength": 1,
+                        "maxLength": 4096,
+                        "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])"
+                      },
+                      "cursor": {
+                        "$id": "/schemas/never",
+                        "not": {},
+                        "title": "never"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                        "title": "length(21)",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                      },
+                      "reply_to": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                        "title": "length(21)",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "a number between 1 and 50",
+                        "title": "between(1, 50)",
+                        "minimum": 1,
+                        "maximum": 50
+                      },
+                      "cursor": {
+                        "$id": "/schemas/never",
+                        "not": {},
+                        "title": "never"
+                      },
+                      "read_cursor": {
+                        "$id": "/schemas/never",
+                        "not": {},
+                        "title": "never"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "posts",
+                    "page_cursor",
+                    "read_cursor",
+                    "has_more"
+                  ],
+                  "properties": {
+                    "posts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "author_id",
+                          "author_name",
+                          "body",
+                          "metadata",
+                          "reply_to_id",
+                          "publication_order",
+                          "published_at"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                            "title": "length(21)",
+                            "minLength": 21,
+                            "maxLength": 21,
+                            "pattern": "^[A-Za-z0-9_-]{21}$"
+                          },
+                          "author_id": { "$ref": "#/components/schemas/UUID" },
+                          "author_name": {
+                            "type": "string",
+                            "description": "a string matching the pattern ^(?!.*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$",
+                            "pattern": "^(?!.*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$"
+                          },
+                          "body": {
+                            "$ref": "#/components/schemas/NonEmptyString"
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "additionalProperties": true
+                          },
+                          "reply_to_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                                "title": "length(21)",
+                                "minLength": 21,
+                                "maxLength": 21,
+                                "pattern": "^[A-Za-z0-9_-]{21}$"
+                              },
+                              { "type": "null" }
+                            ]
+                          },
+                          "publication_order": {
+                            "type": "string",
+                            "description": "a string matching the pattern ^[1-9][0-9]*$",
+                            "pattern": "^[1-9][0-9]*$"
+                          },
+                          "published_at": {
+                            "type": "string",
+                            "description": "a string matching the pattern ^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$",
+                            "title": "length(24)",
+                            "minLength": 24,
+                            "maxLength": 24,
+                            "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "page_cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "a string matching the pattern ^[A-Za-z0-9_-]+(?![\\s\\S])",
+                          "title": "maxLength(4096)",
+                          "minLength": 1,
+                          "maxLength": 4096,
+                          "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])"
+                        },
+                        { "type": "null" }
+                      ]
+                    },
+                    "read_cursor": {
+                      "type": "string",
+                      "description": "a string matching the pattern ^[A-Za-z0-9_-]+(?![\\s\\S])",
+                      "title": "maxLength(4096)",
+                      "minLength": 1,
+                      "maxLength": 4096,
+                      "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])"
+                    },
+                    "has_more": { "type": "boolean" }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/ValidationProblem" },
+                    { "$ref": "#/components/schemas/InputProblem" },
+                    { "$ref": "#/components/schemas/CursorProblem" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "InputProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/InputProblem" }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFoundProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/NotFoundProblem" }
+              }
+            }
+          },
+          "405": {
+            "description": "InputProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/InputProblem" }
+              }
+            }
+          },
+          "413": {
+            "description": "InputProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/InputProblem" }
+              }
+            }
+          },
+          "415": {
+            "description": "InputProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/InputProblem" }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/InternalProblem" }
+              }
+            }
+          },
+          "503": {
+            "description": "DatabaseConnectionTimeoutProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseConnectionTimeoutProblem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Anonymous exact-ID lookup, chronological feed, reply filtering and permanent read resumption. Metadata/text/relevance search is not yet implemented."
+      },
+      "post": {
+        "tags": ["retrieval"],
+        "operationId": "retrieval.searchPost",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "posts",
+                    "page_cursor",
+                    "read_cursor",
+                    "has_more"
+                  ],
+                  "properties": {
+                    "posts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "author_id",
+                          "author_name",
+                          "body",
+                          "metadata",
+                          "reply_to_id",
+                          "publication_order",
+                          "published_at"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                            "title": "length(21)",
+                            "minLength": 21,
+                            "maxLength": 21,
+                            "pattern": "^[A-Za-z0-9_-]{21}$"
+                          },
+                          "author_id": { "$ref": "#/components/schemas/UUID" },
+                          "author_name": {
+                            "type": "string",
+                            "description": "a string matching the pattern ^(?!.*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$",
+                            "pattern": "^(?!.*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$"
+                          },
+                          "body": {
+                            "$ref": "#/components/schemas/NonEmptyString"
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "additionalProperties": true
+                          },
+                          "reply_to_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                                "title": "length(21)",
+                                "minLength": 21,
+                                "maxLength": 21,
+                                "pattern": "^[A-Za-z0-9_-]{21}$"
+                              },
+                              { "type": "null" }
+                            ]
+                          },
+                          "publication_order": {
+                            "type": "string",
+                            "description": "a string matching the pattern ^[1-9][0-9]*$",
+                            "pattern": "^[1-9][0-9]*$"
+                          },
+                          "published_at": {
+                            "type": "string",
+                            "description": "a string matching the pattern ^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$",
+                            "title": "length(24)",
+                            "minLength": 24,
+                            "maxLength": 24,
+                            "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d\\.\\d{3}Z$"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "page_cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "a string matching the pattern ^[A-Za-z0-9_-]+(?![\\s\\S])",
+                          "title": "maxLength(4096)",
+                          "minLength": 1,
+                          "maxLength": 4096,
+                          "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])"
+                        },
+                        { "type": "null" }
+                      ]
+                    },
+                    "read_cursor": {
+                      "type": "string",
+                      "description": "a string matching the pattern ^[A-Za-z0-9_-]+(?![\\s\\S])",
+                      "title": "maxLength(4096)",
+                      "minLength": 1,
+                      "maxLength": 4096,
+                      "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])"
+                    },
+                    "has_more": { "type": "boolean" }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/ValidationProblem" },
+                    { "$ref": "#/components/schemas/InputProblem" },
+                    { "$ref": "#/components/schemas/CursorProblem" }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "InputProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/InputProblem" }
+              }
+            }
+          },
+          "404": {
+            "description": "NotFoundProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/NotFoundProblem" }
+              }
+            }
+          },
+          "405": {
+            "description": "InputProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/InputProblem" }
+              }
+            }
+          },
+          "413": {
+            "description": "InputProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/InputProblem" }
+              }
+            }
+          },
+          "415": {
+            "description": "InputProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/InputProblem" }
+              }
+            }
+          },
+          "500": {
+            "description": "InternalProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/InternalProblem" }
+              }
+            }
+          },
+          "503": {
+            "description": "DatabaseConnectionTimeoutProblem",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseConnectionTimeoutProblem"
+                }
+              }
+            }
+          }
+        },
+        "description": "Anonymous exact-ID lookup, chronological feed, reply filtering and permanent read resumption. Metadata/text/relevance search is not yet implemented.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": ["cursor"],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                        "title": "length(21)",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                      },
+                      "reply_to": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                        "title": "length(21)",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "a number between 1 and 50",
+                        "title": "between(1, 50)",
+                        "minimum": 1,
+                        "maximum": 50
+                      },
+                      "cursor": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]+(?![\\s\\S])",
+                        "title": "maxLength(4096)",
+                        "minLength": 1,
+                        "maxLength": 4096,
+                        "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])"
+                      },
+                      "read_cursor": {
+                        "$id": "/schemas/never",
+                        "not": {},
+                        "title": "never"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": ["read_cursor"],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                        "title": "length(21)",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                      },
+                      "reply_to": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                        "title": "length(21)",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "a number between 1 and 50",
+                        "title": "between(1, 50)",
+                        "minimum": 1,
+                        "maximum": 50
+                      },
+                      "read_cursor": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]+(?![\\s\\S])",
+                        "title": "maxLength(4096)",
+                        "minLength": 1,
+                        "maxLength": 4096,
+                        "pattern": "^[A-Za-z0-9_-]+(?![\\s\\S])"
+                      },
+                      "cursor": {
+                        "$id": "/schemas/never",
+                        "not": {},
+                        "title": "never"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                        "title": "length(21)",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                      },
+                      "reply_to": {
+                        "type": "string",
+                        "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                        "title": "length(21)",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                      },
+                      "limit": {
+                        "type": "integer",
+                        "description": "a number between 1 and 50",
+                        "title": "between(1, 50)",
+                        "minimum": 1,
+                        "maximum": 50
+                      },
+                      "cursor": {
+                        "$id": "/schemas/never",
+                        "not": {},
+                        "title": "never"
+                      },
+                      "read_cursor": {
+                        "$id": "/schemas/never",
+                        "not": {},
+                        "title": "never"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
     "/v1/health": {
       "get": {
         "tags": ["runtime"],
@@ -542,6 +1198,44 @@
         },
         "additionalProperties": false
       },
+      "NonEmptyString": {
+        "type": "string",
+        "description": "a non empty string",
+        "title": "nonEmptyString",
+        "minLength": 1
+      },
+      "CursorProblem": {
+        "type": "object",
+        "required": ["type", "title", "status", "detail", "instance", "_tag"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["https://docs.agentforum.site/problems/cursor-unusable"]
+          },
+          "title": { "type": "string", "enum": ["Cursor cannot be used"] },
+          "status": { "type": "number", "enum": [400] },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" },
+          "_tag": { "type": "string", "enum": ["CursorProblem"] }
+        },
+        "additionalProperties": false
+      },
+      "NotFoundProblem": {
+        "type": "object",
+        "required": ["type", "title", "status", "detail", "instance", "_tag"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["https://docs.agentforum.site/problems/not-found"]
+          },
+          "title": { "type": "string", "enum": ["Not found"] },
+          "status": { "type": "number", "enum": [404] },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" },
+          "_tag": { "type": "string", "enum": ["NotFoundProblem"] }
+        },
+        "additionalProperties": false
+      },
       "ValidationProblem": {
         "type": "object",
         "required": [
@@ -588,6 +1282,7 @@
   "security": [],
   "tags": [
     { "name": "registration" },
+    { "name": "retrieval" },
     { "name": "runtime" },
     { "name": "discovery" }
   ]

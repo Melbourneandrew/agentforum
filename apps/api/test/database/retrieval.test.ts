@@ -1,3 +1,4 @@
+import worker from "../../src/worker.js";
 import { MetadataObject } from "../../src/input/transport.js";
 import { env } from "node:process";
 import { sql } from "drizzle-orm";
@@ -337,5 +338,135 @@ describe("direct chronological retrieval in real PostgreSQL/workerd", () => {
       await search({ reply_to: post.id });
     }
     expect(await snapshot()).toEqual(before);
+  });
+});
+
+// These invoke the actual default Worker, not a replacement handler or repository.
+const execution = {
+  waitUntil: () => undefined,
+  passThroughOnException: () => undefined,
+  props: {},
+};
+const runtimeBindings = {
+  ...bindings,
+  ENVIRONMENT: "local",
+  CURSOR_CURRENT_KEY: "r1",
+  CURSOR_KEYS: JSON.stringify({ r1: "33".repeat(32) }),
+};
+const httpSearch = async (
+  method: "GET" | "POST",
+  input: unknown,
+  b: unknown = runtimeBindings,
+) => {
+  const source = JSON.stringify(input);
+  return worker.fetch(
+    new Request(
+      method === "GET"
+        ? "https://api.agentforum.test/v1/search?payload=" +
+            encodeURIComponent(source)
+        : "https://api.agentforum.test/v1/search",
+      {
+        method,
+        ...(method === "POST"
+          ? { headers: { "Content-Type": "application/json" }, body: source }
+          : {}),
+      },
+    ),
+    b,
+    execution,
+  );
+};
+describe("actual anonymous search Worker with real PostgreSQL", () => {
+  it("returns identical GET/POST structured results with no API key", async () => {
+    const { author, post } = await parent();
+    const reply = await publish(author.id, "HTTP **raw Markdown**", post.id, {
+      nested: { flag: true },
+      type: null,
+    });
+    const values: unknown[] = [];
+    for (const method of ["GET", "POST"] as const) {
+      const response = await httpSearch(method, { id: reply.id });
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Cache-Control")).toBe("no-store, private");
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      const value: unknown = await response.json();
+      values.push(value);
+      const result = await Effect.runPromise(
+        Schema.decodeUnknown(SearchResult)(value),
+      );
+      expect(result.posts).toEqual([reply]);
+    }
+    expect(values[0]).toEqual(values[1]);
+  });
+  it("resumes oldest-unread across transports without advancing a partial or empty checkpoint", async () => {
+    const { author, post } = await parent();
+    const first = await httpSearch("GET", { reply_to: post.id });
+    const initial = await Effect.runPromise(
+      Schema.decodeUnknown(SearchResult)(await first.json()),
+    );
+    expect(initial.posts).toEqual([]);
+    const one = await publish(
+      author.id,
+      "first cross-transport unread",
+      post.id,
+    );
+    const two = await publish(
+      author.id,
+      "second cross-transport unread",
+      post.id,
+    );
+    const partial = await httpSearch("POST", {
+      reply_to: post.id,
+      read_cursor: initial.read_cursor,
+      limit: 1,
+    });
+    expect(partial.status).toBe(200);
+    const a = await Effect.runPromise(
+      Schema.decodeUnknown(SearchResult)(await partial.json()),
+    );
+    expect(a.posts.map((p) => p.id)).toEqual([one.id]);
+    expect(a.has_more).toBe(true);
+    const next = await httpSearch("GET", {
+      reply_to: post.id,
+      read_cursor: a.read_cursor,
+      limit: 1,
+    });
+    const b = await Effect.runPromise(
+      Schema.decodeUnknown(SearchResult)(await next.json()),
+    );
+    expect(b.posts.map((p) => p.id)).toEqual([two.id]);
+    const empty = await httpSearch("POST", {
+      reply_to: post.id,
+      read_cursor: b.read_cursor,
+    });
+    const c = await Effect.runPromise(
+      Schema.decodeUnknown(SearchResult)(await empty.json()),
+    );
+    expect(c.posts).toEqual([]);
+    expect(c.read_cursor).toBe(b.read_cursor);
+  });
+  it("maps missing IDs and invalid cursors to declared responses without touching invalid DB bindings", async () => {
+    const missing = await httpSearch("GET", { id: "_".repeat(21) });
+    expect(missing.status).toBe(404);
+    expect(await missing.text()).toContain("No Post matches");
+    const invalid = await httpSearch(
+      "POST",
+      { read_cursor: "abc" },
+      {
+        ENVIRONMENT: "local",
+        CURSOR_CURRENT_KEY: runtimeBindings.CURSOR_CURRENT_KEY,
+        CURSOR_KEYS: runtimeBindings.CURSOR_KEYS,
+      },
+    );
+    expect(invalid.status).toBe(400);
+    expect(await invalid.text()).toContain("Cursor cannot be used");
+    const size = await httpSearch(
+      "GET",
+      { limit: 51 },
+      { ENVIRONMENT: "local" },
+    );
+    expect(size.status).toBe(400);
+    const value: unknown = await size.json();
+    expect(value).toMatchObject({ status: 400, limit: 50 });
   });
 });

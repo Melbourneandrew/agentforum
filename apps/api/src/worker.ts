@@ -1,3 +1,9 @@
+import { CursorProblem } from "./retrieval/contract.js";
+import {
+  retrievalLive,
+  searchOperation,
+  recognizeSearchProblem,
+} from "./retrieval/http.js";
 import { discoveryGuide } from "@agentforum/discovery-assets";
 import type { ExecutionContext } from "@cloudflare/workers-types/index.ts";
 import {
@@ -9,6 +15,7 @@ import {
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import {
   InputProblem,
+  type Operation,
   inputProblem,
   maxEncodedGetUrlBytes,
 } from "./input/transport.js";
@@ -72,12 +79,14 @@ const genericProblem = (id: string) =>
     detail: "The request could not be completed.",
     instance: `urn:uuid:${id}`,
   });
-const notFoundProblem = (id: string) =>
+const notFoundProblem = (id: string, post = false) =>
   new NotFoundProblem({
     type: "https://docs.agentforum.site/problems/not-found",
     title: "Not found",
     status: 404,
-    detail: "No route matches this request.",
+    detail: post
+      ? "No Post matches this request."
+      : "No route matches this request.",
     instance: `urn:uuid:${id}`,
   });
 const validationProblem = (id: string) =>
@@ -96,11 +105,12 @@ const Problem = Schema.Union(
   DatabaseConnectionTimeoutProblem,
   InputProblem,
   NameUnavailableProblem,
+  CursorProblem,
 );
 export const normalizeProblem = (
   response: Response,
   correlationId: string,
-  registration = false,
+  operation: Operation | boolean = false,
   declaredDatabaseTimeout = true,
 ) =>
   Effect.gen(function* () {
@@ -108,14 +118,20 @@ export const normalizeProblem = (
       ? recognizeDatabaseTimeout(response, correlationId)
       : Effect.succeed(Option.none<DatabaseConnectionTimeoutProblem>());
     if (Option.isSome(timeout)) return timeout.value;
-    const business = yield* registration
+    const business = yield* operation === true || operation === "register"
       ? recognizeRegistrationProblem(response, correlationId)
-      : Effect.succeed(Option.none<InputProblem | NameUnavailableProblem>());
+      : operation === "search"
+        ? recognizeSearchProblem(response, correlationId)
+        : Effect.succeed(
+            Option.none<
+              InputProblem | NameUnavailableProblem | CursorProblem
+            >(),
+          );
     return Option.getOrElse(business, () =>
       response.status === 400
         ? validationProblem(correlationId)
         : response.status === 404
-          ? notFoundProblem(correlationId)
+          ? notFoundProblem(correlationId, operation === "search")
           : genericProblem(correlationId),
     );
   });
@@ -156,6 +172,7 @@ const recordDefect = (correlationId: string) =>
 export const makeWorker = (
   health: Layer.Layer<Health, never, RequestContext> = healthLive,
   registration: typeof registrationLive = registrationLive,
+  retrieval: typeof retrievalLive = retrievalLive,
 ) => ({
   async fetch(
     request: Request,
@@ -174,39 +191,46 @@ export const makeWorker = (
     };
     const problemResponse = (problem: Schema.Schema.Type<typeof Problem>) =>
       renderProblem(problem, request.method, headers);
-    const registrationPath = new URL(request.url).pathname === "/v1/register";
-    if (registrationPath && request.method === "HEAD")
+    const pathname = new URL(request.url).pathname;
+    const registrationPath = pathname === "/v1/register",
+      searchPath = pathname === "/v1/search";
+    const operation = registrationPath
+      ? "register"
+      : searchPath
+        ? "search"
+        : undefined;
+    if (operation !== undefined && request.method === "HEAD")
       return new Response(null, { status: 200, headers });
     if (request.method === "OPTIONS")
       return new Response(null, { status: 204, headers });
     // Reject before the router builds/decodes its unused query-parameter view.
     if (
-      registrationPath &&
+      operation !== undefined &&
       request.method === "GET" &&
       utf8Size(request.url) > maxEncodedGetUrlBytes
     )
       return problemResponse(
         inputProblem(
           new InputFailure({ reason: "encoding" }),
-          "register",
+          operation,
           correlationId,
         ),
       );
     if (
-      registrationPath &&
+      operation !== undefined &&
       request.method !== "GET" &&
       request.method !== "POST"
     )
       return problemResponse(
         inputProblem(
           new InputFailure({ reason: "method" }),
-          "register",
+          operation,
           correlationId,
         ),
       );
     const env = Schema.decodeUnknownEither(Environment)(bindings);
     if (env._tag === "Left") {
-      await Effect.runPromise(recordDefect(correlationId));
+      if (!searchPath) await Effect.runPromise(recordDefect(correlationId));
       return problemResponse(genericProblem(correlationId));
     }
     if (request.signal.aborted) {
@@ -247,6 +271,32 @@ export const makeWorker = (
           }),
         ),
         Layer.provide(
+          HttpApiBuilder.group(Api, "retrieval", (handlers) => {
+            const handle = ({
+              request: incoming,
+            }: {
+              readonly request: HttpServerRequest.HttpServerRequest;
+            }) =>
+              Effect.gen(function* () {
+                const native = yield* HttpServerRequest.toWeb(incoming).pipe(
+                  Effect.orDie,
+                );
+                const response = yield* searchOperation(
+                  native,
+                  correlationId,
+                  () => retrieval(bindings),
+                  Effect.succeed(
+                    problemResponse(genericProblem(correlationId)),
+                  ),
+                );
+                return HttpServerResponse.fromWeb(response);
+              });
+            return handlers
+              .handleRaw("searchGet", handle)
+              .handleRaw("searchPost", handle);
+          }),
+        ),
+        Layer.provide(
           HttpApiBuilder.group(Api, "discovery", (handlers) =>
             handlers
               .handle("llms", () => Effect.succeed(discoveryGuide))
@@ -267,12 +317,12 @@ export const makeWorker = (
           normalizeProblem(
             response,
             correlationId,
-            registrationPath,
-            registrationPath,
+            operation ?? false,
+            operation !== undefined,
           ),
         );
         if (problem.status === 500)
-          await Effect.runPromise(recordDefect(correlationId));
+          if (!searchPath) await Effect.runPromise(recordDefect(correlationId));
         result = problemResponse(problem);
       }
       const output = new Response(
@@ -283,7 +333,7 @@ export const makeWorker = (
         output.headers.set(name, value);
       return output;
     } catch {
-      await Effect.runPromise(recordDefect(correlationId));
+      if (!searchPath) await Effect.runPromise(recordDefect(correlationId));
       return problemResponse(genericProblem(correlationId));
     }
   },

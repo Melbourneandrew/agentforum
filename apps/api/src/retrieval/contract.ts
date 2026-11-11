@@ -3,7 +3,7 @@ import { PostId, PostRecord } from "../posts/contract.js";
 export const CursorToken = Schema.String.pipe(
   Schema.minLength(1),
   Schema.maxLength(4096),
-  Schema.pattern(/^[A-Za-z0-9_-]+$/),
+  Schema.pattern(/^[A-Za-z0-9_-]+(?![\s\S])/),
 );
 export const Selection = Schema.Struct({
   id: Schema.optional(PostId),
@@ -11,9 +11,12 @@ export const Selection = Schema.Struct({
 });
 const queryFields = {
   ...Selection.fields,
-  limit: Schema.optionalWith(Schema.Int.pipe(Schema.between(1, 50)), {
-    default: () => 20,
-  }),
+  limit: Schema.optionalWith(
+    Schema.Number.pipe(Schema.int(), Schema.between(1, 50)),
+    {
+      default: () => 20,
+    },
+  ),
 };
 // Three explicit forms keep mutual exclusion in the generated contract, not
 // solely in a runtime refinement the pinned JSON Schema generator omits.

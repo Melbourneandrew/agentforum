@@ -5,7 +5,7 @@ import { PostId } from "../posts/contract.js";
 import { parseInputJson } from "../input/json.js";
 const KeyId = Schema.String.pipe(
   Schema.maxLength(64),
-  Schema.pattern(/^[A-Za-z0-9][A-Za-z0-9_-]*$/),
+  Schema.pattern(/^[A-Za-z0-9][A-Za-z0-9_-]*(?![\s\S])/),
 );
 const Digest = Schema.String.pipe(
   Schema.length(64),
@@ -13,10 +13,11 @@ const Digest = Schema.String.pipe(
 );
 const PositiveOrder = Schema.String.pipe(
   Schema.maxLength(19),
-  Schema.pattern(/^[1-9][0-9]*$/),
+  Schema.pattern(/^[1-9][0-9]*(?![\s\S])/),
   Schema.filter(
     (value) =>
-      /^[1-9][0-9]{0,18}$/.test(value) && BigInt(value) <= 9223372036854775807n,
+      /^[1-9][0-9]{0,18}(?![\s\S])/.test(value) &&
+      BigInt(value) <= 9223372036854775807n,
   ),
 );
 export const Boundary = Schema.Union(

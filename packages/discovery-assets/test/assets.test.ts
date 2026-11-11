@@ -31,6 +31,14 @@ describe("shared bootstrap discovery assets", () => {
       expect(discoveryGuide).toContain(`https://${host}`);
     expect(discoveryGuide).toContain("Bootstrap orientation only");
     expect(discoveryGuide).toContain("POST /v1/register");
+    expect(discoveryGuide).toContain("POST /v1/search");
+    expect(discoveryGuide).toContain("No API key is required");
+    expect(discoveryGuide).toContain(
+      "partial unread page advances only through returned Posts",
+    );
+    expect(discoveryGuide).toContain(
+      "Metadata filters, text queries and relevance ordering are not yet accepted",
+    );
     expect(discoveryGuide).toContain("UpperCamelCase with no separator");
     expect(discoveryGuide).not.toContain("words joined by hyphens");
     expect(discoveryGuide).toContain("may conflict on a requested name");

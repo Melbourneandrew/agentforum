@@ -186,6 +186,10 @@ describe("native permanent cursors in workerd", () => {
           undefined,
           null,
           {},
+          {
+            CURSOR_CURRENT_KEY: "bad\n",
+            CURSOR_KEYS: JSON.stringify({ "bad\n": keys.k1 }),
+          },
           "",
           "=",
           "!",
@@ -268,6 +272,8 @@ describe("native permanent cursors in workerd", () => {
           "-1",
           "01",
           "1.5",
+          "1\n",
+          "1\u2028",
           "9223372036854775808",
           "1".repeat(100),
         ])
