@@ -71,13 +71,13 @@ const program = Effect.scoped(
         Effect.promise(() => rm(directory, { recursive: true, force: true })),
     );
     const configPath = join(directory, "wrangler.json");
-    // This pepper belongs only to this fresh, disposable local database session.
+    // These independent credentials belong only to this disposable DB session.
     // Wrangler masks .dev.vars values; never put these in printed vars/config.
     yield* Effect.tryPromise({
       try: () =>
         writeFile(
           join(directory, ".dev.vars"),
-          `AUTH_CURRENT_PEPPER="local-v1"\nAUTH_PEPPERS='${JSON.stringify({ "local-v1": randomBytes(32).toString("hex") })}'\n`,
+          `AUTH_CURRENT_PEPPER="local-v1"\nAUTH_PEPPERS='${JSON.stringify({ "local-v1": randomBytes(32).toString("hex") })}'\nCURSOR_CURRENT_KEY="local-v1"\nCURSOR_KEYS='${JSON.stringify({ "local-v1": randomBytes(32).toString("hex") })}'\n`,
           { mode: 0o600 },
         ),
       catch: () => new LocalDatabaseCommandError(),

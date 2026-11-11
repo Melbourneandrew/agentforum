@@ -1,3 +1,8 @@
+import {
+  SearchInput,
+  SearchResult,
+  CursorProblem,
+} from "./retrieval/contract.js";
 import { discoveryMediaType } from "@agentforum/discovery-assets";
 import {
   HttpApi,
@@ -165,8 +170,115 @@ const registrationGroup = HttpApiGroup.make("registration")
         { status: 500 },
       ),
   );
+const SearchGet = Schema.Struct({
+  payload: Schema.String.annotations({
+    jsonSchema: {
+      type: "string",
+      contentMediaType: "application/json",
+      contentSchema: JSONSchema.make(SearchInput, {
+        target: "jsonSchema2020-12",
+      }),
+    },
+  }),
+});
+const retrievalGroup = HttpApiGroup.make("retrieval")
+  .add(
+    HttpApiEndpoint.get("searchGet", "/v1/search")
+      .setPayload(SearchGet)
+      .addSuccess(SearchResult)
+      .addError(
+        CursorProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 400 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 400 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 401 },
+      )
+      .addError(
+        NotFoundProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 404 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 405 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 413 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 415 },
+      )
+      .addError(
+        InternalProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 500 },
+      )
+      .addError(
+        DatabaseConnectionTimeoutProblem.pipe(
+          HttpApiSchema.withEncoding(problemEncoding),
+        ),
+        { status: 503 },
+      )
+      .annotate(
+        OpenApi.Description,
+        "Anonymous exact-ID lookup, chronological feed, reply filtering and permanent read resumption. Metadata/text/relevance search is not yet implemented.",
+      ),
+  )
+  .add(
+    HttpApiEndpoint.post("searchPost", "/v1/search")
+      .setPayload(SearchInput)
+      .addSuccess(SearchResult)
+      .addError(
+        CursorProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 400 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 400 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 401 },
+      )
+      .addError(
+        NotFoundProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 404 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 405 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 413 },
+      )
+      .addError(
+        InputProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 415 },
+      )
+      .addError(
+        InternalProblem.pipe(HttpApiSchema.withEncoding(problemEncoding)),
+        { status: 500 },
+      )
+      .addError(
+        DatabaseConnectionTimeoutProblem.pipe(
+          HttpApiSchema.withEncoding(problemEncoding),
+        ),
+        { status: 503 },
+      )
+      .annotate(
+        OpenApi.Description,
+        "Anonymous exact-ID lookup, chronological feed, reply filtering and permanent read resumption. Metadata/text/relevance search is not yet implemented.",
+      ),
+  );
 export const Api = HttpApi.make("agentforum")
   .add(registrationGroup)
+  .add(retrievalGroup)
   .add(
     HttpApiGroup.make("runtime").add(
       HttpApiEndpoint.get("health", "/v1/health")
@@ -228,11 +340,14 @@ export const makeOpenApi = () => {
           content: {
             "application/problem+json": {
               schema:
-                pathname === "/v1/register"
+                pathname === "/v1/register" || pathname === "/v1/search"
                   ? {
                       anyOf: [
                         { $ref: "#/components/schemas/ValidationProblem" },
                         { $ref: "#/components/schemas/InputProblem" },
+                        ...(pathname === "/v1/search"
+                          ? [{ $ref: "#/components/schemas/CursorProblem" }]
+                          : []),
                       ],
                     }
                   : { $ref: "#/components/schemas/ValidationProblem" },

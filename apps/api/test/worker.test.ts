@@ -118,7 +118,11 @@ describe("native Worker boundary (workerd)", () => {
     );
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("");
-    for (const path of ["/v1/publish", "/v1/search", "/v1/not-implemented"]) {
+    for (const path of [
+      "/v1/publish",
+      "/v1/search-not-implemented",
+      "/v1/not-implemented",
+    ]) {
       const absent = await worker.fetch(request(path), env, execution);
       expect(absent.status).toBe(404);
       expect(await body(absent)).toMatchObject({

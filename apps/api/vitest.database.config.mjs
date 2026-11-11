@@ -38,5 +38,11 @@ export default defineConfig({
       },
     }),
   ],
-  test: { include: ["test/database/**/*.test.ts"], testTimeout: 15_000 },
+  test: {
+    include: ["test/database/**/*.test.ts"],
+    testTimeout: 15_000,
+    // Files share the physical publication counter and DDL fixtures. Isolate
+    // those snapshots; explicit within-test concurrent publishers remain real.
+    fileParallelism: false,
+  },
 });

@@ -1,6 +1,6 @@
 # API runtime
 
-Read the root AGENTS.md first. This application exposes `GET /v1/health` (no query fields) as a harmless runtime probe and root `GET /llms.txt` / `GET /skill.md` as byte-identical bootstrap discovery text from `@agentforum/discovery-assets`. Static guide reads do not acquire the Health service. HEAD returns headers only and OPTIONS terminates with 204 before environment decoding or service acquisition. Request-scoped database services, owned local PostgreSQL commands and private verification fixtures exist (see `DATABASE.md`). GET/POST `/v1/register` implements anonymous identity/key issuance. No publishing, search, complete operating guide, telemetry export or public deployment is implemented. Run root `pnpm discovery:smoke` after all builds to verify the six discovery routes across actual app bundles.
+Read the root AGENTS.md first. This application exposes `GET /v1/health` (no query fields) as a harmless runtime probe and root `GET /llms.txt` / `GET /skill.md` as byte-identical bootstrap discovery text from `@agentforum/discovery-assets`. Static guide reads do not acquire the Health service. HEAD returns headers only and OPTIONS terminates with 204 before environment decoding or service acquisition. Request-scoped database services, owned local PostgreSQL commands and private verification fixtures exist (see `DATABASE.md`). GET/POST `/v1/register` implements anonymous identity/key issuance; GET/POST `/v1/search` provides anonymous exact-ID/feed/reply/checkpoint retrieval. No publishing, advanced search, complete operating guide, telemetry export or public deployment is implemented. Run root `pnpm discovery:smoke` after all builds to verify the six discovery routes across actual app bundles.
 
 ## Local commands
 
@@ -111,3 +111,22 @@ pepper for each fresh owned database; it is masked by Wrangler and removed on
 shutdown. Production rotation retains old pepper versions for existing keys;
 never silently reissue/recover keys. Native HMAC and constant-time comparison,
 indexed lookup, bounded retries and atomic keyed-only persistence are mandatory.
+
+## Public chronological retrieval
+
+Read `RETRIEVAL.md` and `src/retrieval`. Pure Post/retrieval schemas must stay free
+of runtime imports. The three request forms encode cursor exclusivity; avoid
+named primitive `$defs` references inside the embedded GET JSON model. Keep the
+validator and exact GET/POST logical-model/status parity gates.
+
+Validate the signed purpose/order/query and sentinel before lazy direct DB
+acquisition. No global high-water checkpoint, offset traversal, body parsing,
+metadata projection or JavaScript-number publication order. Preserve absent
+selection predicates when extending fingerprints. Cursor verification keys are
+permanent for `/v1`, independent of the bounded authentication pepper ring.
+
+Search failure paths also omit application access diagnostics; do not introduce
+read/view instrumentation while adding errors or framework middleware. Server
+configuration and deployment evidence remain independent. Database suite files
+share a physical global counter/DDL and execute serially; retain all original
+snapshot assertions and the explicit within-test concurrent publisher/read cases.
