@@ -1,3 +1,5 @@
+import { CursorToken, Selection } from "./contract.js";
+export { CursorToken, Selection } from "./contract.js";
 import { Context, Data, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { PostId } from "../posts/contract.js";
 import { parseInputJson } from "../input/json.js";
@@ -29,15 +31,6 @@ export const Boundary = Schema.Union(
   }),
 );
 export type Boundary = Schema.Schema.Type<typeof Boundary>;
-export const Selection = Schema.Struct({
-  id: Schema.optional(PostId),
-  reply_to: Schema.optional(PostId),
-});
-export const CursorToken = Schema.String.pipe(
-  Schema.minLength(1),
-  Schema.maxLength(4096),
-  Schema.pattern(/^[A-Za-z0-9_-]+$/),
-);
 const fields = {
   purpose: Schema.Literal("page", "read"),
   ordering: Schema.Literal("chronological_asc", "chronological_desc"),
@@ -278,15 +271,19 @@ export const cursorsLayer = Layer.effect(
             Effect.mapError(() => new CursorInvalidError()),
           );
           const verifier = yield* key(envelope.payload.key_id);
+          const signature = yield* Effect.try({
+            try: () => decode(envelope.signature),
+            catch: () => new CursorInvalidError(),
+          });
           const valid = yield* Effect.tryPromise({
             try: () =>
               crypto.subtle.verify(
                 "HMAC",
                 verifier,
-                decode(envelope.signature),
+                signature,
                 signedBytes(envelope.payload),
               ),
-            catch: () => new CursorInvalidError(),
+            catch: () => new CursorCryptoError(),
           });
           return yield* Effect.succeed(envelope.payload).pipe(
             Effect.filterOrFail(
