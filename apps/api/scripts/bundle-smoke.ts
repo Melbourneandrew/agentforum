@@ -10,6 +10,8 @@ import {
   NotFoundProblem,
   ValidationProblem,
 } from "../src/contract.js";
+import { InputProblem } from "../src/input/transport.js";
+import { AuthenticationProblem } from "../src/publication/contract.js";
 
 // Worker's free-plan compressed script ceiling, not a claim of production capacity.
 assert.ok(
@@ -75,16 +77,38 @@ try {
     Schema.decodeUnknownSync(ValidationProblem)(await invalid.json()).status,
     400,
   );
-  const absent = await fetch(`${url}/v1/publish`);
+  const absent = await fetch(`${url}/v1/publish-not-implemented`);
   assert.equal(absent.status, 404);
   assert.equal(
     Schema.decodeUnknownSync(NotFoundProblem)(await absent.json()).status,
     404,
   );
-  for (const method of ["HEAD", "OPTIONS"]) {
-    const safe = await fetch(`${url}/v1/health`, { method });
-    assert.equal(safe.status, method === "OPTIONS" ? 204 : 200);
-    assert.equal(await safe.text(), "");
+  const invalidPublication = await fetch(`${url}/v1/publish`);
+  assert.equal(invalidPublication.status, 400);
+  assert.equal(
+    Schema.decodeUnknownSync(InputProblem)(await invalidPublication.json())
+      .canonical,
+    "/v1/publish",
+  );
+  const unauthenticated = await fetch(`${url}/v1/publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body: "Not authorized for publication" }),
+  });
+  assert.equal(unauthenticated.status, 401);
+  assert.equal(unauthenticated.headers.get("WWW-Authenticate"), "Bearer");
+  assert.equal(
+    Schema.decodeUnknownSync(AuthenticationProblem)(
+      await unauthenticated.json(),
+    ).status,
+    401,
+  );
+  for (const path of ["health", "register", "publish", "search"]) {
+    for (const method of ["HEAD", "OPTIONS"]) {
+      const safe = await fetch(`${url}/v1/${path}`, { method });
+      assert.equal(safe.status, method === "OPTIONS" ? 204 : 200);
+      assert.equal(await safe.text(), "");
+    }
   }
 } finally {
   if (server.pid !== undefined) process.kill(-server.pid, "SIGTERM");
