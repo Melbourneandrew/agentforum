@@ -1,0 +1,243 @@
+:root {
+  color: #151817;
+  background: #f6f8f5;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.5;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+}
+a {
+  color: #164f3d;
+  text-underline-offset: 0.2em;
+}
+a:focus-visible {
+  outline: 3px solid #8a4f08;
+  outline-offset: 4px;
+}
+.forum-topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.1rem max(1rem, calc((100vw - 1180px) / 2));
+  color: #c4d6cc;
+  background: #102b22;
+  font-size: 0.8rem;
+}
+.forum-brand {
+  color: white;
+  font-size: 1rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+.forum-shell {
+  max-width: 1244px;
+  margin: auto;
+  padding: 2.5rem 2rem 4rem;
+}
+h1 {
+  font:
+    650 2.2rem/1.15 Georgia,
+    serif;
+  letter-spacing: -0.025em;
+}
+.forum-loading {
+  padding: 2rem;
+  border: 1px solid #dce2de;
+  border-radius: 14px;
+  background: white;
+}
+.forum-shell:has(> .forum-result) > .forum-loading {
+  display: none;
+}
+@media (max-width: 760px) {
+  .forum-shell {
+    padding: 1.75rem 1rem 3rem;
+  }
+  .forum-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
+.forum-heading {
+  margin: 1.5rem 0 2rem;
+}
+.forum-heading h1 {
+  margin: 0.4rem 0;
+  overflow-wrap: anywhere;
+}
+.forum-heading p {
+  max-width: 42rem;
+  color: #66706b;
+}
+.forum-eyebrow {
+  color: #164f3d !important;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+.forum-card {
+  background: white;
+  border: 1px solid #dce2de;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgb(25 40 32 / 8%);
+}
+.forum-table-wrap {
+  overflow-x: auto;
+}
+.forum-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  text-align: left;
+}
+.forum-table caption {
+  padding: 1rem;
+  text-align: left;
+  color: #66706b;
+  font-size: 0.8rem;
+}
+.forum-table th {
+  padding: 0.8rem 1.2rem;
+  background: #fbfcfb;
+  color: #66706b;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+}
+.forum-table td {
+  padding: 1rem 1.2rem;
+  border-top: 1px solid #e8ece9;
+  vertical-align: top;
+}
+.forum-table tbody tr:hover {
+  background: #f7faf8;
+}
+.forum-post-link {
+  color: #151817;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.forum-id,
+.forum-author,
+.forum-facts dd {
+  font:
+    0.8rem/1.6 ui-monospace,
+    monospace;
+  overflow-wrap: anywhere;
+}
+.forum-id {
+  display: block;
+  color: #66706b;
+  margin-top: 0.25rem;
+}
+.forum-excerpt {
+  max-width: 30rem;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: #66706b;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+.forum-table time {
+  font-size: 0.75rem;
+  color: #66706b;
+}
+.forum-reply-label {
+  padding: 0.2rem 0.5rem;
+  background: #e3eee8;
+  color: #164f3d;
+  border-radius: 1rem;
+  font-size: 0.7rem;
+}
+.forum-pager {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 1.2rem;
+  border-top: 1px solid #dce2de;
+  font-size: 0.8rem;
+}
+.forum-pager nav {
+  display: flex;
+  gap: 1.5rem;
+}
+.forum-pager [aria-disabled] {
+  color: #66706b;
+}
+.forum-safety {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #ead4ad;
+  border-radius: 10px;
+  color: #674315;
+  background: #fff9ed;
+  font-size: 0.8rem;
+}
+.forum-safety strong {
+  display: block;
+}
+.forum-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 1.25rem;
+  align-items: start;
+}
+.forum-article,
+.forum-facts,
+.forum-empty,
+.forum-replies {
+  padding: 1.5rem;
+}
+.forum-facts h2,
+.forum-replies h2 {
+  margin-top: 0;
+}
+.forum-facts p,
+.forum-facts dt {
+  color: #66706b;
+  font-size: 0.8rem;
+}
+.forum-facts dt {
+  margin-top: 1rem;
+  border-top: 1px solid #dce2de;
+  padding-top: 0.6rem;
+}
+.forum-facts dd {
+  margin: 0.2rem 0 0;
+}
+.forum-article pre {
+  overflow: auto;
+  padding: 1rem;
+  background: #f6f8f5;
+  font-size: 0.8rem;
+}
+.forum-article .markdown-body {
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+.forum-article details {
+  margin-top: 1.5rem;
+}
+.forum-article summary {
+  cursor: pointer;
+  color: #164f3d;
+}
+.forum-replies {
+  margin-top: 1.5rem;
+}
+@media (max-width: 900px) {
+  .forum-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}

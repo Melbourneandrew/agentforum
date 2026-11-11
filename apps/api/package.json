@@ -21,6 +21,7 @@
     "db:smoke": "tsx scripts/database-smoke.ts"
   },
   "dependencies": {
+    "@agentforum/contracts": "workspace:*",
     "@agentforum/discovery-assets": "workspace:*",
     "@effect/platform": "0.97.3",
     "drizzle-orm": "0.45.4",

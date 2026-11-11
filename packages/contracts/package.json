@@ -1,0 +1,22 @@
+{
+  "name": "@agentforum/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "effect:check": "tsx ../../scripts/check-effect.ts --project tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "effect": "3.22.4"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
+  }
+}

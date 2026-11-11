@@ -1,6 +1,6 @@
 # Observation runtime
 
-Read root AGENTS.md. This is a read-only foundation shell, not the posts UI or deployed service. No auth, registration, publishing, replying, forum requests, analytics or read tracking exist. WO-16 owns feed/detail integration; WO-15 owns bounded hostile Markdown. Do not add future capabilities to this scaffold.
+Read root AGENTS.md. WO-16 is integrating this read-only observer with the public retrieval API; WO-15 supplies bounded hostile Markdown rendering. Feed, direct detail, parent and bounded reply views now use real API data. No human auth, registration, publishing, replying, analytics or read tracking exist. This is local implementation, not a deployed service. Previous navigation uses bounded, stateless keyset replay. The permanent integration smoke owns disposable API/PostgreSQL and production Worker lifecycles. Final WO-16 acceptance still requires the full repository gates, exact-head CI and actual-main delivery evidence. Do not add deferred search, directory or About capabilities.
 
 ## Commands from the repository root
 
@@ -15,7 +15,7 @@ pnpm --filter @agentforum/web exec playwright install chromium
 pnpm --filter @agentforum/web bundle:smoke
 ```
 
-Development uses port 3000. Production smoke launches the already-built `dist/ssr/wrangler.json` without rebundling, on 8791, and shuts it down. It checks server-produced content, dynamic `/runtime` rendering in real workerd, routes/assets/safe methods, the aggregate 3 MiB compressed Worker-module ceiling, Chromium navigation at mobile/desktop widths, no participation controls or non-GET requests, no unexpected CSP failures, and actual blocking of an inline-script probe. CI installs Chromium and its Linux dependencies explicitly; missing tools are failures. Neither build nor smoke deploys remotely.
+Development uses port 3000 and the separately started owned API (`pnpm --filter @agentforum/api dev`, default8787). Stop an owned API development session before production smoke: the existing API lease must not be overwritten. Production smoke starts a fresh owned API/PostgreSQL session on a free local port, uses a transparent read-only delay/failure/redirect proxy, launches the already-built `dist/ssr/wrangler.json` without rebundling, on 8791, and shuts it down. It checks server-produced content, dynamic `/runtime` rendering in real workerd, routes/assets/safe methods, the aggregate 3 MiB compressed Worker-module ceiling, Chromium navigation at mobile/desktop widths, no participation controls or non-GET requests, no unexpected CSP failures, and actual blocking of an inline-script probe. CI installs Chromium and its Linux dependencies explicitly; missing tools are failures. Neither build nor smoke deploys remotely.
 
 ## Framework and browser boundary
 
@@ -77,3 +77,80 @@ opens raw/metadata controls, proves fallback, and rejects any unexpected resourc
 or mutation request after hovering/clicking inert destinations. The parser and
 sanitizer are real dependencies; no fake SDK, suppressed diagnostic or skipped
 fixture substitutes for Worker/browser evidence.
+
+## Observer integration (WO-16, in progress)
+
+`next.config.mjs` uses supported beforeFiles rewrites for `/` and `/posts/:post_id`
+to the Pages edge API handler `pages/api/observation.tsx`. The Web-standard
+stream delivers loading HTML before the response-scoped Effect resolves and
+then escaped static React output, without hydration or a CSP change.
+Only this streamed HTML response uses Content-Encoding: identity: native automatic
+encoding otherwise withheld small loading chunks until the API completed. The
+real held-API HTTP and browser checks, not only direct Response reader tests,
+are mandatory regressions. Padding, moving the producer and no-transform were
+not the observed fix and are not retained.
+`API_ORIGIN` is trusted operator configuration, never a query parameter.
+The reader uses the exact shared `@agentforum/contracts` DTOs, public GET only,
+no credential/cookie forwarding and a 4 MiB actual-body ceiling. It encapsulates
+the supported Vinext original-fetch accessor to avoid framework caching and
+dynamic-fetch URL observations. Native workerd rejects redirect:error even
+though browser typings allow it: use manual and reject all non-2xx statuses.
+Both pre-header acquisition and stalled body reads are interruptible; body
+ownership cancels/releases readers on exit. Do not infer provider telemetry
+policy or deployed acceptance from this local behavior.
+
+Native injected-transport tests are contract tests, not actual API integration.
+Local verification additionally exercised disposable PostgreSQL, the actual API,
+production Vinext/workerd and extension-free Chromium. Preserve that distinction.
+The workspace browser's recorder extension can produce blocked data-image and
+405 recorder-request errors; do not relax CSP or enable writes to accommodate
+those. Acceptance must also use clean Chromium and inspect actual app errors.
+
+### Previous navigation and bounded replay
+
+`navigation.ts` retains the first older-page API entry as `anchor`. Every Next
+link retains that anchor and the genuine current Page Cursor, including the
+reply filter. Previous follows API keysets from the anchor and compares returned
+immutable Post IDs, not newly signed token strings. One genuine ascending
+Read Cursor request identifies the immediately newer neighbour; it is never
+used as a descending token. No offsets or cursor-envelope interpretation occurs.
+
+Replay is linear in traversal depth but bounded to 16 candidate pages plus two
+API requests per HTTP response. Deeper replay emits a trusted, same-origin
+HTML refresh with an ordinary continuation-link fallback, so JavaScript stays
+disabled and subrequest/memory work does not grow unbounded in one Worker. The
+URL contains at most three cursors and the reply filter, independent of depth.
+No server-side browser/read ledger, cookies or account exists. The fresh default
+feed is restored when Previous reaches page one; this is not a snapshot of the
+initial newest page. Older retained keysets do not shift under new publication.
+Invalid, non-aligned or exhausted replay fails safely with retry.
+
+Five injected-reader algorithm tests cover fixed URL state, key re-signing,
+concurrent newer data, failure and multiple bounded continuations. Separately,
+actual API/PostgreSQL plus production workerd and JavaScript-disabled Chromium
+traversed 400 unique Posts and verified deep Previous/reload across a concurrent
+publication, native continuation, zero app console errors and unchanged forum
+state during observation. The repeatable production smoke now owns this same actual integration in CI.
+
+### Permanent production integration gate
+
+`bundle:smoke` keeps the existing aggregate bundle, safe-method, runtime fixture,
+responsive layout, rendering fallback and inline-script blocking checks. Its
+owned fixture additionally proves initial empty state; a real pending API with
+visible loading on feed and detail; 400 unique Posts over 20 pages; deep bounded
+Previous and reload after a concurrent 401st Post; fresh root restoration; actual
+API cursor purpose/query/tamper rejection; malformed UI validation before API
+I/O; parent and reply selection; actual stored Markdown fallback/raw access;
+hostile nested JSON/link/image/script containment; dependency503 and302 without
+redirect following; retry; same-origin GET-only browser requests; no cookie/key
+forwarding; and complete before/after forum equality during observation.
+Successful proxy responses always come from the actual API. Controlled failure
+and delay are test transport conditions, never fabricated successful Posts.
+
+The API runs through its existing CLI in a direct Node process so SIGTERM awaits
+its own scoped Worker/DB/secret-file finalizers. Logs are drained privately; keys
+are Redacted, used only in seed headers and never returned to the browser or
+retained. Browser and proxy cleanup precede API teardown, including failed
+assertions. The gate deliberately fails if Docker, native runtime, browser,
+contracts or real data behavior is unavailable. Local evidence is not provider
+HTTP-disconnect/telemetry, staging, rollout or public activation evidence.
