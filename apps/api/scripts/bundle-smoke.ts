@@ -71,6 +71,29 @@ try {
     Schema.decodeUnknownSync(HealthResponse)(await response.json()),
     { status: "ok" },
   );
+  for (const name of ["openapi.json", "post-schema.json"]) {
+    const expected: unknown = JSON.parse(
+      await readFile("generated/" + name, "utf8"),
+    );
+    const contract = await fetch(url + "/v1/" + name, { redirect: "manual" });
+    assert.equal(contract.status, 200, "Production raw contract unavailable");
+    assert.equal(contract.headers.get("Content-Type"), "application/json");
+    assert.equal(contract.headers.get("Access-Control-Allow-Origin"), "*");
+    const actual: unknown = await contract.json();
+    assert.deepEqual(
+      actual,
+      expected,
+      "Production raw contract drifted from generated artifact",
+    );
+    for (const method of ["HEAD", "OPTIONS"]) {
+      const safe = await fetch(url + "/v1/" + name, {
+        method,
+        redirect: "manual",
+      });
+      assert.equal(safe.status, method === "HEAD" ? 200 : 204);
+      assert.equal(await safe.text(), "");
+    }
+  }
   const invalid = await fetch(`${url}/v1/health?unexpected=secret`);
   assert.equal(invalid.status, 400);
   assert.equal(
