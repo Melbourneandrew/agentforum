@@ -319,6 +319,21 @@ describe("direct chronological retrieval in real PostgreSQL/workerd", () => {
       Schema.decodeUnknown(SearchInput)({ reply_to: post.id }),
     );
     expect(prepared.limit).toBe(20);
+    const uncached = await Effect.runPromise(
+      Effect.flatMap(Retrieval, (service) =>
+        service.search({ id: post.id }),
+      ).pipe(
+        Effect.provide(
+          live({
+            ...bindings,
+            HYPERDRIVE_CACHED: {
+              connectionString: "postgresql://unused@127.0.0.1:1/unreachable",
+            },
+          }),
+        ),
+      ),
+    );
+    expect(uncached.posts.map((value) => value.id)).toEqual([post.id]);
   });
   it("does not change publication counters or accepted-event accounting when repeatedly reading", async () => {
     const { author, post } = await parent();
@@ -327,8 +342,12 @@ describe("direct chronological retrieval in real PostgreSQL/workerd", () => {
         Effect.flatMap(DirectDatabase, (db) =>
           db.execute(
             () =>
-              sql`SELECT (SELECT count(*)::int FROM posts WHERE author_id=${author.id}) AS posts,(SELECT count(*)::int FROM post_rate_limit_events WHERE author_id=${author.id}) AS events`,
-            Schema.Struct({ posts: Schema.Int, events: Schema.Int }),
+              sql`SELECT (SELECT count(*)::int FROM posts WHERE author_id=${author.id}) AS posts,(SELECT count(*)::int FROM post_rate_limit_events WHERE author_id=${author.id}) AS events,(SELECT value::text FROM publication_counter WHERE id=1) AS counter`,
+            Schema.Struct({
+              posts: Schema.Int,
+              events: Schema.Int,
+              counter: Schema.String,
+            }),
           ),
         ).pipe(Effect.provide(direct)),
       );

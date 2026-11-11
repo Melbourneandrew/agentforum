@@ -186,10 +186,6 @@ describe("native permanent cursors in workerd", () => {
           undefined,
           null,
           {},
-          {
-            CURSOR_CURRENT_KEY: "bad\n",
-            CURSOR_KEYS: JSON.stringify({ "bad\n": keys.k1 }),
-          },
           "",
           "=",
           "!",
@@ -227,6 +223,10 @@ describe("native permanent cursors in workerd", () => {
     for (const bindings of [
       undefined,
       {},
+      {
+        CURSOR_CURRENT_KEY: "bad\n",
+        CURSOR_KEYS: JSON.stringify({ "bad\n": keys.k1 }),
+      },
       { CURSOR_CURRENT_KEY: "missing", CURSOR_KEYS: JSON.stringify(keys) },
       {
         CURSOR_CURRENT_KEY: "k1",
