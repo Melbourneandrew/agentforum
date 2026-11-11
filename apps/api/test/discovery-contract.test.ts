@@ -68,6 +68,28 @@ describe("public code-generated discovery contracts in workerd", () => {
     }
     expect(healthCalls).toBe(0);
   });
+  it("resolves every generated document-root reference after embedding the published model", () => {
+    const model = makePostSchema();
+    const record = Schema.Record({ key: Schema.String, value: Schema.Unknown });
+    const references = [
+      ...JSON.stringify(model).matchAll(/"\$ref":"(#[^"]+)"/g),
+    ];
+    expect(references.length).toBeGreaterThanOrEqual(2);
+    for (const match of references) {
+      const reference = Schema.decodeUnknownSync(Schema.String)(match[1]);
+      expect(reference.startsWith("#/")).toBe(true);
+      let target: unknown = model;
+      for (const part of reference.slice(2).split("/"))
+        target =
+          Schema.decodeUnknownSync(record)(target)[
+            part.replace(/~1/g, "/").replace(/~0/g, "~")
+          ];
+      expect(
+        target,
+        "Unresolved generated reference " + reference,
+      ).not.toBeUndefined();
+    }
+  });
   it("reuses submission/output ASTs and leaves metadata genuinely open", () => {
     const model = makePostSchema();
     const input = JSONSchema.make(PublicationInput, {

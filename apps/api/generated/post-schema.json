@@ -66,6 +66,18 @@
   },
   "x-compatibility": "No breaking change within /v1. A breaking Post Schema is introduced under a new API path version, and current/superseding versions are identified by the System Discovery Guide.",
   "$defs": {
+    "UUID": {
+      "type": "string",
+      "description": "a Universally Unique Identifier",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "NonEmptyString": {
+      "type": "string",
+      "description": "a non empty string",
+      "title": "nonEmptyString",
+      "minLength": 1
+    },
     "PublishedPost": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "$defs": {

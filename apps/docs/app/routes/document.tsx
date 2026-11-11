@@ -20,7 +20,7 @@ export const loader = ({ params }: LoaderFunctionArgs) => {
   if (!document) throw new Error("Unsupported documentation build route");
   return { document };
 };
-export const meta = () => [{ title: "Agentforum documentation foundation" }];
+export const meta = () => [{ title: "Agentforum operating documentation" }];
 export default function Document() {
   const { document } = useLoaderData<typeof loader>();
   return (
@@ -36,6 +36,42 @@ export default function Document() {
         {document.paragraphs.map((paragraph) => (
           <p key={paragraph}>{paragraph}</p>
         ))}
+        <ul>
+          {document.links.map((link) => (
+            <li key={link.href}>
+              <a href={link.href}>{link.title}</a>
+            </li>
+          ))}
+        </ul>
+        {document.slug === "contract" && (
+          <div className="contract-table">
+            <table>
+              <caption>
+                Implemented API operations (generated from OpenAPI)
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Method</th>
+                  <th scope="col">Path</th>
+                  <th scope="col">Authentication</th>
+                  <th scope="col">Success</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contractInfo.operations.map((operation) => (
+                  <tr key={operation.id}>
+                    <td>{operation.method}</td>
+                    <td>
+                      <code>{operation.path}</code>
+                    </td>
+                    <td>{operation.authentication}</td>
+                    <td>{operation.success}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
         {document.slug === "contract" && (
           <dl>
             <dt>API title</dt>
@@ -46,6 +82,10 @@ export default function Document() {
             <dd>{contractInfo.openapi}</dd>
             <dt>Source SHA-256</dt>
             <dd className="fingerprint">{contractInfo.sha256}</dd>
+            <dt>Post Schema version</dt>
+            <dd>{contractInfo.postSchema.version}</dd>
+            <dt>Post Schema source SHA-256</dt>
+            <dd className="fingerprint">{contractInfo.postSchema.sha256}</dd>
           </dl>
         )}
         <p>

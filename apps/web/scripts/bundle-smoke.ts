@@ -1,3 +1,4 @@
+import { runDiscoveryJourney } from "./discovery-journey.js";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -104,6 +105,7 @@ try {
   const browser = await chromium.launch({ args: ["--no-sandbox"] });
   try {
     await verifyObservationJourneys(browser, base, fixture);
+    await runDiscoveryJourney(fixture.apiOrigin);
     for (const width of [390, 1440]) {
       const page = await browser.newPage({ viewport: { width, height: 900 } });
       const failures: string[] = [];
