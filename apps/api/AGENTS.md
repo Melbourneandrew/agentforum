@@ -82,3 +82,14 @@ Do not replace strict source validation with JSON.parse alone, normalized JSON
 byte accounting, unbounded request.text/json, permissive URLSearchParams decoding,
 or fake database fixtures claimed as endpoint acceptance. No cloud resources,
 telemetry collection, deployment or public activation is enabled by WO-12.
+
+## Immutable publication storage
+
+Read `POSTS.md` before consuming `PostRepository`. Transport source budgets remain
+with InputTransport; the API supplies the authenticated UUID, never client author
+facts. Preserve agent→counter lock order, post-wait database clock, one complete
+immutable Post INSERT and atomic counter/Post/event commit. Decimal order strings
+must not become imprecise JS numbers. Post mutation is engine-denied, including
+TRUNCATE. Internal bounded expired-event maintenance is not a public endpoint or
+an already-deployed scheduler. Actual HTTP/auth/feed/cursor/provider acceptance
+remains with its work orders; no idempotency or read tracking is authorized.
