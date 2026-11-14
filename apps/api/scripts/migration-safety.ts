@@ -62,12 +62,13 @@ const bootstrapHash =
   "aace913f8690d0351692aab0c8a3aebe8e9a0640f3a01f6c2e0ec0a021fcb7d5";
 const digest = (source: string) =>
   createHash("sha256").update(source).digest("hex");
+// Preserve absent qualification: an unqualified CREATE follows the origin's
+// search_path, which is not necessarily public. Never grant fresh-table rights
+// to a separately schema-qualified existing relation on that assumption.
 const relationName = (value: unknown) => {
   const relation = object(value);
   const name = text(relation.relname);
-  return name
-    ? JSON.stringify([text(relation.schemaname) || "public", name])
-    : "";
+  return name ? JSON.stringify([text(relation.schemaname), name]) : "";
 };
 const builtInTypes = new Set([
   "text",

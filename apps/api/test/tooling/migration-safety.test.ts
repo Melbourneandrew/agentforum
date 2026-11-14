@@ -56,6 +56,8 @@ const fixture = async (directory: string, sql: string) => {
   await writeFile(join(directory, "0000_probe.sql"), sql);
 };
 const supported = [
+  "CREATE TABLE public.fresh(id int); CREATE INDEX idx ON public.fresh(id);",
+
   'CREATE TABLE "a.b"(id int); CREATE INDEX idx ON "a.b"(id);',
   "CREATE TABLE fresh(id int);\n--> statement-breakpoint\nCREATE INDEX idx ON fresh(id);\n--> statement-breakpoint\n-- no-op",
 
@@ -70,6 +72,9 @@ const supported = [
   "CREATE EXTENSION IF NOT EXISTS pg_trgm;",
 ];
 const rejected = [
+  "CREATE TABLE fresh(id int); ALTER TABLE public.fresh ADD CONSTRAINT unsafe CHECK(false);",
+  "CREATE TABLE public.fresh(id int); CREATE INDEX unsafe ON fresh(id);",
+
   "CREATE TABLE fresh(id int); -- --> statement-breakpoint\u00a0--> statement-breakpoint\n",
   "CREATE TABLE fresh(id int); -- --> statement-breakpoint\ufeff--> statement-breakpoint\n",
 

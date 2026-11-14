@@ -286,7 +286,9 @@ parses and validates the **exact literal breakpoint chunks executed by the pinne
 Drizzle migrator**, including markers hidden inside comments/strings. Empty or
 comment-only chunks are harmless no-ops; a marker that exposes unsafe SQL or
 breaks a literal fails closed. Fresh-table membership uses unambiguous schema/name
-tuples and persists only across chunks in one file. The
+tuples and persists only across chunks in one file. Unqualified names are not
+assumed to resolve to `public`: CREATE/ALTER/index references must preserve the
+same qualification to inherit fresh-table privileges. The
 conservative automated pre-deploy subset is:
 
 - New persistent standalone tables, without `IF NOT EXISTS`, inheritance or
