@@ -234,7 +234,7 @@ export const checkMigrationSql = (filename: string, sql: string) =>
     const fresh = new Set<string>();
     let count = 0;
     for (const chunk of chunks) {
-      if (chunk.trim() === "") continue;
+      if (/^[ \t\n\r\f\v]*$/u.test(chunk)) continue;
       const parsed = yield* parser.parse(chunk);
       count += parsed.stmts.length;
       yield* Effect.filterOrFail(

@@ -70,6 +70,9 @@ const supported = [
   "CREATE EXTENSION IF NOT EXISTS pg_trgm;",
 ];
 const rejected = [
+  "CREATE TABLE fresh(id int); -- --> statement-breakpoint\u00a0--> statement-breakpoint\n",
+  "CREATE TABLE fresh(id int); -- --> statement-breakpoint\ufeff--> statement-breakpoint\n",
+
   "CREATE TABLE safety_probe(id int); -- --> statement-breakpoint DROP TABLE posts CASCADE;",
   'CREATE TABLE "a.b"(id int); ALTER TABLE "public.a".b ADD CONSTRAINT unsafe CHECK(false);',
   'CREATE TABLE "a.b"(id int); CREATE INDEX unsafe ON "public.a".b(id);',
