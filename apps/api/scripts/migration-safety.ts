@@ -27,7 +27,6 @@ const text = (value: unknown) => (typeof value === "string" ? value : "");
 const ParsedSql = Schema.Struct({
   version: Schema.Int.pipe(Schema.between(170000, 179999)),
   stmts: Schema.Array(Schema.Struct({ stmt: ObjectNode })).pipe(
-    Schema.minItems(1),
     Schema.maxItems(2000),
   ),
 });
@@ -66,7 +65,9 @@ const digest = (source: string) =>
 const relationName = (value: unknown) => {
   const relation = object(value);
   const name = text(relation.relname);
-  return name ? `${text(relation.schemaname) || "public"}.${name}` : "";
+  return name
+    ? JSON.stringify([text(relation.schemaname) || "public", name])
+    : "";
 };
 const builtInTypes = new Set([
   "text",
@@ -215,14 +216,35 @@ export const checkMigrationSql = (filename: string, sql: string) =>
       () => failure("parse"),
     );
     const parser = yield* MigrationSqlParser;
-    const parsed = yield* parser.parse(sql);
-    if (filename === bootstrapFile && digest(sql) === bootstrapHash) return;
-    const fresh = new Set<string>();
+    const whole = yield* parser.parse(sql);
     yield* Effect.filterOrFail(
-      Effect.succeed(parsed),
-      (value) => value.stmts.every(({ stmt }) => allowedStatement(stmt, fresh)),
+      Effect.succeed(whole),
+      (value) => value.stmts.length > 0,
       () => failure("policy"),
     );
+    if (filename === bootstrapFile && digest(sql) === bootstrapHash) return;
+    // The pinned Drizzle migrator splits this literal marker even INSIDE SQL
+    // comments and strings. Validate what it executes, not just the whole AST.
+    const chunks = sql.split("--> statement-breakpoint");
+    yield* Effect.filterOrFail(
+      Effect.succeed(chunks),
+      (value) => value.length <= 2000,
+      () => failure("policy"),
+    );
+    const fresh = new Set<string>();
+    let count = 0;
+    for (const chunk of chunks) {
+      if (chunk.trim() === "") continue;
+      const parsed = yield* parser.parse(chunk);
+      count += parsed.stmts.length;
+      yield* Effect.filterOrFail(
+        Effect.succeed(parsed),
+        (value) =>
+          count <= 2000 &&
+          value.stmts.every(({ stmt }) => allowedStatement(stmt, fresh)),
+        () => failure("policy"),
+      );
+    }
   });
 
 const Entry = Schema.Struct({

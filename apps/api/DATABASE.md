@@ -281,7 +281,12 @@ all PR, merge-group and main-push events. Its stable status remains **Bootstrap
 tooling**; actual required-status enforcement is still separate WO-6 evidence.
 
 The pinned **PostgreSQL 17 libpg-query WASM parser** parses every complete SQL
-file, not text matched after stripping comments or splitting semicolons. The
+file, not text matched after stripping comments or splitting semicolons. It also
+parses and validates the **exact literal breakpoint chunks executed by the pinned
+Drizzle migrator**, including markers hidden inside comments/strings. Empty or
+comment-only chunks are harmless no-ops; a marker that exposes unsafe SQL or
+breaks a literal fails closed. Fresh-table membership uses unambiguous schema/name
+tuples and persists only across chunks in one file. The
 conservative automated pre-deploy subset is:
 
 - New persistent standalone tables, without `IF NOT EXISTS`, inheritance or

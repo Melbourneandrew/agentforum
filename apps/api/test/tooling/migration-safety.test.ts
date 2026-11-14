@@ -9,7 +9,9 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { Cause, Effect, Exit, Layer } from "effect";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
+import { readMigrationFiles } from "drizzle-orm/migrator";
+import { parse } from "libpg-query";
 import { describe, expect, it } from "vitest";
 import {
   checkMigrationDirectory,
@@ -54,6 +56,9 @@ const fixture = async (directory: string, sql: string) => {
   await writeFile(join(directory, "0000_probe.sql"), sql);
 };
 const supported = [
+  'CREATE TABLE "a.b"(id int); CREATE INDEX idx ON "a.b"(id);',
+  "CREATE TABLE fresh(id int);\n--> statement-breakpoint\nCREATE INDEX idx ON fresh(id);\n--> statement-breakpoint\n-- no-op",
+
   'CREATE TABLE "new_table" (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), body text NOT NULL);',
   "CREATE TABLE fresh(id int); CREATE INDEX fresh_idx ON fresh(id); ALTER TABLE fresh ADD CONSTRAINT positive CHECK(id > 0);",
   "ALTER TABLE posts ADD COLUMN annotation text;",
@@ -65,6 +70,13 @@ const supported = [
   "CREATE EXTENSION IF NOT EXISTS pg_trgm;",
 ];
 const rejected = [
+  "CREATE TABLE safety_probe(id int); -- --> statement-breakpoint DROP TABLE posts CASCADE;",
+  'CREATE TABLE "a.b"(id int); ALTER TABLE "public.a".b ADD CONSTRAINT unsafe CHECK(false);',
+  'CREATE TABLE "a.b"(id int); CREATE INDEX unsafe ON "public.a".b(id);',
+  "ALTER TABLE posts ADD COLUMN note text DEFAULT '--> statement-breakpoint DROP TABLE posts;';",
+  "ALTER TABLE posts ADD COLUMN note text DEFAULT $value$--> statement-breakpoint DROP TABLE posts;$value$;",
+  "CREATE TABLE safety_probe(id int); /* --> statement-breakpoint */ DROP TABLE posts;",
+
   "ALTER TABLE posts DROP COLUMN body;",
   "aLtEr /* separator */ tAbLe posts dRoP /* nested /* comment */ */ CoLuMn body;",
   "ALTER TABLE posts RENAME COLUMN body TO content;",
@@ -472,4 +484,37 @@ it("lets supported remote SQL reach the existing migration process only after a 
     );
     expect(Exit.isSuccess(result)).toBe(true);
     expect(invoked).toBe(true);
+  }));
+
+it("rejects SQL hidden from whole-file parsing but actually executed by pinned Drizzle breakpoint splitting", async () =>
+  temporary(async (directory) => {
+    const sql =
+      "CREATE TABLE safety_probe(id int); -- --> statement-breakpoint DROP TABLE posts CASCADE;";
+    await fixture(directory, sql);
+    const decodeTree = Schema.decodeUnknownSync(
+      Schema.Struct({
+        stmts: Schema.Array(
+          Schema.Struct({
+            stmt: Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+          }),
+        ),
+      }),
+    );
+    const whole = decodeTree(await parse(sql));
+    expect(whole.stmts).toHaveLength(1);
+    const actualChunks = readMigrationFiles({
+      migrationsFolder: directory,
+    }).flatMap((migration) => migration.sql);
+    expect(actualChunks).toHaveLength(2);
+    const second = decodeTree(await parse(actualChunks[1] ?? ""));
+    expect(second.stmts[0]?.stmt).toHaveProperty("DropStmt");
+    expect(
+      Exit.isFailure(
+        await Effect.runPromiseExit(
+          checkMigrationDirectory(directory).pipe(
+            Effect.provide(migrationSqlParserLayer),
+          ),
+        ),
+      ),
+    ).toBe(true);
   }));
