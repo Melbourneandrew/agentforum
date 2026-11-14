@@ -294,7 +294,9 @@ const boundedFile = async (path: string) => {
   if (!info.isFile() || info.size > 1024 * 1024) throw failure("layout");
   const bytes = await readFile(path);
   if (bytes.length > 1024 * 1024) throw failure("layout");
-  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+    bytes,
+  );
 };
 export const readMigrationSnapshot = (directory: string) =>
   Effect.tryPromise({

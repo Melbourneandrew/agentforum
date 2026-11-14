@@ -526,3 +526,22 @@ it("rejects SQL hidden from whole-file parsing but actually executed by pinned D
       ),
     ).toBe(true);
   }));
+
+it("preserves UTF-8 BOM bytes when comparing historical SQL and snapshots", async () =>
+  temporary(async (directory) => {
+    const sql = "CREATE TABLE probe(id int);";
+    await fixture(directory, sql);
+    const before = await Effect.runPromise(readMigrationSnapshot(directory));
+    for (const path of ["0000_probe.sql", "meta/0000_snapshot.json"]) {
+      const original = before.files.get(path) ?? "";
+      await writeFile(join(directory, path), "\ufeff" + original);
+      const after = await Effect.runPromise(readMigrationSnapshot(directory));
+      expect(after.files.get(path)).toBe("\ufeff" + original);
+      expect(
+        Exit.isFailure(
+          await Effect.runPromiseExit(checkMigrationHistory(before, after)),
+        ),
+      ).toBe(true);
+      await writeFile(join(directory, path), original);
+    }
+  }));
