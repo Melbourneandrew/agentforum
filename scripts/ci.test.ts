@@ -104,6 +104,7 @@ describe("required gates detect real introduced failures", () => {
       "contract:check",
       "contract:generate",
       "contract:compat",
+      'pnpm --filter @agentforum/api db:safety "$CONTRACT_BASE"',
       "run: pnpm build",
       "pnpm --filter @agentforum/web bundle:smoke",
       "pnpm --filter @agentforum/docs bundle:smoke",

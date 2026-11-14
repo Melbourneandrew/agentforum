@@ -37,6 +37,8 @@ jobs:
         run: pnpm check
       - name: Verify generated database migration artifacts
         run: pnpm --filter @agentforum/api db:generate
+      - name: Reject destructive SQL and migration history rewrites
+        run: pnpm --filter @agentforum/api db:safety "$CONTRACT_BASE"
       - name: Validate generated API contract
         run: pnpm --filter @agentforum/api contract:check && pnpm --filter @agentforum/api contract:generate
       - name: Reject incompatible contract changes
