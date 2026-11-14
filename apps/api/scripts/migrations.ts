@@ -7,6 +7,10 @@ import { ownedLocalDatabaseUrl } from "./local-postgres.js";
 import { migrationLayout } from "./migration-layout.js";
 
 import { ownedProcess } from "./owned-process.js";
+import {
+  checkMigrationDirectory,
+  migrationSqlParserLayer,
+} from "./migration-safety.js";
 
 export class MigrationError extends Data.TaggedError("MigrationError")<{
   readonly stage: "target" | "generate" | "migrate" | "configuration";
@@ -171,7 +175,16 @@ export const migrateOwnedLocalDatabase = (
     Effect.mapError(() => new MigrationError({ stage: "target" })),
     Effect.flatMap((url) => migrate(url, directory)),
   );
-export const migrateOrigin = (environment: unknown) =>
+export const migrateOrigin = (
+  environment: unknown,
+  directory = migrationLayout.out,
+) =>
   migrationOrigin(environment).pipe(
-    Effect.flatMap((url) => migrate(url, migrationLayout.out)),
+    Effect.tap(() =>
+      checkMigrationDirectory(directory).pipe(
+        Effect.provide(migrationSqlParserLayer),
+        Effect.mapError(() => new MigrationError({ stage: "configuration" })),
+      ),
+    ),
+    Effect.flatMap((url) => migrate(url, directory)),
   );

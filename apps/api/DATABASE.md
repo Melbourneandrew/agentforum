@@ -269,3 +269,66 @@ remains unmigrated, so these successful repository operations cannot be cached
 reads. Synthetic fixture key syntax/pepper is not the production credential format.
 These are local persistence results, not endpoint acceptance, Hyperdrive evidence,
 staging, activation or completion of the agent loop.
+
+## Pre-deploy migration safety (WO-7 code milestone)
+
+Run `pnpm --filter @agentforum/api db:safety` from the root. It resolves the local
+`origin/main` commit; CI supplies the trusted event base explicitly as
+`db:safety "$CONTRACT_BASE"`. A missing/invalid/unavailable commit fails closed.
+The gate needs neither database credentials nor network/database access.
+Bootstrap runs it after migration generation, before contract/build steps, on
+all PR, merge-group and main-push events. Its stable status remains **Bootstrap
+tooling**; actual required-status enforcement is still separate WO-6 evidence.
+
+The pinned **PostgreSQL 17 libpg-query WASM parser** parses every complete SQL
+file, not text matched after stripping comments or splitting semicolons. The
+conservative automated pre-deploy subset is:
+
+- New persistent standalone tables, without `IF NOT EXISTS`, inheritance or
+  partitions. Ordinary indexes and additive constraints are allowed only on
+  tables created earlier in that **same file**.
+- Adding nullable columns of built-in types to existing tables; defaults must
+  be literals or literal casts to built-in types. `NOT NULL` additionally needs
+  a non-null constant default. Volatile/default function calls, generated or
+  identity columns, new uniqueness/FK/check constraints on existing tables and
+  other ALTER subcommands are not silently approved.
+- The existing idempotent `pg_trgm` extension creation, without extra options.
+
+All other statements fail closed, including destructive DDL, renames/type
+changes, DML/backfills, writable CTEs, SELECT/DO/CALL, function/trigger changes,
+transaction/SET commands and unsupported syntax. Comments cannot grant an
+exception. The one exact already-merged `0002_post_immutability.sql` bootstrap
+file is SHA-256 pinned in the guard: it seeds one counter row and installs the
+existing immutability function/trigger. Its filename **and complete bytes**
+must match; copies, edits, extra statements or new files cannot reuse this
+narrow historical allowance. It does not license future DML or bulk backfills.
+
+`drizzle-kit migrate` wraps migrations in a transaction. Therefore **no
+CONCURRENTLY index operation** is accepted by this runner; ordinary index builds
+on existing populated tables are also rejected. New operational/contract work
+needs a separately reviewed multi-phase plan and executable mechanism, not an
+inline bypass annotation. An explicit documented multi-phase exception under
+Delivery ADR-006 must be implemented/reviewed as such; this gate supplies no
+blanket exception facility.
+
+The journal must be contiguous with increasing timestamps, bounded safe tags,
+and exactly one SQL file and numbered snapshot per entry. Orphan/missing files,
+symlinks, invalid UTF-8 and oversized sources fail. Against the trusted Git base,
+all old SQL bytes, snapshot bytes and journal entries must remain identical;
+only new entries/files may be appended. SQL/dependency causes and source text
+are not printed by the CLI. Tests execute the actual CLI in an isolated Git
+repository with real destructive SQL and history-rewrite failures.
+
+The Actions-only `db:migrate` also rescans the full current migration directory
+**before creating any credential-bearing temporary config or launching the
+migration subprocess**. Local disposable `db:dev`/`db:reset` keep their existing
+owned-target safeguards and reset semantics; they are never redirected to Neon.
+The remote runner's SQL preflight does not replace trusted-base history CI.
+
+This static gate is not a proof of production lock duration, provider catalog
+compatibility, capacity, a deployment, successful live migration or rollback.
+It makes no origin connection, provisions nothing and activates no delivery.
+WO-7/23/24 retain actual Actions/resource/provider/rollback acceptance. The
+approved Neon/production-only direction does not waive migration safety, and
+this credential-free milestone does not depend on stale permanent-staging or
+PlanetScale topology wording.
