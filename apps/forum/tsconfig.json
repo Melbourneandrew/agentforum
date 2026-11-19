@@ -13,7 +13,8 @@
     "test/**/*.ts",
     "scripts/**/*.ts",
     "react-router.config.ts",
-    ".react-router/types/**/*"
+    ".react-router/types/**/*",
+    "drizzle.config.ts"
   ],
   "exclude": ["node_modules", "build", "dist"]
 }

@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { Context, Data, Effect, Layer, Option, Schema } from "effect";
 import { nanoid } from "nanoid";
 import { RequestContext } from "../runtime/context.js";
-import { agents, credentials, posts, postTags } from "./schema.js";
+import { credentials, posts, postTags } from "./schema.js";
 
 export class StorageFailure extends Data.TaggedError("StorageFailure") {}
 export class InvalidRecord extends Data.TaggedError("InvalidRecord") {}
@@ -105,7 +105,10 @@ const publicationError = (error: unknown) => {
   const message = providerMessage(error);
   if (message.includes("forum_publication_limit"))
     return new PublicationLimited({ retryAfter: 60, conservative: true });
-  if (message.includes("UNIQUE constraint failed: posts.id"))
+  if (
+    message.includes("UNIQUE constraint failed: posts.id") ||
+    message.includes("forum_post_id_conflict")
+  )
     return new PostIdCollision();
   if (message.includes("forum_parent_not_found")) return new ParentNotFound();
   if (message.includes("forum_author_not_found")) return new AuthorNotFound();
@@ -159,7 +162,7 @@ export const makeForumStore = (
           Effect.mapError(() => new InvalidRecord()),
         );
         // The identity and its only digest are committed together, or neither is.
-        yield* Effect.tryPromise({
+        const results = yield* Effect.tryPromise({
           try: () =>
             binding.batch([
               binding
@@ -170,25 +173,17 @@ export const makeForumStore = (
                   "INSERT INTO credentials(lookup_id,agent_id,digest) VALUES (?,?,?)",
                 )
                 .bind(value.lookupId, value.id, value.digest),
+              binding
+                .prepare(
+                  "SELECT id,name,created_at AS createdAt FROM agents WHERE id=?",
+                )
+                .bind(value.id),
             ]),
           catch: identityError,
         });
-        const rows = yield* Effect.tryPromise({
-          try: () =>
-            db
-              .select({
-                id: agents.id,
-                name: agents.name,
-                createdAt: agents.createdAt,
-              })
-              .from(agents)
-              .where(eq(agents.id, value.id))
-              .limit(1),
-          catch: () => new StorageFailure(),
-        });
-        return yield* Schema.decodeUnknown(AgentRecord)(rows[0]).pipe(
-          Effect.mapError(() => new StorageFailure()),
-        );
+        return yield* Schema.decodeUnknown(AgentRecord)(
+          results.at(-1)?.results[0],
+        ).pipe(Effect.mapError(() => new StorageFailure()));
       }),
     findCredential: (lookupId: string) =>
       Effect.gen(function* () {
