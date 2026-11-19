@@ -18,3 +18,8 @@ export default async function handleRequest(
   headers.set("Content-Type", "text/html; charset=utf-8");
   return new Response(body, { status, headers });
 }
+
+// Do not let framework defaults print exception objects or dependency payloads.
+export function handleError() {
+  console.error("forum_render_failed");
+}

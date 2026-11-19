@@ -48,6 +48,8 @@ jobs:
         run: pnpm --filter @agentforum/forum exec playwright install --with-deps chromium
       - name: Verify production SSR, static assets, D1 and API boundaries in workerd and Chromium
         run: pnpm bundle:smoke
+      - name: Verify source secrets cannot enter build artifacts
+        run: pnpm --filter @agentforum/forum source-secrets:check
       - name: Audit dependencies
         run: pnpm security:check
       - name: Record the current task graph

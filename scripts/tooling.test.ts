@@ -68,6 +68,69 @@ describe("repository toolchain", () => {
       ts.createProgram(["negative.ts"], options, host),
     );
     expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
+      expect.arrayContaining([2322, 2375]),
+    );
+  });
+
+  it("runs typed lint rules and rejects imports from the reference subtree", async () => {
+    const eslint = new ESLint();
+    const results = await eslint.lintText(
+      'import "../.repos/effect/packages/effect/src/Effect.js";\nasync function unsafe() { return 1; }\nvoid unsafe();\n',
+      { filePath: "scripts/tooling.test.ts" },
+    );
+    const rules = results.flatMap((result) =>
+      result.messages.map((message) => message.ruleId),
+    );
+    expect(rules).toContain("no-restricted-imports");
+    expect(rules).toContain("@typescript-eslint/require-await");
+  });
+
+  it("excludes reference files from lint and formatting", async () => {
+    const path = ".repos/effect/packages/effect/src/Effect.ts";
+    expect(await new ESLint().isPathIgnored(path)).toBe(true);
+    expect(
+      await getFileInfo(path, { ignorePath: ".prettierignore" }),
+    ).toMatchObject({ ignored: true });
+    expect(json(".vscode/settings.json")).toMatchObject({
+      "files.watcherExclude": { "**/.repos/**": true },
+      "typescript.preferences.autoImportFileExcludePatterns": ["**/.repos/**"],
+    });
+  });
+
+  it("keeps the reference out of workspace discovery and task execution", () => {
+    const workspace: unknown = JSON.parse(
+      execFileSync("pnpm", ["list", "-r", "--depth", "-1", "--json"], {
+        encoding: "utf8",
+      }),
+    );
+    expect(workspace).toEqual([
+      expect.objectContaining({ name: "agentforum", path: process.cwd() }),
+      expect.objectContaining({
+        name: "@agentforum/forum",
+        path: `${process.cwd()}/apps/forum`,
+      }),
+    ]);
+    const graph: unknown = JSON.parse(
+      execFileSync(
+        "pnpm",
+        [
+          "exec",
+          "turbo",
+          "run",
+          "build",
+          "lint",
+          "typecheck",
+          "test",
+          "--dry=json",
+        ],
+        { encoding: "utf8" },
+      ),
+    );
+    expect(graph).toMatchObject({
+      packages: ["@agentforum/forum"],
+    });
+    expect(graph).toHaveProperty(
+      "tasks",
       expect.arrayContaining([
         expect.objectContaining({ taskId: "@agentforum/forum#build" }),
         expect.objectContaining({ taskId: "@agentforum/forum#test" }),

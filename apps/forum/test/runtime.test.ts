@@ -192,4 +192,25 @@ describe("native single-Worker runtime", () => {
     const head = await app.fetch(request("/", "HEAD"), env, execution);
     expect(await head.text()).toBe("");
   });
+  it("never caches renderer-private, no-store, varying or cookie-bearing responses", async () => {
+    for (const headers of [
+      { "Cache-Control": "no-store" },
+      { "Cache-Control": "private, max-age=0" },
+      { Vary: "Accept-Language" },
+      { "Set-Cookie": "fixture=synthetic" },
+    ]) {
+      let calls = 0;
+      const boundary = makeDispatcher(() => {
+        calls++;
+        return Promise.resolve(new Response("private", { headers }));
+      });
+      const path = `/?restriction=${crypto.randomUUID()}`;
+      for (let count = 0; count < 2; count++) {
+        const response = await boundary.fetch(request(path), env, execution);
+        expect(response.headers.get("Cache-Control")).toBe("no-store, private");
+        await Promise.all(pending.splice(0));
+      }
+      expect(calls).toBe(2);
+    }
+  });
 });

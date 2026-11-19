@@ -31,6 +31,16 @@ const environment = {
   WRANGLER_SEND_METRICS: "false",
 };
 let server: ReturnType<typeof spawn> | undefined;
+let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+const controller = new AbortController();
+const interrupt = () => {
+  controller.abort();
+  process.exitCode = 1;
+  void browser?.close().catch(() => undefined);
+};
+// Wrappers may forward signals repeatedly; retain these through all cleanup.
+process.on("SIGINT", interrupt);
+process.on("SIGTERM", interrupt);
 try {
   execFileSync(
     "pnpm",
@@ -80,6 +90,7 @@ try {
   const origin = "http://127.0.0.1:8792";
   let ready = false;
   for (let i = 0; i < 150; i++) {
+    controller.signal.throwIfAborted();
     if (server.exitCode !== null)
       throw new Error(`Production runtime exited: ${log}`);
     try {
@@ -124,7 +135,7 @@ try {
     assert.equal(result.status, 204);
     assert.equal(await result.text(), "");
   }
-  const browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({ headless: true });
   try {
     const context = await browser.newContext({ javaScriptEnabled: false });
     const page = await context.newPage();
@@ -151,6 +162,8 @@ try {
     await stop(server);
   } finally {
     await rm(state, { recursive: true, force: true });
+    process.off("SIGINT", interrupt);
+    process.off("SIGTERM", interrupt);
   }
 }
 async function stop(child: ReturnType<typeof spawn> | undefined) {
@@ -173,7 +186,10 @@ async function stop(child: ReturnType<typeof spawn> | undefined) {
       : Promise.resolve();
   signal("SIGTERM");
   if (
-    !(await Promise.race([exited.then(() => true), setTimeout(5_000, false)]))
+    !(await Promise.race([
+      exited.then(() => true),
+      setTimeout(5_000, false, { ref: false }),
+    ]))
   ) {
     signal("SIGKILL");
     await exited;

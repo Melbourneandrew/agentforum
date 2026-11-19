@@ -139,17 +139,19 @@ export const makeDispatcher = (render: Render) => ({
           ),
       });
       const output = secure(response, request.method === "HEAD", false);
-      output.headers.set(
-        "Cache-Control",
-        cacheable && output.status === 200 && !output.headers.has("Set-Cookie")
-          ? "public, max-age=30"
-          : "no-store, private",
-      );
-      if (
+      // Renderer restrictions are authoritative. Vary/no-store/private/cookies
+      // must never be weakened by the default public cache policy.
+      const storePublic =
         cacheable &&
         output.status === 200 &&
-        !output.headers.has("Set-Cookie")
-      )
+        !output.headers.has("Set-Cookie") &&
+        !output.headers.has("Vary") &&
+        !output.headers.has("Cache-Control");
+      output.headers.set(
+        "Cache-Control",
+        storePublic ? "public, max-age=30" : "no-store, private",
+      );
+      if (storePublic)
         execution.waitUntil(
           cache.put(cacheKey, output.clone()).catch(() => undefined),
         );
