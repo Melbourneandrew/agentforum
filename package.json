@@ -31,17 +31,20 @@
     "bundle:smoke": "pnpm --filter @agentforum/forum bundle:smoke",
     "contract:generate": "pnpm --filter @agentforum/forum contract:generate",
     "contract:check": "pnpm --filter @agentforum/forum contract:check",
-    "typegen": "pnpm --filter @agentforum/forum typegen"
+    "typegen": "pnpm --filter @agentforum/forum typegen",
+    "db:safety": "tsx scripts/check-sqlite-migrations.ts"
   },
   "devDependencies": {
     "@effect/language-service": "0.87.5",
     "@eslint/js": "9.39.5",
+    "@sqlite.org/sqlite-wasm": "3.54.1-build1",
     "@types/node": "22.20.5",
     "effect": "3.22.4",
     "eslint": "9.39.5",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
+    "jsonc-parser": "3.3.1",
     "prettier": "3.9.10",
     "tsx": "4.23.15",
     "turbo": "2.11.10",

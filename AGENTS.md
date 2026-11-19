@@ -14,6 +14,8 @@ Use Node `.node-version` and exact pnpm `package.json` versions.
 
 - `pnpm install --frozen-lockfile`: reproducible install.
 - `pnpm db:migrate:local`: apply versioned SQLite migrations to disposable **local** D1; no remote default.
+- `pnpm db:safety <trusted-base-commit-sha>`: fail-closed SQLite native parser/authorizer, pinned Wrangler chunks and append-only SQL/journal/snapshot history; CI supplies the trusted event SHA.
+- `pnpm --filter @agentforum/forum db:generate`: generate schema changes; CI requires generated schema/migrations to remain clean.
 - `pnpm db:reset:local`: explicit local-only reset, never an update/retry step; rejects arguments/symlinks.
 - `pnpm dev`: supported React Router/Vite/workerd on port3000.
 - `pnpm check`: formatting, zero-warning typed lint, strict types, all-zero Effect diagnostics, actual tooling and workerd/D1 tests.

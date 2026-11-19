@@ -105,6 +105,8 @@ describe("required gates detect real introduced failures", () => {
       "contract:generate",
       "contract:compat",
       "pnpm db:migrate:local",
+      "pnpm db:safety",
+      "db:generate",
       "run: pnpm build",
       "pnpm bundle:smoke",
       "source-secrets:check",

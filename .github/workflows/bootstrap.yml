@@ -40,6 +40,12 @@ jobs:
         run: pnpm contract:check && pnpm contract:generate
       - name: Reject incompatible contract changes
         run: pnpm contract:compat "$CONTRACT_BASE"
+      - name: Verify generated SQLite schema matches committed migrations
+        run: |
+          pnpm --filter @agentforum/forum db:generate
+          git diff --exit-code && test -z "$(git ls-files --others --exclude-standard)"
+      - name: Reject unsafe SQLite migrations and rewritten history
+        run: pnpm db:safety "$CONTRACT_BASE"
       - name: Apply versioned local D1 migrations and verify repeatability
         run: pnpm db:migrate:local && pnpm db:migrate:local
       - name: Build production application
@@ -61,7 +67,7 @@ jobs:
       - name: Record evidence identity
         if: always()
         run: |
-          printf '### Required verification evidence\n\nCommit: `%s`\n\nSingle Worker with genuine workerd/local D1 tests, strict types and all-zero Effect diagnostics, native FTS5/integer harness, safe methods, origin/cache boundaries, generated foundation contract, versioned local migrations, production SSR/static/API and no-JavaScript browser checks. Domain operations explicitly return 501 until their owning work orders land. This is not complete-app, provider installation or public-readiness evidence.\n\nEvent: `%s`\nHead: `%s`\nContract baseline: `%s`\nJob status: `%s`\n' "$GITHUB_SHA" "$EVENT_NAME" "$HEAD_SHA" "$CONTRACT_BASE" "$JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
+          printf '### Required verification evidence\n\nCommit: `%s`\n\nSingle Worker with genuine workerd/local D1 tests, strict types and all-zero Effect diagnostics, native D1 atomic identity/publication, immutable ordered tags, FTS5, fixed-window admission, lossless integer and SQLite migration/history gates, safe methods, origin/cache boundaries, generated foundation contract, versioned local migrations, production SSR/static/API and no-JavaScript browser checks. Domain operations explicitly return 501 until their owning work orders land. This is not complete-app, provider installation or public-readiness evidence.\n\nEvent: `%s`\nHead: `%s`\nContract baseline: `%s`\nJob status: `%s`\n' "$GITHUB_SHA" "$EVENT_NAME" "$HEAD_SHA" "$CONTRACT_BASE" "$JOB_STATUS" >> "$GITHUB_STEP_SUMMARY"
         env:
           EVENT_NAME: ${{ github.event_name }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
