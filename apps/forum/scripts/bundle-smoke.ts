@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn, execFileSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { gzipSync } from "node:zlib";
 import { chromium } from "playwright";
+import { Schema } from "effect";
 
 const files = (await readdir("dist/server", { recursive: true })).filter(
   (path) => /\.m?js$/.test(path),
@@ -31,6 +32,7 @@ const environment = {
   WRANGLER_SEND_METRICS: "false",
 };
 let server: ReturnType<typeof spawn> | undefined;
+let migration: ReturnType<typeof spawn> | undefined;
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 const controller = new AbortController();
 const interrupt = () => {
@@ -42,7 +44,7 @@ const interrupt = () => {
 process.on("SIGINT", interrupt);
 process.on("SIGTERM", interrupt);
 try {
-  execFileSync(
+  migration = spawn(
     "pnpm",
     [
       "exec",
@@ -57,8 +59,21 @@ try {
       "--persist-to",
       state,
     ],
-    { env: environment, stdio: "pipe", timeout: 30_000 },
+    { env: environment, detached: true, stdio: "ignore" },
   );
+  try {
+    const completion: unknown = await once(migration, "exit", {
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]),
+    });
+    assert.ok(
+      Schema.is(Schema.Tuple(Schema.Literal(0), Schema.Null))(completion),
+      "Local migration failed",
+    );
+  } finally {
+    await stop(migration);
+    migration = undefined;
+  }
+  controller.signal.throwIfAborted();
   server = spawn(
     "pnpm",
     [
@@ -94,7 +109,9 @@ try {
     if (server.exitCode !== null)
       throw new Error(`Production runtime exited: ${log}`);
     try {
-      if ((await fetch(origin, { signal: AbortSignal.timeout(500) })).ok) {
+      if (
+        (await boundedFetch(origin, { signal: AbortSignal.timeout(500) })).ok
+      ) {
         ready = true;
         break;
       }
@@ -104,7 +121,7 @@ try {
     await setTimeout(100);
   }
   assert.ok(ready, `Production runtime failed readiness: ${log}`);
-  const response = await fetch(origin);
+  const response = await boundedFetch(origin);
   const html = await response.text();
   assert.match(html, /One installation/);
   assert.match(html, /data-database="available"/);
@@ -115,14 +132,16 @@ try {
   );
   const css = /href="([^"]+\.css)"/.exec(html)?.[1];
   assert.ok(css, "SSR must link a real local stylesheet");
-  assert.equal((await fetch(new URL(css, origin))).status, 200);
-  const docs = await fetch(origin + "/docs/");
+  assert.equal((await boundedFetch(new URL(css, origin))).status, 200);
+  const docs = await boundedFetch(origin + "/docs/");
   assert.equal(docs.status, 200);
   assert.match(await docs.text(), /not a complete installation/);
-  assert.equal((await fetch(origin + "/missing")).status, 404);
+  assert.equal((await boundedFetch(origin + "/missing")).status, 404);
   for (const method of ["GET", "POST"])
     for (const operation of ["register", "publish", "search"]) {
-      const result = await fetch(`${origin}/v1/${operation}`, { method });
+      const result = await boundedFetch(`${origin}/v1/${operation}`, {
+        method,
+      });
       assert.equal(result.status, 501);
       assert.match(
         result.headers.get("Content-Type") ?? "",
@@ -131,12 +150,21 @@ try {
       assert.match(result.headers.get("Cache-Control") ?? "", /no-store/);
     }
   for (const method of ["HEAD", "OPTIONS"]) {
-    const result = await fetch(origin + "/v1/publish", { method });
+    const result = await boundedFetch(origin + "/v1/publish", { method });
     assert.equal(result.status, 204);
     assert.equal(await result.text(), "");
   }
-  browser = await chromium.launch({ headless: true });
+  controller.signal.throwIfAborted();
+  browser = await chromium.launch({
+    headless: true,
+    timeout: 10_000,
+    handleSIGINT: false,
+    handleSIGTERM: false,
+    handleSIGHUP: false,
+  });
   try {
+    controller.signal.throwIfAborted();
+    console.log("production_smoke_browser_started");
     const context = await browser.newContext({ javaScriptEnabled: false });
     const page = await context.newPage();
     await page.goto(origin);
@@ -159,7 +187,11 @@ try {
   );
 } finally {
   try {
-    await stop(server);
+    try {
+      await stop(migration);
+    } finally {
+      await stop(server);
+    }
   } finally {
     await rm(state, { recursive: true, force: true });
     process.off("SIGINT", interrupt);
@@ -195,4 +227,15 @@ async function stop(child: ReturnType<typeof spawn> | undefined) {
     await exited;
   }
   signal("SIGKILL");
+}
+
+function boundedFetch(input: string | URL, init?: RequestInit) {
+  return fetch(input, {
+    ...init,
+    signal: AbortSignal.any([
+      controller.signal,
+      AbortSignal.timeout(5_000),
+      ...(init?.signal ? [init.signal] : []),
+    ]),
+  });
 }

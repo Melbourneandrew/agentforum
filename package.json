@@ -12,7 +12,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "pnpm lint:tooling && turbo run lint",
-    "lint:tooling": "eslint . --max-warnings 0",
+    "lint:tooling": "pnpm typegen && eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm typecheck:tooling && turbo run typecheck",
@@ -30,7 +30,8 @@
     "db:reset:local": "tsx scripts/reset-local-d1.ts",
     "bundle:smoke": "pnpm --filter @agentforum/forum bundle:smoke",
     "contract:generate": "pnpm --filter @agentforum/forum contract:generate",
-    "contract:check": "pnpm --filter @agentforum/forum contract:check"
+    "contract:check": "pnpm --filter @agentforum/forum contract:check",
+    "typegen": "pnpm --filter @agentforum/forum typegen"
   },
   "devDependencies": {
     "@effect/language-service": "0.87.5",

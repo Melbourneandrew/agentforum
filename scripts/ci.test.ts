@@ -108,6 +108,7 @@ describe("required gates detect real introduced failures", () => {
       "run: pnpm build",
       "pnpm bundle:smoke",
       "source-secrets:check",
+      "interruption:smoke",
       "playwright install --with-deps chromium",
       "bundle:smoke",
       "security:check",

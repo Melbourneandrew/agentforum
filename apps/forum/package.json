@@ -13,7 +13,9 @@
     "bundle:smoke": "tsx scripts/bundle-smoke.ts",
     "contract:generate": "tsx scripts/contract.ts",
     "contract:check": "tsx scripts/contract.ts --check",
-    "source-secrets:check": "tsx scripts/source-secrets-check.ts"
+    "source-secrets:check": "tsx scripts/source-secrets-check.ts",
+    "typegen": "react-router typegen",
+    "interruption:smoke": "tsx scripts/interruption-smoke.ts"
   },
   "dependencies": {
     "@effect/platform": "0.97.3",
