@@ -5,6 +5,7 @@ import { lstat, open, readdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { promisify } from "node:util";
+import { parse as parseJsonc, type ParseError } from "jsonc-parser";
 import initSqlite, {
   type Database,
   type Sqlite3Static,
@@ -61,7 +62,13 @@ const approved = new Map([
 export class SqliteMigrationError extends Error {
   constructor(
     readonly stage:
-      "layout" | "history" | "tooling" | "parse" | "policy" | "replay",
+      | "layout"
+      | "history"
+      | "tooling"
+      | "parse"
+      | "policy"
+      | "replay"
+      | "configuration",
   ) {
     super(`SQLite migration safety failed: ${stage}`);
     this.name = "SqliteMigrationError";
@@ -94,6 +101,37 @@ const parseJson = (bytes: Uint8Array): unknown => {
   } catch {
     return fail("layout");
   }
+};
+// The analyzed chain must be the chain the pinned root Wrangler command runs.
+// Otherwise a config edit could leave this gate checking an unused safe folder.
+export const checkSqliteMigrationConfiguration = (
+  bytes: Uint8Array,
+  environment?: string,
+): void => {
+  if (environment !== undefined && environment !== "")
+    return fail("configuration");
+  const errors: ParseError[] = [];
+  const value: unknown = parseJsonc(decode(bytes), errors, {
+    allowTrailingComma: true,
+  });
+  if (
+    errors.length !== 0 ||
+    !object(value) ||
+    value.env !== undefined ||
+    !Array.isArray(value.d1_databases) ||
+    value.d1_databases.length !== 1
+  )
+    return fail("configuration");
+  const database: unknown = value.d1_databases[0];
+  if (
+    !object(database) ||
+    database.binding !== "DB" ||
+    database.migrations_dir !== directory ||
+    (database.migrations_table !== undefined &&
+      database.migrations_table !== "d1_migrations") ||
+    database.migrations_pattern !== undefined
+  )
+    return fail("configuration");
 };
 const uuid = (value: unknown): value is string =>
   typeof value === "string" &&
@@ -749,6 +787,10 @@ export const checkSqliteMigrations = async (
   const base = await readGitSqliteMigrationSnapshot(
     repositoryRoot,
     trustedBase,
+  );
+  checkSqliteMigrationConfiguration(
+    await regularFile(join(repositoryRoot, "wrangler.jsonc")),
+    process.env.CLOUDFLARE_ENV,
   );
   const current = await readSqliteMigrationSnapshot(repositoryRoot);
   checkSqliteMigrationHistory(base, current);

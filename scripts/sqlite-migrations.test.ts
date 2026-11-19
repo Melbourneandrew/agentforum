@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  checkSqliteMigrationConfiguration,
   checkSqliteMigrationHistory,
   checkSqliteMigrationSources,
   checkSqliteMigrations,
@@ -132,6 +133,12 @@ const git = (path: string, args: readonly string[]) =>
 const commitFixture = async (snapshot: SqliteMigrationSnapshot) => {
   const path = await temp();
   await writeSnapshot(path, snapshot);
+  await writeFile(
+    join(path, "wrangler.jsonc"),
+    JSON.stringify({
+      d1_databases: [{ binding: "DB", migrations_dir: directory }],
+    }),
+  );
   git(path, ["init", "--quiet"]);
   git(path, ["add", "."]);
   git(path, [
@@ -802,6 +809,108 @@ describe("CLI requires an explicit trusted commit", () => {
     expect(result.stdout).toBe("");
     expect(result.stderr.trim()).toBe(
       "SQLite migration safety failed: history",
+    );
+  });
+});
+
+describe("runner configuration matches the analyzed chain", () => {
+  const valid = { binding: "DB", migrations_dir: directory };
+  it("accepts the current JSONC root configuration and provider binding IDs", async () => {
+    expect(() => {
+      checkSqliteMigrationConfiguration(
+        Buffer.from(
+          '{ /* root */ "d1_databases": [{"binding":"DB", "migrations_dir":"apps/forum/migrations", "migrations_table":"d1_migrations", "database_id":"fixture-provider-id",}],}',
+        ),
+      );
+    }).not.toThrow();
+    checkSqliteMigrationConfiguration(
+      await readFile(join(root, "wrangler.jsonc")),
+    );
+  });
+  it.each([
+    { d1_databases: [{ ...valid, migrations_dir: "unchecked" }] },
+    {
+      d1_databases: [
+        {
+          ...valid,
+          migrations_pattern: "apps/forum/migrations/nested/**/*.sql",
+        },
+      ],
+    },
+    { d1_databases: [{ ...valid, migrations_table: "unchecked_history" }] },
+    { d1_databases: [{ ...valid, binding: "OTHER" }] },
+    { d1_databases: [valid, valid] },
+    { d1_databases: [] },
+    {
+      d1_databases: [valid],
+      env: {
+        unchecked: {
+          d1_databases: [{ ...valid, migrations_dir: "unchecked" }],
+        },
+      },
+    },
+    { d1_databases: [{ binding: "DB" }] },
+    {},
+  ])(
+    "rejects a runner target differing from the native replay: %j",
+    (value) => {
+      expect(() => {
+        checkSqliteMigrationConfiguration(jsonBytes(value));
+      }).toThrow("configuration");
+    },
+  );
+  it("rejects malformed configuration JSONC", () => {
+    expect(() => {
+      checkSqliteMigrationConfiguration(Buffer.from('{"d1_databases":['));
+    }).toThrow("configuration");
+  });
+});
+
+describe("actual safety entrypoint rejects runner redirection", () => {
+  it.each(["other-environment", "--remote"])(
+    "rejects a selected environment %s",
+    (environment) => {
+      expect(() => {
+        checkSqliteMigrationConfiguration(
+          jsonBytes({
+            d1_databases: [{ binding: "DB", migrations_dir: directory }],
+          }),
+          environment,
+        );
+      }).toThrow("configuration");
+    },
+  );
+  it("rejects config-only directory redirection through the real entrypoint", async () => {
+    const { path, base } = await commitFixture(fixtureSnapshot());
+    await writeFile(
+      join(path, "wrangler.jsonc"),
+      JSON.stringify({
+        d1_databases: [{ binding: "DB", migrations_dir: "unchecked" }],
+      }),
+    );
+    await expect(checkSqliteMigrations(path, base)).rejects.toThrow(
+      "configuration",
+    );
+  });
+  it("rejects symlinked configuration files", async () => {
+    const { path, base } = await commitFixture(fixtureSnapshot());
+    await rm(join(path, "wrangler.jsonc"));
+    await writeFile(
+      join(path, "other.jsonc"),
+      JSON.stringify({
+        d1_databases: [{ binding: "DB", migrations_dir: directory }],
+      }),
+    );
+    await symlink("other.jsonc", join(path, "wrangler.jsonc"));
+    await expect(checkSqliteMigrations(path, base)).rejects.toBeInstanceOf(
+      SqliteMigrationError,
+    );
+  });
+  it("rejects oversized configuration files", async () => {
+    const { path, base } = await commitFixture(fixtureSnapshot());
+    await writeFile(join(path, "wrangler.jsonc"), " ".repeat(1024 * 1024 + 1));
+    await expect(checkSqliteMigrations(path, base)).rejects.toBeInstanceOf(
+      SqliteMigrationError,
     );
   });
 });
