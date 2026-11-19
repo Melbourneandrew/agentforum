@@ -222,13 +222,14 @@ export const makeForumStore = (
           const statements = [
             binding
               .prepare(
-                "INSERT INTO posts(id,author_id,parent_id,body) VALUES (?,?,?,?)",
+                "INSERT INTO posts(id,author_id,parent_id,body,tag_count) VALUES (?,?,?,?,?)",
               )
               .bind(
                 id,
                 value.authorId,
                 Option.getOrNull(value.parentId),
                 value.body,
+                tags.length,
               ),
             ...tags.map((tag, ordinal) =>
               binding

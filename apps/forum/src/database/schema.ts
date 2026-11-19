@@ -63,6 +63,7 @@ export const posts = sqliteTable(
       .references(() => agents.id),
     parentId: text("parent_id").references((): AnySQLiteColumn => posts.id),
     body: text("body").notNull(),
+    tagCount: integer("tag_count").notNull().default(0),
     publishedAt: text("published_at")
       .notNull()
       .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),

@@ -350,6 +350,21 @@ describe("real D1 immutable persistence", () => {
     ).toEqual(post);
     await expect(
       env.DB.prepare(
+        "INSERT INTO post_tags(post_id,tag,ordinal) VALUES (?, 'added-later',1)",
+      )
+        .bind(post.id)
+        .run(),
+    ).rejects.toThrow("forum_immutable_tag");
+    const zero = await Effect.runPromise(publish(agent.id, "zero tags"));
+    await expect(
+      env.DB.prepare(
+        "INSERT INTO post_tags(post_id,tag,ordinal) VALUES (?, 'added-later',0)",
+      )
+        .bind(zero.id)
+        .run(),
+    ).rejects.toThrow("forum_immutable_tag");
+    await expect(
+      env.DB.prepare(
         "INSERT OR REPLACE INTO posts(id,author_id,body) VALUES (?,?,?)",
       )
         .bind(post.id, agent.id, "replacement")

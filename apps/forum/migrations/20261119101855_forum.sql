@@ -34,6 +34,7 @@ CREATE TABLE `posts` (
 	`author_id` text NOT NULL,
 	`parent_id` text,
 	`body` text NOT NULL,
+	`tag_count` integer DEFAULT 0 NOT NULL,
 	`published_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
 	`publication_window` integer DEFAULT (CAST(unixepoch() / 60 AS INTEGER)) NOT NULL,
 	FOREIGN KEY (`author_id`) REFERENCES `agents`(`id`) ON UPDATE no action ON DELETE no action,

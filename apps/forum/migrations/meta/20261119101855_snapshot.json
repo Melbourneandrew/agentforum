@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "00ada910-f04a-4262-8605-16966747d668",
+  "id": "cb3902eb-9a77-4cb3-b419-889a9efb95ef",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agents": {
@@ -213,6 +213,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "tag_count": {
+          "name": "tag_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "published_at": {
           "name": "published_at",
