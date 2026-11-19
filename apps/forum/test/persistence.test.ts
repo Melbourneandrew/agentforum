@@ -103,6 +103,50 @@ describe("real D1 immutable persistence", () => {
       ),
     ).toBe(inject("migrations").length);
   });
+  it("retains prior records and successful migration history after a later migration fails, then retries without reset", async () => {
+    const before = await count(historicalId);
+    const first = {
+      name: "fixture_recovery_1",
+      queries: ["CREATE TABLE fixture_recovery_1(value TEXT)"],
+    };
+    const failed = {
+      name: "fixture_recovery_2",
+      queries: [
+        "CREATE TABLE fixture_rolled_back(value TEXT)",
+        "SELECT * FROM fixture_nonexistent_table",
+      ],
+    };
+    await expect(apply([first, failed])).rejects.toThrow();
+    expect(
+      await env.DB.prepare(
+        "SELECT name FROM sqlite_master WHERE name='fixture_rolled_back'",
+      ).first(),
+    ).toBeNull();
+    expect(
+      await env.DB.prepare("SELECT name FROM d1_migrations WHERE name=?")
+        .bind(first.name)
+        .first("name"),
+    ).toBe(first.name);
+    expect(
+      await env.DB.prepare("SELECT name FROM d1_migrations WHERE name=?")
+        .bind(failed.name)
+        .first(),
+    ).toBeNull();
+    await apply([
+      first,
+      { ...failed, queries: ["CREATE TABLE fixture_recovery_2(value TEXT)"] },
+    ]);
+    await apply([
+      first,
+      { ...failed, queries: ["CREATE TABLE fixture_recovery_2(value TEXT)"] },
+    ]);
+    expect(await count(historicalId)).toBe(before);
+    expect(
+      Option.getOrThrow(
+        await Effect.runPromise(store().findCredential(historicalLookup)),
+      ),
+    ).toEqual({ agentId: historicalId, digest });
+  });
   it("preserves the reviewed, pinned naming vocabulary", () => {
     expect(vocabularyVersion).toBe("english-v1");
     expect(vocabulary.length).toBeGreaterThan(20);
@@ -355,6 +399,20 @@ describe("real D1 immutable persistence", () => {
         .bind(post.id)
         .run(),
     ).rejects.toThrow("forum_immutable_tag");
+    await expect(
+      env.DB.prepare(
+        "INSERT INTO post_tags(post_id,tag,ordinal) VALUES (?, 'fractional-late',0.5)",
+      )
+        .bind(post.id)
+        .run(),
+    ).rejects.toThrow("forum_immutable_tag");
+    await expect(
+      env.DB.prepare(
+        "INSERT INTO posts(id,author_id,body,tag_count) VALUES (?,?,?,1.5)",
+      )
+        .bind(nanoid(), agent.id, "fractional cardinality")
+        .run(),
+    ).rejects.toThrow("forum_invalid_tag_count");
     const zero = await Effect.runPromise(publish(agent.id, "zero tags"));
     await expect(
       env.DB.prepare(
