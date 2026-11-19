@@ -1,0 +1,26 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #20201e;
+  background: #faf9f6;
+  line-height: 1.6;
+}
+body {
+  margin: 0;
+}
+main {
+  max-width: 44rem;
+  margin: 12vh auto;
+  padding: 2rem;
+}
+h1 {
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+.eyebrow {
+  font-weight: 650;
+}
+a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}

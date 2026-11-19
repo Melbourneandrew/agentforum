@@ -106,24 +106,8 @@ describe("repository toolchain", () => {
     expect(workspace).toEqual([
       expect.objectContaining({ name: "agentforum", path: process.cwd() }),
       expect.objectContaining({
-        name: "@agentforum/api",
-        path: `${process.cwd()}/apps/api`,
-      }),
-      expect.objectContaining({
-        name: "@agentforum/docs",
-        path: `${process.cwd()}/apps/docs`,
-      }),
-      expect.objectContaining({
-        name: "@agentforum/web",
-        path: `${process.cwd()}/apps/web`,
-      }),
-      expect.objectContaining({
-        name: "@agentforum/contracts",
-        path: `${process.cwd()}/packages/contracts`,
-      }),
-      expect.objectContaining({
-        name: "@agentforum/discovery-assets",
-        path: `${process.cwd()}/packages/discovery-assets`,
+        name: "@agentforum/forum",
+        path: `${process.cwd()}/apps/forum`,
       }),
     ]);
     const graph: unknown = JSON.parse(
@@ -143,39 +127,20 @@ describe("repository toolchain", () => {
       ),
     );
     expect(graph).toMatchObject({
-      packages: [
-        "@agentforum/api",
-        "@agentforum/contracts",
-        "@agentforum/discovery-assets",
-        "@agentforum/docs",
-        "@agentforum/web",
-      ],
+      packages: ["@agentforum/forum"],
     });
     expect(graph).toHaveProperty(
       "tasks",
       expect.arrayContaining([
-        expect.objectContaining({ taskId: "@agentforum/api#build" }),
-        expect.objectContaining({ taskId: "@agentforum/api#test" }),
-        expect.objectContaining({ taskId: "@agentforum/contracts#build" }),
-        expect.objectContaining({ taskId: "@agentforum/contracts#test" }),
-        expect.objectContaining({ taskId: "@agentforum/web#build" }),
-        expect.objectContaining({ taskId: "@agentforum/web#test" }),
-        expect.objectContaining({ taskId: "@agentforum/docs#build" }),
-        expect.objectContaining({ taskId: "@agentforum/docs#test" }),
-        expect.objectContaining({
-          taskId: "@agentforum/discovery-assets#build",
-        }),
-        expect.objectContaining({
-          taskId: "@agentforum/discovery-assets#test",
-        }),
+        expect.objectContaining({ taskId: "@agentforum/forum#build" }),
+        expect.objectContaining({ taskId: "@agentforum/forum#test" }),
       ]),
     );
     expect(json("turbo.json")).toMatchObject({
       tasks: {
         build: { dependsOn: ["^build"] },
-        "@agentforum/contracts#build": { dependsOn: ["^build"], outputs: [] },
-        lint: { dependsOn: ["^build"] },
-        typecheck: { dependsOn: ["^build"] },
+        lint: { dependsOn: ["build"] },
+        typecheck: { dependsOn: ["build"] },
         test: { dependsOn: ["^build"] },
         dev: { cache: false, persistent: true },
       },

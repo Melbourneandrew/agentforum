@@ -12,7 +12,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "pnpm lint:tooling && turbo run lint",
-    "lint:tooling": "eslint . --max-warnings 0",
+    "lint:tooling": "pnpm typegen && eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "pnpm typecheck:tooling && turbo run typecheck",
@@ -25,7 +25,13 @@
     "ci:setup": "bash scripts/install-oasdiff.sh",
     "contract:compat": "bash scripts/check-contract-compatibility.sh",
     "dependency:check": "pnpm dedupe --check",
-    "discovery:smoke": "tsx scripts/discovery-smoke.ts"
+    "discovery:smoke": "pnpm --filter @agentforum/forum bundle:smoke",
+    "db:migrate:local": "CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false pnpm --filter @agentforum/forum exec wrangler d1 migrations apply DB --local --config ../../wrangler.jsonc",
+    "db:reset:local": "tsx scripts/reset-local-d1.ts",
+    "bundle:smoke": "pnpm --filter @agentforum/forum bundle:smoke",
+    "contract:generate": "pnpm --filter @agentforum/forum contract:generate",
+    "contract:check": "pnpm --filter @agentforum/forum contract:check",
+    "typegen": "pnpm --filter @agentforum/forum typegen"
   },
   "devDependencies": {
     "@effect/language-service": "0.87.5",

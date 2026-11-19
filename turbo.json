@@ -3,20 +3,20 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**"]
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["build"]
     },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["build"]
     },
     "test": {
       "dependsOn": ["^build"],
       "outputs": []
     },
     "effect:check": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/scripts/check-effect.ts",
@@ -26,19 +26,6 @@
     "dev": {
       "cache": false,
       "persistent": true
-    },
-    "@agentforum/docs#build": {
-      "dependsOn": ["^build"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/apps/api/generated/openapi.json",
-        "$TURBO_ROOT$/apps/api/generated/post-schema.json"
-      ],
-      "outputs": ["build/**", "dist/**"]
-    },
-    "@agentforum/contracts#build": {
-      "dependsOn": ["^build"],
-      "outputs": []
     }
   }
 }

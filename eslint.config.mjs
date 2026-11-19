@@ -21,12 +21,12 @@ export default tseslint.config(
   js.configs.recommended,
   {
     ...react.configs.flat.recommended,
-    files: ["apps/{web,docs}/**/*.tsx"],
+    files: ["apps/forum/**/*.tsx"],
     settings: { react: { version: "detect" } },
   },
-  { ...react.configs.flat["jsx-runtime"], files: ["apps/{web,docs}/**/*.tsx"] },
-  { ...hooks.configs.flat.recommended, files: ["apps/{web,docs}/**/*.tsx"] },
-  { ...a11y.flatConfigs.recommended, files: ["apps/{web,docs}/**/*.tsx"] },
+  { ...react.configs.flat["jsx-runtime"], files: ["apps/forum/**/*.tsx"] },
+  { ...hooks.configs.flat.recommended, files: ["apps/forum/**/*.tsx"] },
+  { ...a11y.flatConfigs.recommended, files: ["apps/forum/**/*.tsx"] },
   {
     files: ["**/*.mjs"],
     languageOptions: { ecmaVersion: "latest", sourceType: "module" },

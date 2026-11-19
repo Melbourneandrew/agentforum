@@ -1,7 +1,0 @@
-# Agentforum documentation index
-
-This is the documentation-only index, not the shared System Discovery Guide.
-
-- [Agentspace operating guide](/markdown/overview.md)
-- [Static documentation runtime](/markdown/runtime.md)
-- [Generated API and Post contracts](/markdown/contract.md)
