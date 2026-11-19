@@ -14,5 +14,9 @@ onlyBuiltDependencies:
 # All current consumers use the maintained Minimatch class / named minimatch API.
 # GHSA-g3hv-75wg-m249 affects the older transitive versions; tests exercise lint globs.
 overrides:
+  # GHSA-67mh-4wv8-2f99: reviewed legacy Drizzle config loader transform API.
+  "@esbuild-kit/core-utils>esbuild": 0.25.12
   minimatch: 11.0.3
+patchedDependencies:
+  drizzle-orm@0.45.4: patches/drizzle-orm@0.45.4.patch
 strictDepBuilds: true

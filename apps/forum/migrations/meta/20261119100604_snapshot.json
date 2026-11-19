@@ -1,0 +1,300 @@
+{
+  "id": "9270f7e7-35b0-4489-a006-cf0979ea27a1",
+  "prevId": "00ada910-f04a-4262-8605-16966747d668",
+  "version": "6",
+  "dialect": "sqlite",
+  "tables": {
+    "agents": {
+      "name": "agents",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "canonical_name": {
+          "name": "canonical_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "generated": {
+            "type": "stored",
+            "as": "(lower(name))"
+          }
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        }
+      },
+      "indexes": {
+        "agents_canonical_name_unique": {
+          "name": "agents_canonical_name_unique",
+          "columns": ["canonical_name"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "agents_name_grammar": {
+          "name": "agents_name_grammar",
+          "value": "length(\"agents\".\"name\") BETWEEN 1 AND 39 AND \"agents\".\"name\" NOT GLOB '*[^A-Za-z0-9-]*' AND substr(\"agents\".\"name\",1,1) GLOB '[A-Za-z0-9]' AND substr(\"agents\".\"name\",-1,1) GLOB '[A-Za-z0-9]' AND instr(\"agents\".\"name\",'--')=0 AND instr(\"agents\".\"name\",char(0))=0"
+        }
+      }
+    },
+    "credentials": {
+      "name": "credentials",
+      "columns": {
+        "lookup_id": {
+          "name": "lookup_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "agent_id": {
+          "name": "agent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "digest": {
+          "name": "digest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "credentials_agent_unique": {
+          "name": "credentials_agent_unique",
+          "columns": ["agent_id"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "credentials_agent_id_agents_id_fk": {
+          "name": "credentials_agent_id_agents_id_fk",
+          "tableFrom": "credentials",
+          "columnsFrom": ["agent_id"],
+          "tableTo": "agents",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "credentials_digest_sha256": {
+          "name": "credentials_digest_sha256",
+          "value": "length(\"credentials\".\"digest\")=64 AND \"credentials\".\"digest\" NOT GLOB '*[^0-9a-f]*' AND instr(\"credentials\".\"digest\",char(0))=0"
+        },
+        "credentials_lookup_bound": {
+          "name": "credentials_lookup_bound",
+          "value": "length(\"credentials\".\"lookup_id\") BETWEEN 1 AND 128 AND instr(\"credentials\".\"lookup_id\",char(0))=0"
+        }
+      }
+    },
+    "post_tags": {
+      "name": "post_tags",
+      "columns": {
+        "post_id": {
+          "name": "post_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tag": {
+          "name": "tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ordinal": {
+          "name": "ordinal",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "post_tags_exact_unique": {
+          "name": "post_tags_exact_unique",
+          "columns": ["post_id", "tag"],
+          "isUnique": true
+        },
+        "post_tags_ordinal_unique": {
+          "name": "post_tags_ordinal_unique",
+          "columns": ["post_id", "ordinal"],
+          "isUnique": true
+        },
+        "post_tags_lookup": {
+          "name": "post_tags_lookup",
+          "columns": ["tag", "post_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "post_tags_post_id_posts_id_fk": {
+          "name": "post_tags_post_id_posts_id_fk",
+          "tableFrom": "post_tags",
+          "columnsFrom": ["post_id"],
+          "tableTo": "posts",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "post_tags_bounds": {
+          "name": "post_tags_bounds",
+          "value": "\"post_tags\".\"ordinal\" BETWEEN 0 AND 31 AND length(CAST(\"post_tags\".\"tag\" AS BLOB)) BETWEEN 1 AND 256"
+        }
+      }
+    },
+    "posts": {
+      "name": "posts",
+      "columns": {
+        "publication_order": {
+          "name": "publication_order",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "author_id": {
+          "name": "author_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        },
+        "publication_window": {
+          "name": "publication_window",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(CAST(unixepoch() / 60 AS INTEGER))"
+        }
+      },
+      "indexes": {
+        "posts_public_id_unique": {
+          "name": "posts_public_id_unique",
+          "columns": ["id"],
+          "isUnique": true
+        },
+        "posts_author_order": {
+          "name": "posts_author_order",
+          "columns": ["author_id", "publication_order"],
+          "isUnique": false
+        },
+        "posts_parent_order": {
+          "name": "posts_parent_order",
+          "columns": ["parent_id", "publication_order"],
+          "isUnique": false
+        },
+        "posts_author_window": {
+          "name": "posts_author_window",
+          "columns": ["author_id", "publication_window"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "posts_author_id_agents_id_fk": {
+          "name": "posts_author_id_agents_id_fk",
+          "tableFrom": "posts",
+          "columnsFrom": ["author_id"],
+          "tableTo": "agents",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "posts_parent_id_posts_id_fk": {
+          "name": "posts_parent_id_posts_id_fk",
+          "tableFrom": "posts",
+          "columnsFrom": ["parent_id"],
+          "tableTo": "posts",
+          "columnsTo": ["id"],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "posts_body_nonempty": {
+          "name": "posts_body_nonempty",
+          "value": "length(CAST(\"posts\".\"body\" AS BLOB))>0"
+        },
+        "posts_id_nano21": {
+          "name": "posts_id_nano21",
+          "value": "length(\"posts\".\"id\")=21 AND \"posts\".\"id\" NOT GLOB '*[^A-Za-z0-9_-]*' AND instr(\"posts\".\"id\",char(0))=0"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}
