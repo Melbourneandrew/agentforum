@@ -104,11 +104,9 @@ describe("required gates detect real introduced failures", () => {
       "contract:check",
       "contract:generate",
       "contract:compat",
-      'pnpm --filter @agentforum/api db:safety "$CONTRACT_BASE"',
+      "pnpm db:migrate:local",
       "run: pnpm build",
-      "pnpm --filter @agentforum/web bundle:smoke",
-      "pnpm --filter @agentforum/docs bundle:smoke",
-      "pnpm discovery:smoke",
+      "pnpm bundle:smoke",
       "playwright install --with-deps chromium",
       "bundle:smoke",
       "security:check",
@@ -142,24 +140,24 @@ describe("required gates detect real introduced failures", () => {
 
   it("rejects unchecked index access in the actual app typecheck", () => {
     negativeFixture(
-      "apps/api/test/ci-probe.ts",
+      "apps/forum/test/ci-probe.ts",
       'export const unchecked: string = ["one"][9];\n',
-      ["--filter", "@agentforum/api", "typecheck"],
+      ["--filter", "@agentforum/forum", "typecheck"],
       "TS2322",
     );
   }, 60_000);
 
   it("rejects an actual Effect language-service diagnostic", () => {
     negativeFixture(
-      "apps/api/test/ci-probe.ts",
+      "apps/forum/test/ci-probe.ts",
       'import { Effect } from "effect";\nexport const failed = Effect.gen(function* () { yield* Effect.fail("fixture"); });\n',
-      ["--filter", "@agentforum/api", "effect:check"],
+      ["--filter", "@agentforum/forum", "effect:check"],
       "missingReturnYieldStar",
     );
   }, 60_000);
 
   it("rejects a genuine informational Effect diagnostic even when the pinned CLI exits zero", () => {
-    const path = "apps/api/test/ci-probe.ts";
+    const path = "apps/forum/test/ci-probe.ts";
     writeFileSync(
       path,
       'import { Effect } from "effect";\nexport const message = Effect.succeed(1).pipe(Effect.map((n) => n + 1)).pipe(Effect.map((n) => n + 1));\n',
@@ -168,7 +166,7 @@ describe("required gates detect real introduced failures", () => {
     try {
       const upstream = execute("pnpm", [
         "--filter",
-        "@agentforum/api",
+        "@agentforum/forum",
         "exec",
         "effect-language-service",
         "diagnostics",
@@ -183,7 +181,7 @@ describe("required gates detect real introduced failures", () => {
       expect(upstream.output).toContain('"severity": "message"');
       const gated = execute("pnpm", [
         "--filter",
-        "@agentforum/api",
+        "@agentforum/forum",
         "effect:check",
       ]);
       expect(gated.status).not.toBe(0);
@@ -264,8 +262,8 @@ describe("required gates detect real introduced failures", () => {
         JSON.stringify(baseline),
       );
       const result = execute(
-        resolve("apps/api/node_modules/.bin/tsx"),
-        [resolve("apps/api/scripts/verify-contract.ts")],
+        resolve("apps/forum/node_modules/.bin/tsx"),
+        [resolve("apps/forum/scripts/contract.ts"), "--check"],
         path,
       );
       expect(result.status).not.toBe(0);
@@ -275,14 +273,14 @@ describe("required gates detect real introduced failures", () => {
 
   it("rejects an oversized production bundle before launching a runtime", () => {
     temporary((path) => {
-      mkdirSync(resolve(path, "dist"));
+      mkdirSync(resolve(path, "dist/server"), { recursive: true });
       writeFileSync(
-        resolve(path, "dist/worker.js"),
+        resolve(path, "dist/server/worker.js"),
         randomBytes(3 * 1024 * 1024 + 256 * 1024),
       );
       const result = execute(
-        resolve("apps/api/node_modules/.bin/tsx"),
-        [resolve("apps/api/scripts/bundle-smoke.ts")],
+        resolve("apps/forum/node_modules/.bin/tsx"),
+        [resolve("apps/forum/scripts/bundle-smoke.ts")],
         path,
       );
       expect(result.status).not.toBe(0);

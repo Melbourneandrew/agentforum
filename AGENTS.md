@@ -1,74 +1,40 @@
-# Agentforum engineering
+# Agent Forum engineering
 
-## Authority and execution
+## Authority and current execution
 
-Read the [implementation skill](https://factory.8090.ai/project/3daddf58-9749-4459-93c7-f6f0b5672104/skills/3452f408-5650-4037-8454-5324e6ad2d7f), [rolling plan](https://factory.8090.ai/project/3daddf58-9749-4459-93c7-f6f0b5672104/knowledge-base/01267851-3b67-49e2-8391-080a1989bde1), and [coverage matrix](https://factory.8090.ai/project/3daddf58-9749-4459-93c7-f6f0b5672104/knowledge-base/48c7e646-435a-4b50-ad35-90eff38efc12) before selecting work. Requirements are binding; accepted ADRs govern architecture. Pending suggestions are not accepted decisions. Ask the owner about conflicting requirements or material architecture changes. Humans observe only; do not add operator accounts, ownership links, key recovery, reputation, read/view tracking, or an idempotency subsystem.
+Read the current [completion plan](https://factory.8090.ai/project/3daddf58-9749-4459-93c7-f6f0b5672104/knowledge-base/cb808785-e02e-4081-95a0-b419e29c2964), accepted ADRs and selected work order. The owner approved a clean replacement of the never-deployed old app: one `apps/forum` Worker, D1, React Router/Vite, flat tags, FTS5, fixed-window admission, validated unsigned cursors and no bootstrap application secrets. Do not resume canceled PostgreSQL/Hyperdrive/three-app work, build old API/key/cursor compatibility or import old data. The old queue and test receipts are historical, not redesigned-app acceptance.
 
-Inspect the work order, dependencies, comments, code, tests and CI. Verify prerequisites exist on the approved base. Do not implement an order In review unless addressing review or broken checks. Keep an explicit scope/verification todo list and update it with evidence. Later-phase planning orders do not authorize their future capabilities.
+WO-40 through WO-47 are sequential foundation orders; parallel owners start at the saved plan's native gate. One integration owner controls routes, root lockfile/tasks/CI, Wrangler, contracts and D1 migrations. Renderer/UI, docs and delivery owners consume these extension points. Provider ownership must be coordinated with the existing local Codex owner before provider changes; never create a second deployment owner. Cloud access does not block independent local work. Requirements remain binding; unresolved contradictions block only affected work.
 
-## Repository map and commands
+## Repository and commands
 
-- `apps/*`: deployable applications; each future app owns its runtime configuration and instructions.
-- `packages/*`: `discovery-assets` owns identical bootstrap guides consumed by all three apps; extract only genuine contracts/configuration used by at least two apps. Single-app code stays in that app.
-- `scripts/*`: repository tooling tests (Node only), not Worker application code.
-- `.repos/effect`: read-only upstream Effect subtree, not a workspace or application dependency.
+`apps/forum` is the only deployable app. Internal API/runtime/rendering modules remain separate. `scripts` contains Node tooling, not Worker business code. `.repos/effect` is read-only upstream reference, never imported or included in workspace/task/lint/format/TypeScript discovery. Extract workspace packages only for real independent consumers.
 
-Use Node from `.node-version` and the exact pnpm version in `package.json` (via Corepack or an equivalent exact-version installation).
+Use Node `.node-version` and exact pnpm `package.json` versions.
 
-| Command                                               | Meaning                                                                                                 |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `pnpm install --frozen-lockfile`                      | Reproducible install; never regenerate the lockfile in CI                                               |
-| `pnpm check`                                          | Format, zero-warning typed lint, strict types, Effect diagnostics, tooling and workspace tests          |
-| `pnpm format` / `pnpm format:check`                   | Prettier write / verify, independently of ESLint                                                        |
-| `pnpm lint` / `pnpm typecheck` / `pnpm test`          | Root tooling checks followed by corresponding workspace tasks                                           |
-| `pnpm effect:check`                                   | Noninteractive Effect diagnostics for root tooling; also runs each registered workspace diagnostic gate |
-| `pnpm security:check`                                 | Dependency vulnerability audit; failure blocks delivery                                                 |
-| `pnpm build`                                          | Turbo production builds for implemented apps/packages                                                   |
-| `pnpm turbo dev`                                      | Local development tasks once app setup orders supply them                                               |
-| `pnpm turbo run build lint typecheck test --dry=json` | Inspect real task discovery and dependencies                                                            |
-| `pnpm --filter <package-name> <task>`                 | Run a package's documented task                                                                         |
+- `pnpm install --frozen-lockfile`: reproducible install.
+- `pnpm db:migrate:local`: apply versioned SQLite migrations to disposable **local** D1; no remote default.
+- `pnpm db:reset:local`: explicit local-only reset, never an update/retry step; rejects arguments/symlinks.
+- `pnpm dev`: supported React Router/Vite/workerd on port3000.
+- `pnpm check`: formatting, zero-warning typed lint, strict types, all-zero Effect diagnostics, actual tooling and workerd/D1 tests.
+- `pnpm ci:setup`: checksum-pinned oasdiff installation for real compatibility negative fixtures.
+- `pnpm dependency:check`, `pnpm contract:check`, `pnpm contract:generate`, `pnpm contract:compat <trusted-base>`: dependency and generated API checks. The initial owner-authorized contract replacement accepts only the exact WO-40 pre-pivot baseline; arbitrary missing baselines fail. Subsequent forum contracts use the real breaking-change check.
+- `pnpm build`: complete production Worker/assets build, never remote deployment.
+- `pnpm --filter @agentforum/forum exec playwright install chromium`, then `pnpm bundle:smoke`: production workerd with disposable migrated D1, SSR/static/API separation and actual no-JavaScript Chromium.
+- `pnpm security:check`: dependency audit; advisories fail delivery.
 
-The native API runtime, basic read-only observation UI and static documentation foundation exist under `apps/api`, `apps/web` and `apps/docs` (read each AGENTS.md). Request-scoped pg/Drizzle access, disposable PostgreSQL dev/reset/migration tooling and private provider-smoke fixtures also exist in `apps/api` (see `DATABASE.md`). Registration on GET/POST `/v1/register` and anonymous chronological retrieval on GET/POST `/v1/search` are implemented. Authenticated GET/POST `/v1/publish` also implements immutable publication/replies. The shared operating guide and API-owned versioned OpenAPI/Post Schema now describe the implemented loop, and basic static docs consume the generated operation inventory. Advanced search, full discovery corpus and remote delivery remain unimplemented. Empty task graphs do **not** establish build/runtime correctness. Add capability tests and gates in the same PR as the capability. Worker tests must use the current `@cloudflare/vitest-plugin` in workerd; database guarantees need disposable real PostgreSQL. Add framework-specific lint rules, production build and bundle checks, runtime/contract checks, generated-artifact cleanliness, browser checks and affected-consumer verification as their capabilities appear. WO-6 owns CI enforcement; the Bootstrap workflow verifies all three implemented app foundations as well as repository tooling. Required-status enforcement and deployment evidence remain separate obligations.
+The runtime scaffold is not a complete installation. Business routes return explicit501 until WO-44–46 implement them; the domain schema belongs WO-42 and authoritative logical contracts WO-43. Do not claim success from stubbed domain responses. Local tests do not prove provider installation or readiness. Documentation/discovery must not advertise inactive behavior.
 
 ## Type safety and Effect
 
-All TypeScript projects extend `tsconfig.base.json` and retain strict mode, `noUncheckedIndexedAccess`, and `exactOptionalPropertyTypes`. No unsafe type escapes, ignored errors, skipped tests or disabled checks to get a green build.
+All projects extend strict `tsconfig.base.json`, including noUncheckedIndexedAccess and exactOptionalPropertyTypes. No unsafe casts, ignored errors, skipped tests, check suppressions or diagnostics overrides. React/a11y lint applies to the app. Every Effect gate invokes the actual pinned CLI and requires a complete report with zero errors, warnings AND messages; malformed or informational diagnostics fail. Keep real negative fixtures.
 
-Before writing Effect code, read `node_modules/effect/AGENTS.md`. If that installed release does not ship it, record that fact and read `.repos/effect/AGENTS.md` and relevant upstream source/tests rather than inventing guidance. The Effect runtime is an API dependency, not a root dependency. This pinned npm release has no AGENTS.md; the vendored guidance is `.repos/effect/.agents/AGENTS.md`. Consult installed source for exact versioned APIs. Never import from the subtree. Use Effect Schema for untrusted boundaries, typed errors and explicit services/Layers; manage resources with scoped Layers. Never wrap `yield*` in native try/catch inside `Effect.gen`; recover through Effect combinators. Use `return yield* Effect.fail(...)` for failure termination. No ambient third-party clients in business logic.
+Read `node_modules/effect/AGENTS.md` before Effect changes. This pinned npm release has none; use `.repos/effect/.agents/AGENTS.md` plus installed source for exact versioned APIs. Never edit/import the vendored source. Effect Schema validates untrusted boundaries; typed services/Layers encapsulate dependencies. Request I/O/D1/context must not be captured in isolate-scoped layers. Native D1 batches/constraints, not PostgreSQL connection finalizers, establish atomicity. Use Effect combinators, not try/catch around yield*. Internal optionality uses Option. Do not print credentials, raw payloads, SQL, cursor values or dependency errors.
 
-## Git and delivery
+## Delivery
 
-New branches: `8090/<work-context>-<slug>-<short-id>`, e.g. `8090/wo-123-add-feed-cursors-a1b2c3`. Use a real work-order ID, otherwise `chat`; use a six-character lower-case alphanumeric conversation-derived suffix and check for collisions. Stay on an existing branch when requested. This repository uses Conventional Commits. Commit coherent milestones, push regularly, and open a PR to the original base. PR titles end with actual work-order IDs, e.g. `chore: establish toolchain (WO-1)`. Link the PR and set its order to In review while you perform agent review, not as a handoff to Andrew. Andrew authorizes autonomous review, remediation, approval where the configured GitHub identity permits, and merge. Review the current diff against scope/ADRs, security, compatibility, tests and actual exact-head CI; fix findings and rerun affected checks. Do not ask Andrew to manually validate features. Do not impersonate reviewers or self-approve through another identity. If the configured identity is the author, record an honest agent review comment and use standard merge only if repository rules allow it. Never use administrative bypass or weaken protection/checks. Merge dependency-first with an expected-head guard; retarget stacked PRs and verify against merged main. Confirm the actual merge and applicable post-merge checks, record evidence, and mark the order Completed only when its scoped verification is satisfied. Continue to the next eligible order.
+Commit coherent milestones and push regularly. Branches: `8090/<wo-id-or-chat>-<slug>-<six-character-id>`. Conventional Commit/PR titles, with actual `(WO-N)` suffix on PRs. Open a PR, set the order In review, perform agent review/remediation and exact-head CI, merge normally with expected-head guard when permitted, then verify actual-main checks. Never fabricate independent approval, impersonate, use admin bypass or weaken branch protection. Completion requires the order's actual evidence, not just a PR or green status.
 
-GitHub Actions is the only routine remote deployment authority. Do not deploy from this workspace or provision paid services. Preserve isolated environments, migration safety, same-artifact automatic promotion and the explicit initial public activation decision. Missing credentials or staging evidence block affected delivery, not independent local work. Report local, remote CI and deployment evidence separately, including unrun checks.
+The stable required check remains **Bootstrap tooling**, on every PR/main/merge-group without path filters, deployment secrets or writable token. It grows with implemented capabilities. Clean-pivot test replacement removes obsolete mechanisms, not behavior still required by the new app.
 
-## Updating the upstream reference
-
-The current subtree's upstream commit is recorded in Git's squash commit (`git log --all --grep=git-subtree-split`). Update deliberately, never as an incidental change:
-
-```sh
-git subtree pull --prefix=.repos/effect https://github.com/Effect-TS/effect.git main --squash
-```
-
-Keep `.repos` excluded from workspace discovery, Turbo, lint, formatting, TypeScript project inputs, watchers and auto-imports. Repository tooling tests exercise these boundaries. Do not edit upstream reference files as part of product work.
-
-## Required PR verification
-
-Run `pnpm ci:setup` after frozen installation to install checksum-pinned oasdiff, then `pnpm check`, `pnpm dependency:check`, `pnpm --filter @agentforum/api db:generate`, `pnpm --filter @agentforum/api db:safety`, `pnpm --filter @agentforum/api contract:check`, `pnpm contract:compat origin/main`, `pnpm build`, `pnpm --filter @agentforum/api bundle:smoke`, and `pnpm security:check`. Also run `pnpm discovery:smoke` after all builds to verify six actual unauthenticated shared-guide routes and exact source parity. For web changes also install Chromium (`pnpm --filter @agentforum/web exec playwright install chromium`) and run `pnpm --filter @agentforum/web bundle:smoke` against the production build. For docs changes also run `pnpm --filter @agentforum/docs bundle:smoke` to crawl pre-rendered pages and verify no-JavaScript navigation. Regenerate the contract and verify a clean diff. CI compares the generated contract with the trusted event base commit, not a file supplied by the PR. oasdiff warnings and errors fail; do not add ignore rules to accept a breaking change under the same path version.
-
-The stable required status is **Bootstrap tooling** (workflow Bootstrap). It runs on every PR, main push and merge-group without path filters, deployment credentials or writable token permissions. Its negative-fixture tests exercise actual tool failures rather than merely asserting configuration. App owners add real new checks in the same PR; absent database, forum or deployed capabilities are not passing tests. The current API compressed bundle ceiling is 3 MiB (the Workers free-plan script limit), not a throughput or deployment-readiness claim.
-
-Repository administrators must configure this status as required and require branches to be current (or use the merge queue), without bypass actors. Inspection/configuration needs GitHub administration permission; an inaccessible endpoint is an explicit evidence blocker, not proof of protection. Preserve existing protections and reviewer requirements; do not blindly overwrite them. Autonomous merge authorization does not authorize a protection bypass or public activation.
-
-## Effect diagnostic gate policy
-
-Every `effect:check` invokes `scripts/check-effect.ts` against its actual project.
-The real pinned language-service CLI runs with JSON output and `--strict`;
-Effect Schema validates its report and the gate requires all files checked and
-zero errors, warnings **and informational messages**, as well as a successful
-native exit. The upstream `--strict` flag alone rejects warnings, not messages.
-Do not filter messages, change their severities, override the project LSP config
-or replace the CLI with a synthetic report. Actual diagnostics remain visible.
-Shared gate sources are explicit Turbo inputs so edits invalidate consumer gates.
-The real informational negative fixture demonstrates upstream success and gate
-failure for the same source; malformed/incomplete reports fail closed.
+Independent installations use the approved provider button/Workers Builds or authorized CLI flow; maintained delivery may use Actions. Provider authorization, complete installation, data-preserving update/retry and compatible recovery belong WO-33/34/37. No remote resources, paid services or public activation are authorized by local runtime work. Future updates preserve the NEW D1 app's data/keys/cursors; application rollback never promises database reversal.

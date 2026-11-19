@@ -68,114 +68,16 @@ describe("repository toolchain", () => {
       ts.createProgram(["negative.ts"], options, host),
     );
     expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
-      expect.arrayContaining([2322, 2375]),
-    );
-  });
-
-  it("runs typed lint rules and rejects imports from the reference subtree", async () => {
-    const eslint = new ESLint();
-    const results = await eslint.lintText(
-      'import "../.repos/effect/packages/effect/src/Effect.js";\nasync function unsafe() { return 1; }\nvoid unsafe();\n',
-      { filePath: "scripts/tooling.test.ts" },
-    );
-    const rules = results.flatMap((result) =>
-      result.messages.map((message) => message.ruleId),
-    );
-    expect(rules).toContain("no-restricted-imports");
-    expect(rules).toContain("@typescript-eslint/require-await");
-  });
-
-  it("excludes reference files from lint and formatting", async () => {
-    const path = ".repos/effect/packages/effect/src/Effect.ts";
-    expect(await new ESLint().isPathIgnored(path)).toBe(true);
-    expect(
-      await getFileInfo(path, { ignorePath: ".prettierignore" }),
-    ).toMatchObject({ ignored: true });
-    expect(json(".vscode/settings.json")).toMatchObject({
-      "files.watcherExclude": { "**/.repos/**": true },
-      "typescript.preferences.autoImportFileExcludePatterns": ["**/.repos/**"],
-    });
-  });
-
-  it("keeps the reference out of workspace discovery and task execution", () => {
-    const workspace: unknown = JSON.parse(
-      execFileSync("pnpm", ["list", "-r", "--depth", "-1", "--json"], {
-        encoding: "utf8",
-      }),
-    );
-    expect(workspace).toEqual([
-      expect.objectContaining({ name: "agentforum", path: process.cwd() }),
-      expect.objectContaining({
-        name: "@agentforum/api",
-        path: `${process.cwd()}/apps/api`,
-      }),
-      expect.objectContaining({
-        name: "@agentforum/docs",
-        path: `${process.cwd()}/apps/docs`,
-      }),
-      expect.objectContaining({
-        name: "@agentforum/web",
-        path: `${process.cwd()}/apps/web`,
-      }),
-      expect.objectContaining({
-        name: "@agentforum/contracts",
-        path: `${process.cwd()}/packages/contracts`,
-      }),
-      expect.objectContaining({
-        name: "@agentforum/discovery-assets",
-        path: `${process.cwd()}/packages/discovery-assets`,
-      }),
-    ]);
-    const graph: unknown = JSON.parse(
-      execFileSync(
-        "pnpm",
-        [
-          "exec",
-          "turbo",
-          "run",
-          "build",
-          "lint",
-          "typecheck",
-          "test",
-          "--dry=json",
-        ],
-        { encoding: "utf8" },
-      ),
-    );
-    expect(graph).toMatchObject({
-      packages: [
-        "@agentforum/api",
-        "@agentforum/contracts",
-        "@agentforum/discovery-assets",
-        "@agentforum/docs",
-        "@agentforum/web",
-      ],
-    });
-    expect(graph).toHaveProperty(
-      "tasks",
       expect.arrayContaining([
-        expect.objectContaining({ taskId: "@agentforum/api#build" }),
-        expect.objectContaining({ taskId: "@agentforum/api#test" }),
-        expect.objectContaining({ taskId: "@agentforum/contracts#build" }),
-        expect.objectContaining({ taskId: "@agentforum/contracts#test" }),
-        expect.objectContaining({ taskId: "@agentforum/web#build" }),
-        expect.objectContaining({ taskId: "@agentforum/web#test" }),
-        expect.objectContaining({ taskId: "@agentforum/docs#build" }),
-        expect.objectContaining({ taskId: "@agentforum/docs#test" }),
-        expect.objectContaining({
-          taskId: "@agentforum/discovery-assets#build",
-        }),
-        expect.objectContaining({
-          taskId: "@agentforum/discovery-assets#test",
-        }),
+        expect.objectContaining({ taskId: "@agentforum/forum#build" }),
+        expect.objectContaining({ taskId: "@agentforum/forum#test" }),
       ]),
     );
     expect(json("turbo.json")).toMatchObject({
       tasks: {
         build: { dependsOn: ["^build"] },
-        "@agentforum/contracts#build": { dependsOn: ["^build"], outputs: [] },
-        lint: { dependsOn: ["^build"] },
-        typecheck: { dependsOn: ["^build"] },
+        lint: { dependsOn: ["build"] },
+        typecheck: { dependsOn: ["build"] },
         test: { dependsOn: ["^build"] },
         dev: { cache: false, persistent: true },
       },

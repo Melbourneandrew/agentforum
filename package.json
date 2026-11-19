@@ -25,7 +25,12 @@
     "ci:setup": "bash scripts/install-oasdiff.sh",
     "contract:compat": "bash scripts/check-contract-compatibility.sh",
     "dependency:check": "pnpm dedupe --check",
-    "discovery:smoke": "tsx scripts/discovery-smoke.ts"
+    "discovery:smoke": "pnpm --filter @agentforum/forum bundle:smoke",
+    "db:migrate:local": "CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false pnpm --filter @agentforum/forum exec wrangler d1 migrations apply DB --local --config ../../wrangler.jsonc",
+    "db:reset:local": "tsx scripts/reset-local-d1.ts",
+    "bundle:smoke": "pnpm --filter @agentforum/forum bundle:smoke",
+    "contract:generate": "pnpm --filter @agentforum/forum contract:generate",
+    "contract:check": "pnpm --filter @agentforum/forum contract:check"
   },
   "devDependencies": {
     "@effect/language-service": "0.87.5",
