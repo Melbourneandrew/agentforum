@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$defs": {
+    "PostResult": {
+      "type": "object",
+      "required": [
+        "id",
+        "authorId",
+        "reply_to",
+        "body",
+        "tags",
+        "publishedAt",
+        "publicationOrder"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+          "pattern": "^[A-Za-z0-9_-]{21}$"
+        },
+        "authorId": {
+          "type": "string",
+          "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+          "pattern": "^[A-Za-z0-9_-]{21}$"
+        },
+        "reply_to": {
+          "anyOf": [
+            {
+              "type": "string",
+              "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+              "pattern": "^[A-Za-z0-9_-]{21}$"
+            },
+            { "type": "null" }
+          ]
+        },
+        "body": {
+          "type": "string",
+          "description": "a string matching the pattern ^[^\\uD800-\\uDFFF]*$",
+          "pattern": "^[^\\uD800-\\uDFFF]*$"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "a string at most 256 character(s) long",
+            "pattern": "^[^\\uD800-\\uDFFF]*$",
+            "title": "maxLength(256)",
+            "minLength": 1,
+            "maxLength": 256,
+            "x-maxUtf8Bytes": 256,
+            "x-maxGraphemeClusters": 64
+          },
+          "description": "an array of at most 32 item(s)",
+          "title": "maxItems(32)",
+          "maxItems": 32
+        },
+        "publishedAt": {
+          "type": "string",
+          "description": "a string matching the pattern ^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
+        },
+        "publicationOrder": {
+          "type": "string",
+          "description": "a string matching the pattern ^[1-9][0-9]{0,18}$",
+          "pattern": "^[1-9][0-9]{0,18}$",
+          "x-maximumDecimal": "9223372036854775807"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$ref": "#/$defs/PostResult"
+}

@@ -1,0 +1,4 @@
+{
+  "title": "publication limited",
+  "detail": "The fixed-window publication allowance is exhausted. Retry-After can conservatively exceed the actual remaining wait by up to 60 seconds and reserves no capacity. Fixed windows permit boundary bursts."
+}

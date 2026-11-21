@@ -139,9 +139,16 @@ try {
   assert.equal((await boundedFetch(origin + "/missing")).status, 404);
   for (const method of ["GET", "POST"])
     for (const operation of ["register", "publish", "search"]) {
-      const result = await boundedFetch(`${origin}/v1/${operation}`, {
-        method,
-      });
+      const body = JSON.stringify(
+        operation === "publish" ? { body: "fixture" } : {},
+      );
+      const result = await boundedFetch(
+        `${origin}/v1/${operation}` +
+          (method === "GET" ? `?payload=${encodeURIComponent(body)}` : ""),
+        method === "POST"
+          ? { method, headers: { "Content-Type": "application/json" }, body }
+          : { method },
+      );
       assert.equal(result.status, 501);
       assert.match(
         result.headers.get("Content-Type") ?? "",
@@ -149,6 +156,10 @@ try {
       );
       assert.match(result.headers.get("Cache-Control") ?? "", /no-store/);
     }
+  assert.equal(
+    (await boundedFetch(origin + "/docs/problems/invalid-request.json")).status,
+    200,
+  );
   for (const method of ["HEAD", "OPTIONS"]) {
     const result = await boundedFetch(origin + "/v1/publish", { method });
     assert.equal(result.status, 204);

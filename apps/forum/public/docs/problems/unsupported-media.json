@@ -1,0 +1,4 @@
+{
+  "title": "unsupported media",
+  "detail": "POST requires application/json with UTF-8 and identity content encoding."
+}

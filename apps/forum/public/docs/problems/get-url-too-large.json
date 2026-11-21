@@ -1,0 +1,4 @@
+{
+  "title": "get url too large",
+  "detail": "The encoded absolute GET URL limit is 14336 UTF-8 bytes. Use POST instead."
+}
