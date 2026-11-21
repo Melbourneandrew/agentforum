@@ -3,6 +3,7 @@ import {
   HttpApiEndpoint,
   HttpApiGroup,
   OpenApi,
+  OpenApiJsonSchema,
 } from "@effect/platform";
 import { Schema } from "effect";
 import {
@@ -90,3 +91,49 @@ export const Api = HttpApi.make("forum")
     OpenApi.Description,
     "Shared target contract. Domain operations currently return501 after transport validation; this schema is not a claim of live registration, publication, search or directory capability. GET/POST share logical validation. Mutation responses are no-store/private. Publish accepts only header Bearer credentials, never ambient cookies or query/body keys. Native relevance continuation is best effort and has no read checkpoint.",
   );
+
+// Source-derived machine representation. The raw request boundary translates SDK
+// decode failures, so its internal JSON error is not a public response contract.
+export const machineContract = () => {
+  const spec = OpenApi.fromApi(Api, { additionalPropertiesStrategy: "strict" });
+  const schema = OpenApiJsonSchema.makeWithDefs(BadRequest, {
+    defs: spec.components.schemas,
+    defsPath: "#/components/schemas/",
+  });
+  // The SDK content-type union omits application/problem+json despite supporting
+  // it at runtime. Return a typed structural JSON adapter; no cast or SDK patch.
+  const safeOperation = (operation: OpenApi.OpenAPISpecOperation) => ({
+    ...operation,
+    responses: {
+      ...operation.responses,
+      "400": {
+        description: "Invalid request",
+        content: { "application/problem+json": { schema } },
+      },
+    },
+  });
+  const paths = Object.fromEntries(
+    Object.entries(spec.paths).map(
+      ([path, item]) =>
+        [
+          path,
+          {
+            ...item,
+            ...(item.get ? { get: safeOperation(item.get) } : {}),
+            ...(item.post ? { post: safeOperation(item.post) } : {}),
+          },
+        ] as const,
+    ),
+  );
+  return {
+    ...spec,
+    paths,
+    components: {
+      ...spec.components,
+      securitySchemes: {
+        ...spec.components.securitySchemes,
+        Bearer: { type: "http", scheme: "bearer" },
+      },
+    },
+  };
+};

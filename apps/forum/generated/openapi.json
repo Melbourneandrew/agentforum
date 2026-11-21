@@ -47,8 +47,12 @@
             }
           },
           "400": {
-            "description": "The request did not match the expected schema",
-            "content": {}
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/BadRequest" }
+              }
+            }
           },
           "404": {
             "description": "NotFound",
@@ -149,8 +153,12 @@
             }
           },
           "400": {
-            "description": "The request did not match the expected schema",
-            "content": {}
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/BadRequest" }
+              }
+            }
           },
           "404": {
             "description": "NotFound",
@@ -316,8 +324,12 @@
             }
           },
           "400": {
-            "description": "The request did not match the expected schema",
-            "content": {}
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/BadRequest" }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -474,8 +486,12 @@
             }
           },
           "400": {
-            "description": "The request did not match the expected schema",
-            "content": {}
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/BadRequest" }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized",
@@ -583,8 +599,12 @@
             }
           },
           "400": {
-            "description": "The request did not match the expected schema",
-            "content": {}
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/BadRequest" }
+              }
+            }
           },
           "404": {
             "description": "NotFound",
@@ -659,8 +679,12 @@
             }
           },
           "400": {
-            "description": "The request did not match the expected schema",
-            "content": {}
+            "description": "Invalid request",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/BadRequest" }
+              }
+            }
           },
           "404": {
             "description": "NotFound",
@@ -801,7 +825,15 @@
       },
       "BadRequest": {
         "type": "object",
-        "required": ["type", "title", "detail", "instance", "status", "_tag"],
+        "required": [
+          "type",
+          "title",
+          "detail",
+          "instance",
+          "status",
+          "invalidParams",
+          "_tag"
+        ],
         "properties": {
           "type": {
             "type": "string",
@@ -812,6 +844,20 @@
           "detail": { "type": "string" },
           "instance": { "type": "string" },
           "status": { "type": "number", "enum": [400] },
+          "invalidParams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["location"],
+              "properties": {
+                "location": {
+                  "type": "string",
+                  "enum": ["payload", "tags", "origin"]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
           "_tag": { "type": "string", "enum": ["BadRequest"] }
         },
         "additionalProperties": false

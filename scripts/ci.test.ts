@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import {
+  cpSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -271,8 +272,58 @@ describe("required gates detect real introduced failures", () => {
         path,
       );
       expect(result.status).not.toBe(0);
-      expect(result.output).toContain("Regenerate the OpenAPI description");
+      expect(result.output).toContain(
+        "Regenerate machine contracts and problem documents",
+      );
     });
+  });
+
+  it.each(["post.schema.json", "cursor.schema.json"])(
+    "rejects stale generated %s through the actual validator",
+    (file) => {
+      temporary((path) => {
+        cpSync(
+          resolve(root, "apps/forum/generated"),
+          resolve(path, "generated"),
+          { recursive: true },
+        );
+        writeFileSync(resolve(path, "generated", file), "{}");
+        const result = execute(
+          resolve("apps/forum/node_modules/.bin/tsx"),
+          [resolve("apps/forum/scripts/contract.ts"), "--check"],
+          path,
+        );
+        expect(result.status).not.toBe(0);
+        expect(result.output).toContain(
+          "Regenerate machine contracts and problem documents",
+        );
+      });
+    },
+  );
+  it("does not allow changed target contracts through the exact initial transition", () => {
+    const path = resolve(root, "apps/forum/generated/openapi.json");
+    const original = readFileSync(path);
+    try {
+      writeFileSync(
+        path,
+        JSON.stringify({
+          openapi: "3.1.0",
+          info: {
+            title: "negative initial transition fixture",
+            version: "1.0.0",
+          },
+          paths: {},
+        }),
+      );
+      const result = execute("pnpm", [
+        "contract:compat",
+        "5416338a482ab481c81d80eba424b9bfaff18d5a",
+      ]);
+      expect(result.status).not.toBe(0);
+      expect(result.output).toContain("api-path-removed-without-deprecation");
+    } finally {
+      writeFileSync(path, original);
+    }
   });
 
   it("rejects an oversized production bundle before launching a runtime", () => {

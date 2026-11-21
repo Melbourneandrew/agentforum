@@ -6,6 +6,17 @@ export class InvalidTransport extends Data.TaggedError("InvalidTransport")<{
   readonly status: 400 | 401 | 413 | 415;
   readonly code: ProblemCode;
 }> {}
+const check = (
+  valid: boolean,
+  status: 400 | 401 | 413 | 415,
+  code: ProblemCode,
+) =>
+  Effect.void.pipe(
+    Effect.filterOrFail(
+      () => valid,
+      () => new InvalidTransport({ status, code }),
+    ),
+  );
 const invalid = () =>
   new InvalidTransport({ status: 400, code: "invalid-request" });
 export const decodeJson = (bytes: Uint8Array) =>
@@ -33,10 +44,7 @@ const readBody = (request: Request) =>
         let part = yield* read;
         while (!part.done) {
           size += part.value.byteLength;
-          if (size > 65536)
-            return yield* Effect.fail(
-              new InvalidTransport({ status: 413, code: "payload-too-large" }),
-            );
+          yield* check(size <= 65536, 413, "payload-too-large");
           chunks.push(part.value);
           part = yield* read;
         }
@@ -52,9 +60,12 @@ const readBody = (request: Request) =>
       Option.match(optionalReader, {
         onNone: () => Effect.void,
         onSome: (reader) =>
-          Effect.promise(async () => {
-            await reader.cancel().catch(() => undefined);
+          Effect.sync(() => {
+            // Request cancellation, but do not wait for an uncooperative producer
+            // or tee sibling before returning an already-determined rejection.
+            const cancellation = reader.cancel();
             reader.releaseLock();
+            void cancellation.catch(() => undefined);
           }),
       }),
   );
@@ -62,10 +73,11 @@ export const readDocument = (request: Request) =>
   Effect.gen(function* () {
     const url = new URL(request.url);
     if (request.method === "GET") {
-      if (new TextEncoder().encode(request.url).length > 14336)
-        return yield* Effect.fail(
-          new InvalidTransport({ status: 413, code: "get-url-too-large" }),
-        );
+      yield* check(
+        new TextEncoder().encode(request.url).length <= 14336,
+        413,
+        "get-url-too-large",
+      );
       const text = yield* Effect.try({
         try: () => {
           if (url.hash) throw invalid();
@@ -93,18 +105,20 @@ export const readDocument = (request: Request) =>
       });
       return yield* decodeJson(new TextEncoder().encode(text));
     }
-    if (request.method !== "POST" || url.search || url.hash)
-      return yield* Effect.fail(invalid());
+    yield* check(
+      request.method === "POST" && !url.search && !url.hash,
+      400,
+      "invalid-request",
+    );
     const encoding = request.headers.get("Content-Encoding");
-    if (
-      (encoding !== null && encoding.toLowerCase().trim() !== "identity") ||
-      !/^application\/json(?:\s*;\s*charset=(?:utf-8|"utf-8"))?\s*$/i.test(
-        request.headers.get("Content-Type") ?? "",
-      )
-    )
-      return yield* Effect.fail(
-        new InvalidTransport({ status: 415, code: "unsupported-media" }),
-      );
+    yield* check(
+      (encoding === null || encoding.toLowerCase().trim() === "identity") &&
+        /^application\/json(?:\s*;\s*charset=(?:utf-8|"utf-8"))?\s*$/i.test(
+          request.headers.get("Content-Type") ?? "",
+        ),
+      415,
+      "unsupported-media",
+    );
     return yield* decodeJson(yield* readBody(request));
   });
 export const readBearer = (request: Request) =>
@@ -114,18 +128,53 @@ export const readBearer = (request: Request) =>
       value === null
         ? null
         : /^Bearer ([A-Za-z0-9\-._~+/]+=*)$/i.exec(value)?.[1];
-    if (!token)
-      return yield* Effect.fail(
-        new InvalidTransport({ status: 401, code: "unauthorized" }),
-      );
-    return token;
+    return yield* Schema.decodeUnknown(Schema.NonEmptyString)(token).pipe(
+      Effect.mapError(
+        () => new InvalidTransport({ status: 401, code: "unauthorized" }),
+      ),
+    );
   });
 export const decodeRegister = (input: unknown) =>
   Schema.decodeUnknown(RegisterInput)(input, {
     onExcessProperty: "error",
-  }).pipe(Effect.mapError(invalid));
-export const decodePublish = (input: unknown) =>
-  Schema.decodeUnknown(PublishInput)(input, { onExcessProperty: "error" }).pipe(
-    Effect.map((value) => ({ ...value, tags: [...new Set(value.tags ?? [])] })),
+  }).pipe(
     Effect.mapError(invalid),
+    Effect.map((value) => ({ name: Option.fromNullable(value.name) })),
   );
+export const decodePublish = (input: unknown) =>
+  Effect.gen(function* () {
+    // Limits describe the submitted list, never its deduplicated representation.
+    if (
+      Schema.is(Schema.Record({ key: Schema.String, value: Schema.Unknown }))(
+        input,
+      ) &&
+      Array.isArray(input.tags)
+    ) {
+      yield* check(input.tags.length <= 32, 400, "tag-count-limit");
+      for (const tag of input.tags) {
+        if (typeof tag !== "string") continue;
+        yield* check(
+          new TextEncoder().encode(tag).length <= 256,
+          400,
+          "tag-byte-limit",
+        );
+        yield* check(
+          [
+            ...new Intl.Segmenter("en", { granularity: "grapheme" }).segment(
+              tag,
+            ),
+          ].length <= 64,
+          400,
+          "tag-grapheme-limit",
+        );
+      }
+    }
+    const value = yield* Schema.decodeUnknown(PublishInput)(input, {
+      onExcessProperty: "error",
+    }).pipe(Effect.mapError(invalid));
+    return {
+      body: value.body,
+      parent: Option.fromNullable(value.reply_to),
+      tags: [...new Set(value.tags ?? [])],
+    };
+  });

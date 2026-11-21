@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import { makeDispatcher } from "../src/runtime/dispatch.js";
 import type { Bindings, Execution } from "../src/runtime/context.js";
@@ -9,7 +9,20 @@ import {
   readBearer,
   readDocument,
 } from "../src/api/transport.js";
-import { problemResponse } from "../src/api/problems.js";
+import {
+  problemResponse,
+  BadRequest,
+  Unauthorized,
+  NotFound,
+  MethodNotAllowed,
+  Conflict,
+  PayloadTooLarge,
+  UnsupportedMedia,
+  RateLimited,
+  InternalError,
+  NotImplemented,
+  Unavailable,
+} from "../src/api/problems.js";
 
 const origin = "https://contracts.owner.workers.dev";
 const execution: Execution = {
@@ -43,6 +56,91 @@ const succeeds = <A, E>(effect: Effect.Effect<A, E>) =>
   Effect.runPromise(Effect.isSuccess(effect));
 
 describe("strict original-byte transport in native workerd", () => {
+  it("encodes every declared status using the matching public problem schema", async () => {
+    const errors = Schema.Union(
+      BadRequest,
+      Unauthorized,
+      NotFound,
+      MethodNotAllowed,
+      Conflict,
+      PayloadTooLarge,
+      UnsupportedMedia,
+      RateLimited,
+      InternalError,
+      NotImplemented,
+      Unavailable,
+    );
+    const cases = [
+      [400, "invalid-request"],
+      [401, "unauthorized"],
+      [404, "not-found"],
+      [405, "method-not-allowed"],
+      [409, "name-unavailable"],
+      [413, "payload-too-large"],
+      [415, "unsupported-media"],
+      [429, "publication-limited"],
+      [500, "internal-error"],
+      [501, "not-implemented"],
+      [503, "unavailable"],
+    ] as const;
+    for (const [status, code] of cases) {
+      const response = problemResponse(
+        status,
+        origin,
+        crypto.randomUUID(),
+        code,
+      );
+      expect(
+        await succeeds(Schema.decodeUnknown(errors)(await response.json())),
+      ).toBe(true);
+    }
+  });
+
+  it("returns oversized rejection and releases the reader despite a pending producer cancellation", async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(65537));
+      },
+      cancel() {
+        cancelled = true;
+        return new Promise<void>(() => undefined);
+      },
+    });
+    const input = new Request(`${origin}/v1/publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: stream,
+    });
+    const response = await call(input);
+    expect(response.status).toBe(413);
+    expect(cancelled).toBe(true);
+    expect(input.body?.locked).toBe(false);
+  });
+  it.each([
+    {
+      tags: Array.from({ length: 33 }, () => "same"),
+      code: "tag-count-limit",
+      limit: "32",
+    },
+    { tags: ["é".repeat(129)], code: "tag-byte-limit", limit: "256" },
+    { tags: ["x".repeat(65)], code: "tag-grapheme-limit", limit: "64" },
+  ])(
+    "reports the exceeded tag limit and a safe validation location: $code",
+    async ({ tags, code, limit }) => {
+      const response = await call(
+        post("publish", JSON.stringify({ body: "x", tags })),
+      );
+      const document: unknown = await response.json();
+      expect(document).toMatchObject({
+        status: 400,
+        type: `${origin}/docs/problems/${code}.json`,
+        invalidParams: [{ location: "tags" }],
+      });
+      expect(JSON.stringify(document)).toContain(limit);
+    },
+  );
+
   it.each([
     ["register", {}],
     ["publish", { body: "raw Markdown\n😀", tags: [" A ", "a", " A "] }],
@@ -187,7 +285,11 @@ describe("strict original-byte transport in native workerd", () => {
       await Effect.runPromise(
         decodePublish({ body: "raw\n", tags: [" a ", "a", " a ", "A"] }),
       ),
-    ).toEqual({ body: "raw\n", tags: [" a ", "a", "A"] });
+    ).toEqual({
+      body: "raw\n",
+      parent: Option.none(),
+      tags: [" a ", "a", "A"],
+    });
     expect(
       await succeeds(
         Schema.decodeUnknown(Tags)(["é".repeat(64), "😀".repeat(64)]),

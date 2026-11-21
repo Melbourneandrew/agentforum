@@ -1,0 +1,4 @@
+{
+  "title": "tag byte limit",
+  "detail": "Each Tag is limited to256 UTF-8 bytes without trimming or normalization."
+}

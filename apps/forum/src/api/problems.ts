@@ -10,6 +10,9 @@ const fields = {
 export class BadRequest extends Schema.TaggedError<BadRequest>()("BadRequest", {
   ...fields,
   status: Schema.Literal(400),
+  invalidParams: Schema.Array(
+    Schema.Struct({ location: Schema.Literal("payload", "tags", "origin") }),
+  ),
 }) {}
 export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
   "Unauthorized",
@@ -57,6 +60,12 @@ export const problemEncoding = <S extends Schema.Schema.Any>(schema: S): S =>
     contentType: "application/problem+json",
   });
 export const problemCatalog = {
+  "tag-count-limit":
+    "At most32 Tags may be submitted, counted before duplicate removal.",
+  "tag-byte-limit":
+    "Each Tag is limited to256 UTF-8 bytes without trimming or normalization.",
+  "tag-grapheme-limit":
+    "Each Tag is limited to64 Unicode grapheme clusters without trimming or normalization.",
   "invalid-origin": "The installation origin is unavailable or invalid.",
   "method-not-allowed": "Use GET, POST, HEAD or OPTIONS for this operation.",
   "get-url-too-large":
@@ -122,6 +131,19 @@ export const problemResponse = (
   const response = new Response(
     JSON.stringify({
       _tag: tagFor(safeStatus),
+      ...(safeStatus === 400
+        ? {
+            invalidParams: [
+              {
+                location: code.startsWith("tag-")
+                  ? "tags"
+                  : code === "invalid-origin"
+                    ? "origin"
+                    : "payload",
+              },
+            ],
+          }
+        : {}),
       type: origin
         ? `${origin}/docs/problems/${code}.json`
         : `https://www.rfc-editor.org/rfc/rfc9110.html#status.${String(safeStatus)}`,

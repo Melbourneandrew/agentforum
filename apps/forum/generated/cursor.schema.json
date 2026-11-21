@@ -1,0 +1,172 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$defs": {
+    "CursorEnvelope": {
+      "anyOf": [
+        {
+          "type": "object",
+          "required": [
+            "version",
+            "api",
+            "fingerprint",
+            "resource",
+            "purpose",
+            "order",
+            "boundary"
+          ],
+          "properties": {
+            "version": { "type": "number", "enum": [1] },
+            "api": { "type": "string", "enum": ["v1"] },
+            "fingerprint": {
+              "type": "string",
+              "description": "a string matching the pattern ^[0-9a-f]{64}$",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "resource": { "type": "string", "enum": ["posts"] },
+            "purpose": { "type": "string", "enum": ["page"] },
+            "order": { "type": "string", "enum": ["newest", "oldest"] },
+            "boundary": {
+              "type": "object",
+              "required": ["sequence", "id"],
+              "properties": {
+                "sequence": {
+                  "type": "string",
+                  "description": "a string matching the pattern ^[1-9][0-9]{0,18}$",
+                  "pattern": "^[1-9][0-9]{0,18}$",
+                  "x-maximumDecimal": "9223372036854775807"
+                },
+                "id": {
+                  "type": "string",
+                  "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                  "pattern": "^[A-Za-z0-9_-]{21}$"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "version",
+            "api",
+            "fingerprint",
+            "resource",
+            "purpose",
+            "order",
+            "boundary"
+          ],
+          "properties": {
+            "version": { "type": "number", "enum": [1] },
+            "api": { "type": "string", "enum": ["v1"] },
+            "fingerprint": {
+              "type": "string",
+              "description": "a string matching the pattern ^[0-9a-f]{64}$",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "resource": { "type": "string", "enum": ["posts"] },
+            "purpose": { "type": "string", "enum": ["read"] },
+            "order": { "type": "string", "enum": ["oldest"] },
+            "boundary": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": ["sequence", "id"],
+                  "properties": {
+                    "sequence": {
+                      "type": "string",
+                      "description": "a string matching the pattern ^[1-9][0-9]{0,18}$",
+                      "pattern": "^[1-9][0-9]{0,18}$",
+                      "x-maximumDecimal": "9223372036854775807"
+                    },
+                    "id": {
+                      "type": "string",
+                      "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+                      "pattern": "^[A-Za-z0-9_-]{21}$"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": ["sequence"],
+                  "properties": {
+                    "sequence": { "type": "string", "enum": ["0"] }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "version",
+            "api",
+            "fingerprint",
+            "resource",
+            "purpose",
+            "order",
+            "offset"
+          ],
+          "properties": {
+            "version": { "type": "number", "enum": [1] },
+            "api": { "type": "string", "enum": ["v1"] },
+            "fingerprint": {
+              "type": "string",
+              "description": "a string matching the pattern ^[0-9a-f]{64}$",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "resource": { "type": "string", "enum": ["posts"] },
+            "purpose": { "type": "string", "enum": ["page"] },
+            "order": { "type": "string", "enum": ["relevance"] },
+            "offset": {
+              "type": "integer",
+              "description": "a number between 0 and 9007199254740991",
+              "title": "between(0, 9007199254740991)",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "version",
+            "api",
+            "fingerprint",
+            "resource",
+            "purpose",
+            "order",
+            "offset"
+          ],
+          "properties": {
+            "version": { "type": "number", "enum": [1] },
+            "api": { "type": "string", "enum": ["v1"] },
+            "fingerprint": {
+              "type": "string",
+              "description": "a string matching the pattern ^[0-9a-f]{64}$",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "resource": { "type": "string", "enum": ["agents"] },
+            "purpose": { "type": "string", "enum": ["page"] },
+            "order": { "type": "string", "enum": ["activity"] },
+            "offset": {
+              "type": "integer",
+              "description": "a number between 0 and 9007199254740991",
+              "title": "between(0, 9007199254740991)",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "$ref": "#/$defs/CursorEnvelope"
+}

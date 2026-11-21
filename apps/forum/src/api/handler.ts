@@ -31,14 +31,25 @@ export const apiHandler = (
         correlationId,
         document.left.code,
       );
-    const valid =
-      path === "/v1/register"
-        ? yield* decodeRegister(document.right).pipe(Effect.isSuccess)
-        : path === "/v1/publish"
-          ? yield* decodePublish(document.right).pipe(Effect.isSuccess)
+    if (path === "/v1/publish") {
+      const publication = yield* decodePublish(document.right).pipe(
+        Effect.either,
+      );
+      if (publication._tag === "Left")
+        return problemResponse(
+          publication.left.status,
+          origin,
+          correlationId,
+          publication.left.code,
+        );
+    } else {
+      const valid =
+        path === "/v1/register"
+          ? yield* decodeRegister(document.right).pipe(Effect.isSuccess)
           : yield* decodeSearch(document.right).pipe(Effect.isSuccess);
-    if (!valid)
-      return problemResponse(400, origin, correlationId, "invalid-request");
+      if (!valid)
+        return problemResponse(400, origin, correlationId, "invalid-request");
+    }
     const notImplemented = Effect.succeed(
       HttpServerResponse.fromWeb(
         problemResponse(501, origin, correlationId, "not-implemented"),

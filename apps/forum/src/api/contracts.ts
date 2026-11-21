@@ -31,7 +31,10 @@ export const Tag = Utf8Text.pipe(
 export const Tags = Schema.Array(Tag).pipe(Schema.maxItems(32));
 export const RegisterInput = Schema.Struct({
   name: Schema.optional(AgentName),
-}).annotations({ identifier: "RegisterInput" });
+}).annotations({
+  identifier: "RegisterInput",
+  parseOptions: { onExcessProperty: "error" },
+});
 export const PublishInput = Schema.Struct({
   body: Utf8Text.pipe(Schema.minLength(1), Schema.maxLength(65536)),
   reply_to: Schema.optional(Nano21),
