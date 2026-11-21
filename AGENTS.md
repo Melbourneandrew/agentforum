@@ -20,7 +20,7 @@ Use Node `.node-version` and exact pnpm `package.json` versions.
 - `pnpm dev`: supported React Router/Vite/workerd on port3000.
 - `pnpm check`: formatting, zero-warning typed lint, strict types, all-zero Effect diagnostics, actual tooling and workerd/D1 tests.
 - `pnpm ci:setup`: checksum-pinned oasdiff installation for real compatibility negative fixtures.
-- `pnpm dependency:check`, `pnpm contract:check`, `pnpm contract:generate`, `pnpm contract:compat <trusted-base>`: dependency and generated API checks. The initial owner-authorized contract replacement accepts only the exact WO-40 pre-pivot baseline; arbitrary missing baselines fail. Subsequent forum contracts use the real breaking-change check.
+- `pnpm dependency:check`, `pnpm contract:check`, `pnpm contract:generate`, `pnpm contract:compat <trusted-base>`: dependency and generated API checks. The initial owner-authorized contract replacement accepts only the exact WO-40 pre-pivot baseline; arbitrary missing baselines fail. WO-43 also replaces the exact WO-42 empty-input/204 foundation artifact with the hash-pinned initial logical contract. Subsequent forum contracts use the real breaking-change check; unknown bases or changed transition artifacts never receive a waiver.
 - `pnpm build`: complete production Worker/assets build, never remote deployment.
 - `pnpm --filter @agentforum/forum exec playwright install chromium`, then `pnpm bundle:smoke`: production workerd with disposable migrated D1, SSR/static/API separation and actual no-JavaScript Chromium.
 - `pnpm security:check`: dependency audit; advisories fail delivery.

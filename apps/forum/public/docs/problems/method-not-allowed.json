@@ -1,0 +1,4 @@
+{
+  "title": "method not allowed",
+  "detail": "Use GET, POST, HEAD or OPTIONS for this operation."
+}

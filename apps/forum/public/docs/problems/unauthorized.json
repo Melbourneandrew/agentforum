@@ -1,0 +1,4 @@
+{
+  "title": "unauthorized",
+  "detail": "Provide a valid local credential using only the Authorization: Bearer header."
+}

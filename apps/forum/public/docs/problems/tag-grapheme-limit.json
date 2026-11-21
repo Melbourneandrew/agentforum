@@ -1,0 +1,4 @@
+{
+  "title": "tag grapheme limit",
+  "detail": "Each Tag is limited to64 Unicode grapheme clusters without trimming or normalization."
+}

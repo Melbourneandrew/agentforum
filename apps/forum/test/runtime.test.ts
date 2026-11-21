@@ -69,7 +69,21 @@ describe("native single-Worker runtime", () => {
     for (const operation of ["register", "publish", "search"])
       for (const method of ["GET", "POST"]) {
         const response = await boundary.fetch(
-          request(`/v1/${operation}`, method),
+          new Request(
+            `https://alpha.owner.workers.dev/v1/${operation}` +
+              (method === "GET"
+                ? `?payload=${encodeURIComponent(JSON.stringify(operation === "publish" ? { body: "fixture" } : {}))}`
+                : ""),
+            method === "POST"
+              ? {
+                  method,
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(
+                    operation === "publish" ? { body: "fixture" } : {},
+                  ),
+                }
+              : { method },
+          ),
           env,
           execution,
         );

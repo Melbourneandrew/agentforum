@@ -1,5 +1,6 @@
 import { Effect, Layer } from "effect";
 import { apiHandler, problemResponse } from "../api/handler.js";
+import type { ProblemCode } from "../api/problems.js";
 import {
   installationOrigin,
   requestLayer,
@@ -60,21 +61,15 @@ export const makeDispatcher = (render: Render) => ({
     if (originResult._tag === "Left") {
       const status = originResult.left.configuration ? 500 : 400;
       return secure(
-        problemResponse(
-          status,
-          "",
-          id,
-          "invalid-origin",
-          "The installation origin is unavailable or invalid.",
-        ),
+        problemResponse(status, "", id, "invalid-origin"),
         request.method === "HEAD",
         api,
       );
     }
     const origin = originResult.right;
-    const fail = (status: number, code: string, detail: string) =>
+    const fail = (status: number, code: ProblemCode) =>
       secure(
-        problemResponse(status, origin, id, code, detail),
+        problemResponse(status, origin, id, code),
         request.method === "HEAD",
         api,
       );
@@ -82,11 +77,7 @@ export const makeDispatcher = (render: Render) => ({
       !["GET", "POST", "HEAD"].includes(request.method) ||
       (!api && request.method === "POST")
     ) {
-      const response = fail(
-        405,
-        "method-not-allowed",
-        "Use the supported methods for this resource.",
-      );
+      const response = fail(405, "method-not-allowed");
       response.headers.set(
         "Allow",
         api ? "GET, POST, HEAD, OPTIONS" : "GET, HEAD, OPTIONS",
@@ -98,25 +89,22 @@ export const makeDispatcher = (render: Render) => ({
       api &&
       new TextEncoder().encode(request.url).byteLength > 14_336
     )
-      return fail(
-        413,
-        "get-url-too-large",
-        "The encoded absolute GET URL limit is 14336 UTF-8 bytes. Use POST instead.",
-      );
+      return fail(413, "get-url-too-large");
     const context = requestLayer(bindings, execution, origin, id);
     try {
       if (api) {
         const response = await Effect.runPromise(apiHandler(request, context));
-        if (response.status !== 501)
+        if (
+          !response.ok &&
+          response.headers.get("Content-Type") !== "application/problem+json"
+        )
           return fail(
-            response.status === 404 ? 404 : 500,
-            response.status === 404 ? "not-found" : "internal-error",
-            "The operation could not be completed.",
+            response.status === 400 ? 400 : 500,
+            response.status === 400 ? "invalid-request" : "internal-error",
           );
         return secure(response, false, true);
       }
-      if (url.pathname !== "/")
-        return fail(404, "not-found", "No public page matches this request.");
+      if (url.pathname !== "/") return fail(404, "not-found");
       // URL includes validated origin + complete route/query state. No global request/data layer.
       const cache = await caches.open("forum-public-v1");
       const cacheKey = new Request(new URL(url.pathname + url.search, origin));
@@ -157,7 +145,7 @@ export const makeDispatcher = (render: Render) => ({
         );
       return output;
     } catch {
-      return fail(500, "internal-error", "The request could not be completed.");
+      return fail(500, "internal-error");
     }
   },
 });

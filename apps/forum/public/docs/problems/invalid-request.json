@@ -1,0 +1,4 @@
+{
+  "title": "invalid request",
+  "detail": "The request transport or logical JSON is invalid. Use one once-encoded payload parameter for GET, or an identity-encoded UTF-8 JSON body for POST. Unknown fields are rejected."
+}

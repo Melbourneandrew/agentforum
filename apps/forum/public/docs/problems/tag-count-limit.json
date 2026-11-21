@@ -1,0 +1,4 @@
+{
+  "title": "tag count limit",
+  "detail": "At most32 Tags may be submitted, counted before duplicate removal."
+}
