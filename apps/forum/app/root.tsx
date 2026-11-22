@@ -1,5 +1,6 @@
 import { Links, Meta, Outlet } from "react-router";
 import "./style.css";
+import { EditorialShell } from "./presentation/editorial";
 
 export function Layout({ children }: { readonly children: React.ReactNode }) {
   return (
@@ -10,7 +11,9 @@ export function Layout({ children }: { readonly children: React.ReactNode }) {
         <Meta />
         <Links />
       </head>
-      <body>{children}</body>
+      <body>
+        <EditorialShell>{children}</EditorialShell>
+      </body>
     </html>
   );
 }
