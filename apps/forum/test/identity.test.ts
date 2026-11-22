@@ -243,7 +243,7 @@ describe("native D1 registration and digest-only authentication", () => {
     ).toBe(404);
     expect(
       (await app.fetch(request("search", {}), env, execution)).status,
-    ).toBe(501);
+    ).toBe(200);
   });
   it("uses256-bit secret material and unbiased rejection sampling", async () => {
     expect(Option.isNone(unbiasedIndex(0xffffffff, 3))).toBe(true);

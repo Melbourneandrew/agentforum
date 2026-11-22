@@ -9,7 +9,9 @@ import { cryptographyLayer } from "../identity/credentials.js";
 import { generatedNamesLayer } from "../identity/names.js";
 import { authenticationLayer, registrationLayer } from "../identity/service.js";
 import { publicationLayer } from "../publication/service.js";
-import { Registration, Publication } from "./services.js";
+import { forumQueriesLayer } from "../queries/service.js";
+import { queryStoreLayer } from "../queries/store.js";
+import { Registration, Publication, ForumQueries } from "./services.js";
 import { RequestContext } from "../runtime/context.js";
 import { Api } from "./definition.js";
 import { problemResponse } from "./problems.js";
@@ -54,6 +56,7 @@ export const apiHandler = (
     );
     let registerResponse = notImplemented;
     let publishResponse = notImplemented;
+    let searchResponse = notImplemented;
     if (path === "/v1/publish") {
       const publication = yield* decodePublish(document.right).pipe(
         Effect.either,
@@ -148,8 +151,47 @@ export const apiHandler = (
           ),
         ),
       );
-    } else if (!(yield* decodeSearch(document.right).pipe(Effect.isSuccess)))
-      return problemResponse(400, origin, correlationId, "invalid-request");
+    } else {
+      const input = yield* decodeSearch(document.right).pipe(Effect.either);
+      if (input._tag === "Left")
+        return problemResponse(400, origin, correlationId, "invalid-request");
+      searchResponse = Effect.flatMap(ForumQueries, (service) =>
+        service.search(input.right),
+      ).pipe(
+        Effect.provide(
+          forumQueriesLayer.pipe(
+            Layer.provide(queryStoreLayer),
+            Layer.provide(context),
+          ),
+        ),
+        Effect.map((result) =>
+          HttpServerResponse.unsafeJson(result, {
+            headers: {
+              "Cache-Control": "no-store, private",
+              "X-Request-Id": correlationId,
+            },
+          }),
+        ),
+        Effect.catchAll((error) =>
+          Effect.succeed(
+            HttpServerResponse.fromWeb(
+              problemResponse(
+                error.status,
+                origin,
+                correlationId,
+                error.status === 400
+                  ? "invalid-request"
+                  : error.status === 404
+                    ? "not-found"
+                    : error.status === 501
+                      ? "not-implemented"
+                      : "unavailable",
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     const registration = HttpApiBuilder.group(Api, "registration", (handlers) =>
       handlers
         .handleRaw("registerGet", () => registerResponse)
@@ -162,8 +204,8 @@ export const apiHandler = (
     );
     const search = HttpApiBuilder.group(Api, "search", (handlers) =>
       handlers
-        .handleRaw("searchGet", () => notImplemented)
-        .handleRaw("searchPost", () => notImplemented),
+        .handleRaw("searchGet", () => searchResponse)
+        .handleRaw("searchPost", () => searchResponse),
     );
     const app = HttpApiBuilder.toWebHandler(
       HttpApiBuilder.api(Api).pipe(
