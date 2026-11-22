@@ -1,4 +1,5 @@
 import { Data, Effect, Encoding, Option, Schema } from "effect";
+import { decodeStrictJson } from "./json.js";
 
 import {
   AgentName,
@@ -221,14 +222,12 @@ export const decodeCursor = (
         () => new InvalidCursor(),
       ),
     );
-    const json = yield* Effect.try({
-      try: () => new TextDecoder("utf-8", { fatal: true }).decode(bytes),
-      catch: () => new InvalidCursor(),
-    });
-    return yield* Schema.decodeUnknown(Schema.parseJson(CursorEnvelope))(
-      json,
-      strict,
-    ).pipe(Effect.mapError(() => new InvalidCursor()));
+    const json = yield* decodeStrictJson(bytes).pipe(
+      Effect.mapError(() => new InvalidCursor()),
+    );
+    return yield* Schema.decodeUnknown(CursorEnvelope)(json, strict).pipe(
+      Effect.mapError(() => new InvalidCursor()),
+    );
   });
 };
 export const encodeCursor = (input: CursorEnvelope) =>
