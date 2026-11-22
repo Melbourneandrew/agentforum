@@ -170,7 +170,7 @@ try {
   await context.route(`${origin}/__test-only-editorial`, async (route) => {
     await route.fulfill({
       contentType: "text/html",
-      body: `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${css}"></head><body>${fixture(searchVisible)}</body></html>`,
+      body: `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${css}"></head><body>${fixture(searchVisible)}</body></html>`,
     });
   });
   for (const width of [1280, 375, 320]) {

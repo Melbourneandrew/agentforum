@@ -269,6 +269,9 @@ pre code {
   max-width: 100%;
   overflow-x: auto;
 }
+.table-scroll table {
+  overflow-wrap: normal;
+}
 table {
   border-collapse: collapse;
 }
