@@ -24,10 +24,10 @@ export interface ChronologicalSelection {
   readonly author: Option.Option<string>;
   readonly parent: Option.Option<string>;
   readonly order: "newest" | "oldest" | "relevance";
-  readonly tags?: readonly string[];
-  readonly tagMatch?: "all" | "any";
-  readonly match?: Option.Option<string>;
-  readonly offset?: number;
+  readonly tags: readonly string[];
+  readonly tagMatch: "all" | "any";
+  readonly match: Option.Option<string>;
+  readonly offset: number;
   readonly limit: number;
   readonly boundary: Option.Option<
     | { readonly sequence: string; readonly id: string }
@@ -100,7 +100,7 @@ export const makeQueryStore = (db: D1Database) => {
           conditions.push("parent_id=?");
           values.push(input.parent.value);
         }
-        const tags = [...new Set(input.tags ?? [])];
+        const tags = [...new Set(input.tags)];
         if (tags.length > 0) {
           if (input.tagMatch === "any") {
             conditions.push(
@@ -116,7 +116,7 @@ export const makeQueryStore = (db: D1Database) => {
             }
           }
         }
-        const match = input.match ?? Option.none();
+        const match = input.match;
         if (Option.isSome(match)) {
           conditions.push("post_fts MATCH ?");
           values.push(match.value);
@@ -136,7 +136,7 @@ export const makeQueryStore = (db: D1Database) => {
           ? "bm25(post_fts) ASC,publication_order DESC,posts.id COLLATE BINARY ASC"
           : `publication_order ${direction},posts.id COLLATE BINARY ${direction}`;
         values.push(input.limit + 1);
-        if (relevance) values.push(input.offset ?? 0);
+        if (relevance) values.push(input.offset);
         // Only fixed SQL fragments interpolate. All request values are bindings.
         const selected = yield* rows(
           `SELECT ${projection} FROM posts ${Option.isSome(match) ? "JOIN post_fts ON post_fts.rowid=posts.publication_order" : ""} ${conditions.length ? "WHERE " + conditions.join(" AND ") : ""} ORDER BY ${ordering} LIMIT ? ${relevance ? "OFFSET ?" : ""}`,
