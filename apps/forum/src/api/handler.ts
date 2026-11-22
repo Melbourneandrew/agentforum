@@ -3,16 +3,13 @@ import {
   HttpServer,
   HttpServerResponse,
 } from "@effect/platform";
-import { Effect, Layer, Redacted } from "effect";
+import { Effect, Layer } from "effect";
 import { forumStoreLayer } from "../database/store.js";
 import { cryptographyLayer } from "../identity/credentials.js";
 import { generatedNamesLayer } from "../identity/names.js";
-import {
-  Authentication,
-  authenticationLayer,
-  registrationLayer,
-} from "../identity/service.js";
-import { Registration } from "./services.js";
+import { authenticationLayer, registrationLayer } from "../identity/service.js";
+import { publicationLayer } from "../publication/service.js";
+import { Registration, Publication } from "./services.js";
 import { RequestContext } from "../runtime/context.js";
 import { Api } from "./definition.js";
 import { problemResponse } from "./problems.js";
@@ -50,14 +47,13 @@ export const apiHandler = (
       cryptographyLayer,
       generatedNamesLayer.pipe(Layer.provide(cryptographyLayer)),
     );
-    const identity = (layer: typeof authenticationLayer) =>
-      layer.pipe(Layer.provide(dependencies), Layer.provide(context));
     const notImplemented = Effect.succeed(
       HttpServerResponse.fromWeb(
         problemResponse(501, origin, correlationId, "not-implemented"),
       ),
     );
     let registerResponse = notImplemented;
+    let publishResponse = notImplemented;
     if (path === "/v1/publish") {
       const publication = yield* decodePublish(document.right).pipe(
         Effect.either,
@@ -72,16 +68,51 @@ export const apiHandler = (
       const bearer = yield* readBearer(request).pipe(Effect.either);
       if (bearer._tag === "Left" || new URL(request.url).protocol !== "https:")
         return problemResponse(401, origin, correlationId, "unauthorized");
-      const authenticated = yield* Effect.flatMap(Authentication, (service) =>
-        service.authenticate(Redacted.make(bearer.right)),
-      ).pipe(Effect.provide(identity(authenticationLayer)), Effect.either);
-      if (authenticated._tag === "Left")
-        return problemResponse(
-          authenticated.left.status,
-          origin,
-          correlationId,
-          authenticated.left.status === 401 ? "unauthorized" : "unavailable",
-        );
+      publishResponse = Effect.flatMap(Publication, (service) =>
+        service.publish(publication.right, bearer.right),
+      ).pipe(
+        Effect.provide(
+          publicationLayer.pipe(
+            Layer.provide(
+              Layer.merge(
+                dependencies,
+                authenticationLayer.pipe(Layer.provide(dependencies)),
+              ),
+            ),
+            Layer.provide(context),
+          ),
+        ),
+        Effect.map((result) =>
+          HttpServerResponse.unsafeJson(result, {
+            status: 201,
+            headers: {
+              "Cache-Control": "no-store, private",
+              "X-Request-Id": correlationId,
+            },
+          }),
+        ),
+        Effect.catchAll((error) => {
+          const code =
+            error.status === 400
+              ? "invalid-request"
+              : error.status === 401
+                ? "unauthorized"
+                : error.status === 404
+                  ? "parent-not-found"
+                  : error.status === 429
+                    ? "publication-limited"
+                    : "unavailable";
+          const response = problemResponse(
+            error.status,
+            origin,
+            correlationId,
+            code,
+          );
+          // Store reports a documented conservative fallback, not an exact reset.
+          if (error.status === 429) response.headers.set("Retry-After", "60");
+          return Effect.succeed(HttpServerResponse.fromWeb(response));
+        }),
+      );
     } else if (path === "/v1/register") {
       const input = yield* decodeRegister(document.right).pipe(Effect.either);
       if (input._tag === "Left")
@@ -126,8 +157,8 @@ export const apiHandler = (
     );
     const publication = HttpApiBuilder.group(Api, "publication", (handlers) =>
       handlers
-        .handleRaw("publishGet", () => notImplemented)
-        .handleRaw("publishPost", () => notImplemented),
+        .handleRaw("publishGet", () => publishResponse)
+        .handleRaw("publishPost", () => publishResponse),
     );
     const search = HttpApiBuilder.group(Api, "search", (handlers) =>
       handlers

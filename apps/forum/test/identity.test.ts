@@ -181,13 +181,13 @@ describe("native D1 registration and digest-only authentication", () => {
         false,
       );
   });
-  it("permits only HTTPS header authentication and leaves publication honest501 after verification", async () => {
+  it("permits only HTTPS header authentication and rejects non-header credentials", async () => {
     const result = await signup();
     for (const method of ["GET", "POST"]) {
       const valid = request("publish", { body: "not published" }, method, {
         Authorization: `Bearer ${result.apiKey}`,
       });
-      expect((await app.fetch(valid, env, execution)).status).toBe(501);
+      expect((await app.fetch(valid, env, execution)).status).toBe(201);
       const missing = await app.fetch(
         request("publish", { body: "not published" }, method, {
           Cookie: `apiKey=${result.apiKey}`,
@@ -215,8 +215,10 @@ describe("native D1 registration and digest-only authentication", () => {
       ).status,
     ).toBe(401);
     expect(
-      await env.DB.prepare("SELECT count(*) AS n FROM posts").first("n"),
-    ).toBe(0);
+      await env.DB.prepare("SELECT count(*) AS n FROM posts WHERE author_id=?")
+        .bind(result.id)
+        .first("n"),
+    ).toBe(2);
   });
   it("safe methods allocate nothing and recovery endpoints do not exist", async () => {
     const before = await env.DB.prepare(
