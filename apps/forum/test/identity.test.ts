@@ -57,7 +57,7 @@ const signup = async (name?: string, method = "POST") => {
     env,
     execution,
   );
-  expect(response.status).toBe(200);
+  expect(response.status).toBe(201);
   expect(response.headers.get("Cache-Control")).toBe("no-store, private");
   return Schema.decodeUnknownPromise(RegistrationResult)(await response.json());
 };
@@ -137,7 +137,7 @@ describe("native D1 registration and digest-only authentication", () => {
         execution,
       ),
     ]);
-    expect(responses.map((value) => value.status).sort()).toEqual([200, 409]);
+    expect(responses.map((value) => value.status).sort()).toEqual([201, 409]);
     expect(
       await env.DB.prepare("SELECT count(*) AS n FROM credentials").first("n"),
     ).toBe((before ?? 0) + 1);
@@ -148,6 +148,10 @@ describe("native D1 registration and digest-only authentication", () => {
       "-bad",
       "bad-",
       "bad--name",
+      "Agent\n",
+      "Agent\r",
+      "Agent\u2028",
+      "Agent\u2029",
       "two words",
       "é",
       "",

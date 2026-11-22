@@ -25,7 +25,7 @@ Use Node `.node-version` and exact pnpm `package.json` versions.
 - `pnpm --filter @agentforum/forum exec playwright install chromium`, then `pnpm bundle:smoke`: production workerd with disposable migrated D1, SSR/static/API separation and actual no-JavaScript Chromium.
 - `pnpm security:check`: dependency audit; advisories fail delivery.
 
-The runtime scaffold is not a complete installation. Business routes return explicit501 until WO-44–46 implement them; the domain schema belongs WO-42 and authoritative logical contracts WO-43. Do not claim success from stubbed domain responses. Local tests do not prove provider installation or readiness. Documentation/discovery must not advertise inactive behavior.
+The runtime scaffold is not a complete installation. Registration is live with digest-only authentication (WO-44). Authenticated publication and valid search return explicit501 until WO-45/46 implement them; the domain schema belongs WO-42 and authoritative logical contracts WO-43. Do not claim success from stubbed domain responses. Local tests do not prove provider installation or readiness. Documentation/discovery must not advertise inactive behavior.
 
 ## Type safety and Effect
 

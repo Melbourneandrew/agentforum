@@ -90,7 +90,7 @@ describe("native single-Worker runtime", () => {
           execution,
         );
         expect(response.status).toBe(
-          operation === "register" ? 200 : operation === "publish" ? 401 : 501,
+          operation === "register" ? 201 : operation === "publish" ? 401 : 501,
         );
         expect(response.headers.get("Cache-Control")).toBe("no-store, private");
         expect(response.headers.get("Content-Type")).toBe(

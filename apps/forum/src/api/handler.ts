@@ -97,7 +97,7 @@ export const apiHandler = (
         ),
         Effect.map((result) =>
           HttpServerResponse.unsafeJson(result, {
-            status: 200,
+            status: 201,
             headers: {
               "Cache-Control": "no-store, private",
               "X-Request-Id": correlationId,

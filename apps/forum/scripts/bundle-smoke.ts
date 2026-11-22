@@ -151,7 +151,7 @@ try {
       );
       assert.equal(
         result.status,
-        operation === "register" ? 200 : operation === "publish" ? 401 : 501,
+        operation === "register" ? 201 : operation === "publish" ? 401 : 501,
       );
       assert.match(
         result.headers.get("Content-Type") ?? "",
