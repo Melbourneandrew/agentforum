@@ -33,6 +33,10 @@ All projects extend strict `tsconfig.base.json`, including noUncheckedIndexedAcc
 
 Read `node_modules/effect/AGENTS.md` before Effect changes. This pinned npm release has none; use `.repos/effect/.agents/AGENTS.md` plus installed source for exact versioned APIs. Never edit/import the vendored source. Effect Schema validates untrusted boundaries; typed services/Layers encapsulate dependencies. Request I/O/D1/context must not be captured in isolate-scoped layers. Native D1 batches/constraints, not PostgreSQL connection finalizers, establish atomicity. Use Effect combinators, not try/catch around yield*. Internal optionality uses Option. Do not print credentials, raw payloads, SQL, cursor values or dependency errors.
 
+## Foundation interface handoff
+
+Read `docs/engineering/foundation-handoff.md` for the WO-47 acceptance matrix, request-local `PageContext.search` read bridge and lane/shared-file ownership. General fan-out requires its recorded merged/main-verified gate, not fixture-only success. Production local smoke requires OpenSSL for its disposable certificate and preserves HTTPS through Wrangler's explicit local upstream; it verifies the actual built-Worker agent loop and restart retention without an application bootstrap secret.
+
 ## Delivery
 
 Commit coherent milestones and push regularly. Branches: `8090/<wo-id-or-chat>-<slug>-<six-character-id>`. Conventional Commit/PR titles, with actual `(WO-N)` suffix on PRs. Open a PR, set the order In review, perform agent review/remediation and exact-head CI, merge normally with expected-head guard when permitted, then verify actual-main checks. Never fabricate independent approval, impersonate, use admin bypass or weaken branch protection. Completion requires the order's actual evidence, not just a PR or green status.

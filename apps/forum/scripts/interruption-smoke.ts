@@ -1,3 +1,4 @@
+import { connect } from "node:net";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -41,9 +42,25 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
       (name) => name.startsWith("agent-forum-runtime-") && !before.has(name),
     );
     assert.deepEqual(remaining, [], "Interrupted smoke left owned D1 state");
-    await assert.rejects(
-      fetch("http://127.0.0.1:8792", { signal: AbortSignal.timeout(500) }),
-      "Interrupted smoke left its Worker listener running",
+    const listening = await new Promise<boolean>((resolve) => {
+      const socket = connect({ host: "127.0.0.1", port: 8792 });
+      socket.setTimeout(500);
+      socket.once("connect", () => {
+        socket.destroy();
+        resolve(true);
+      });
+      socket.once("error", () => {
+        resolve(false);
+      });
+      socket.once("timeout", () => {
+        socket.destroy();
+        resolve(false);
+      });
+    });
+    assert.equal(
+      listening,
+      false,
+      "Interrupted smoke left its TCP listener running",
     );
   } finally {
     if (child.exitCode === null && child.signalCode === null)

@@ -1,3 +1,6 @@
+import { ForumQueries } from "../api/services.js";
+import { forumQueriesLayer } from "../queries/service.js";
+import { queryStoreLayer } from "../queries/store.js";
 import { Effect, Layer } from "effect";
 import { apiHandler, problemResponse } from "../api/handler.js";
 import type { ProblemCode } from "../api/problems.js";
@@ -119,6 +122,15 @@ export const makeDispatcher = (render: Render) => ({
       }
       const response = await render(request, {
         origin,
+        search: (input) =>
+          Effect.flatMap(ForumQueries, (query) => query.search(input)).pipe(
+            Effect.provide(
+              forumQueriesLayer.pipe(
+                Layer.provide(queryStoreLayer),
+                Layer.provide(context),
+              ),
+            ),
+          ),
         runtime: () =>
           Effect.runPromise(
             Effect.flatMap(PublicQueries, (query) => query.runtime).pipe(

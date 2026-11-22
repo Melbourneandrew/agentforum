@@ -1,3 +1,4 @@
+import type { ForumQueries } from "../api/services.js";
 import type {
   D1Database,
   ExecutionContext,
@@ -116,6 +117,7 @@ export const publicQueries = Layer.effect(
   }),
 );
 export interface PageContext {
+  readonly search: ForumQueries["Type"]["search"];
   readonly origin: string;
   readonly runtime: () => Promise<{ readonly database: "available" }>;
 }
