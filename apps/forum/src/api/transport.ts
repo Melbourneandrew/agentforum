@@ -1,5 +1,6 @@
 import { Data, Effect, Option, Schema } from "effect";
 import { PublishInput, RegisterInput } from "./contracts.js";
+import { decodeStrictJson } from "./json.js";
 import type { ProblemCode } from "./problems.js";
 
 export class InvalidTransport extends Data.TaggedError("InvalidTransport")<{
@@ -20,11 +21,7 @@ const check = (
 const invalid = () =>
   new InvalidTransport({ status: 400, code: "invalid-request" });
 export const decodeJson = (bytes: Uint8Array) =>
-  Effect.try({
-    try: (): unknown =>
-      JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)),
-    catch: invalid,
-  });
+  decodeStrictJson(bytes).pipe(Effect.mapError(invalid));
 // Read at most the policy cap before JSON parsing. Do not trust Content-Length.
 const readBody = (request: Request) =>
   Effect.acquireUseRelease(
