@@ -142,7 +142,6 @@ describe("strict original-byte transport in native workerd", () => {
   );
 
   it.each([
-    ["register", {}],
     ["publish", { body: "raw Markdown\n😀", tags: [" A ", "a", " A "] }],
     ["search", {}],
     ["search", { resource: "agents" }],
@@ -152,7 +151,7 @@ describe("strict original-byte transport in native workerd", () => {
       const body = JSON.stringify(value);
       for (const request of [get(operation, body), post(operation, body)]) {
         const response = await call(request);
-        expect(response.status).toBe(501);
+        expect(response.status).toBe(operation === "publish" ? 401 : 501);
         expect(response.headers.get("Cache-Control")).toBe("no-store, private");
         expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
         expect(response.headers.has("Access-Control-Allow-Credentials")).toBe(
@@ -168,7 +167,7 @@ describe("strict original-byte transport in native workerd", () => {
     ]) {
       const exact =
         source + " ".repeat(65536 - new TextEncoder().encode(source).length);
-      expect((await call(post("publish", exact))).status).toBe(501);
+      expect((await call(post("publish", exact))).status).toBe(401);
       const rejected = await call(post("publish", exact + " "));
       expect(rejected.status).toBe(413);
       expect(await rejected.text()).toContain("65536");
@@ -181,7 +180,7 @@ describe("strict original-byte transport in native workerd", () => {
       JSON.stringify({ body: "x".repeat(14336 - base + 1) }),
     );
     expect(new TextEncoder().encode(request.url).length).toBe(14336);
-    expect((await call(request)).status).toBe(501);
+    expect((await call(request)).status).toBe(401);
     const response = await call(
       get("publish", JSON.stringify({ body: "x".repeat(14336 - base + 2) })),
     );
@@ -230,7 +229,7 @@ describe("strict original-byte transport in native workerd", () => {
     expect(
       (
         await call(
-          post("register", "{}", {
+          post("search", "{}", {
             "Content-Encoding": "identity",
             "Content-Type": 'application/json; charset="UTF-8"',
             "Content-Length": "999999",

@@ -1,6 +1,7 @@
+import { migrate } from "./d1.js";
 import { env } from "cloudflare:workers";
 import { Effect } from "effect";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   installationOrigin,
   type Bindings,
@@ -25,6 +26,7 @@ const app = makeDispatcher(async (_request, context) => {
   const runtime = await context.runtime();
   return new Response(`${context.origin} ${runtime.database}`);
 });
+beforeAll(() => migrate());
 beforeEach(async () => {
   await Promise.all(pending.splice(0));
 });
@@ -87,12 +89,17 @@ describe("native single-Worker runtime", () => {
           env,
           execution,
         );
-        expect(response.status).toBe(501);
+        expect(response.status).toBe(
+          operation === "register" ? 200 : operation === "publish" ? 401 : 501,
+        );
         expect(response.headers.get("Cache-Control")).toBe("no-store, private");
         expect(response.headers.get("Content-Type")).toBe(
-          "application/problem+json",
+          operation === "register"
+            ? "application/json"
+            : "application/problem+json",
         );
-        expect(await response.text()).toContain("not-implemented");
+        if (operation === "search")
+          expect(await response.text()).toContain("not-implemented");
       }
     expect(renders).toBe(0);
   });
