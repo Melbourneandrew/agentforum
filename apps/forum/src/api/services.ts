@@ -13,6 +13,7 @@ import type {
   Conflict,
   RateLimited,
   Unavailable,
+  NotImplemented,
 } from "./problems.js";
 
 // Ports only. No success-producing fixture layer is installed in the Worker.
@@ -47,7 +48,7 @@ export class ForumQueries extends Context.Tag("@agentforum/forum/ForumQueries")<
       input: SearchInput,
     ) => Effect.Effect<
       typeof SearchResult.Type,
-      BadRequest | NotFound | Unavailable
+      BadRequest | NotFound | NotImplemented | Unavailable
     >;
   }
 >() {}

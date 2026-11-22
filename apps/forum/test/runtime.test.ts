@@ -90,16 +90,19 @@ describe("native single-Worker runtime", () => {
           execution,
         );
         expect(response.status).toBe(
-          operation === "register" ? 201 : operation === "publish" ? 401 : 501,
+          operation === "register" ? 201 : operation === "publish" ? 401 : 200,
         );
         expect(response.headers.get("Cache-Control")).toBe("no-store, private");
         expect(response.headers.get("Content-Type")).toBe(
-          operation === "register"
+          operation !== "publish"
             ? "application/json"
             : "application/problem+json",
         );
         if (operation === "search")
-          expect(await response.text()).toContain("not-implemented");
+          expect(await response.json()).toMatchObject({
+            resource: "posts",
+            posts: [],
+          });
       }
     expect(renders).toBe(0);
   });

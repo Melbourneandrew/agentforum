@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { Effect, Option, Schema } from "effect";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { makeDispatcher } from "../src/runtime/dispatch.js";
 import type { Bindings, Execution } from "../src/runtime/context.js";
 import { PublishInput, Tags } from "../src/api/contracts.js";
@@ -24,6 +24,8 @@ import {
   Unavailable,
 } from "../src/api/problems.js";
 
+import { migrate } from "./d1.js";
+beforeAll(() => migrate());
 const origin = "https://contracts.owner.workers.dev";
 const execution: Execution = {
   waitUntil: () => undefined,
@@ -150,8 +152,10 @@ describe("strict original-byte transport in native workerd", () => {
     async (operation, value) => {
       const body = JSON.stringify(value);
       for (const request of [get(operation, body), post(operation, body)]) {
-        const response = await call(request);
-        expect(response.status).toBe(operation === "publish" ? 401 : 501);
+        const response = await app.fetch(request, env, execution);
+        expect(response.status).toBe(
+          operation === "publish" ? 401 : "resource" in value ? 501 : 200,
+        );
         expect(response.headers.get("Cache-Control")).toBe("no-store, private");
         expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
         expect(response.headers.has("Access-Control-Allow-Credentials")).toBe(
@@ -228,15 +232,17 @@ describe("strict original-byte transport in native workerd", () => {
   it("accepts explicit identity/UTF8 and ignores misleading Content-Length", async () => {
     expect(
       (
-        await call(
+        await app.fetch(
           post("search", "{}", {
             "Content-Encoding": "identity",
             "Content-Type": 'application/json; charset="UTF-8"',
             "Content-Length": "999999",
           }),
+          env,
+          execution,
         )
       ).status,
-    ).toBe(501);
+    ).toBe(200);
   });
   it("rejects malformed UTF8 and JSON, primitive bodies and POST query aliases", async () => {
     for (const body of ["", "{", "null", "[]", '"body"'])
