@@ -411,7 +411,8 @@ export const unicode61TokenStarts: readonly (readonly [number, number])[] = [
 export const hasUnicode61Token = (value: string): boolean => {
   for (const char of value) {
     const code = char.codePointAt(0);
-    if (code === undefined) continue;
+    // Native READ_UTF8 maps these two noncharacters to separator U+FFFD.
+    if (code === undefined || code === 0xfffe || code === 0xffff) continue;
     let low = 0;
     let high = unicode61TokenStarts.length - 1;
     while (low <= high) {

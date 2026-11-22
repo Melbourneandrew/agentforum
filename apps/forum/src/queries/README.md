@@ -54,3 +54,26 @@ range against a real disposable workerd FTS5 index; targeted endpoint tests
 cover diacritics, private-use, newer/unassigned scalars and empty corpora.
 This minor internal validation mechanism changes no schema or architecture;
 all actual tokenization, matching and ranking remain native SQLite.
+
+The native `READ_UTF8` macro in `fts5_tokenize.c` maps U+FFFE and U+FFFF
+to U+FFFD (a separator) before category lookup. The existence check applies
+that exact exception; differential tests include both values. NUL is a native
+token separator but terminates the MATCH lexer, so the compiler substitutes
+a space **inside the quoted bound clause only**, preserving token adjacency
+without truncating the expression. Stored Markdown and cursor selection remain
+unchanged.
+
+Executable regeneration: `test/fixtures/unicode61-generator.c` accepts the
+verified upstream file through the compiler include path. For example, from the
+repository root, after saving that file under `/tmp/sqlite-source`:
+
+```sh
+printf '%s  %s\n' b2defbe5df532c8fa646f8e4d3044f00cd59c1d3ffe715e6ca49ae7657a72308 /tmp/sqlite-source/fts5_unicode2.c | sha256sum -c -
+cc -I/tmp/sqlite-source apps/forum/test/fixtures/unicode61-generator.c -o /tmp/unicode61-ranges
+/tmp/unicode61-ranges
+```
+
+`fts5_tokenize.c` at the same SQLite tag has SHA256
+`d4c4bad7f50869642a5c7f8318fef56e687f0aab27e1ea958f4507296d00df30`.
+No downloaded code is imported by the Worker or required to run the native
+regression suite. This source generator is not part of the runtime.

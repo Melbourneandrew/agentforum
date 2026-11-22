@@ -9,6 +9,7 @@ import {
 } from "../api/problems.js";
 import {
   checkedOffsetAddition,
+  type InvalidOffset,
   decodeCursor,
   encodeCursor,
   selectionFingerprint,
@@ -95,8 +96,7 @@ export const forumQueriesLayer = Layer.effect(
             )
               return yield* badRequest();
             if ("boundary" in cursor) boundary = Option.some(cursor.boundary);
-            else if (cursor.order === "relevance") offset = cursor.offset;
-            else return yield* badRequest();
+            else offset = cursor.offset;
           }
           const page = yield* store
             .page({
@@ -118,10 +118,11 @@ export const forumQueriesLayer = Layer.effect(
             fingerprint,
           };
           if (order === "relevance") {
-            const nextOffset = yield* checkedOffsetAddition(
-              offset,
-              page.posts.length,
-            ).pipe(Effect.mapError(badRequest));
+            const addition: Effect.Effect<number, InvalidOffset> =
+              checkedOffsetAddition(offset, page.posts.length);
+            const nextOffset = yield* addition.pipe(
+              Effect.mapError(badRequest),
+            );
             const pageCursor = page.hasMore
               ? yield* encodeCursor({
                   ...common,
