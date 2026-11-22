@@ -8,12 +8,14 @@ import {
   problemCatalog,
 } from "../api/problems.js";
 import {
+  checkedOffsetAddition,
   decodeCursor,
   encodeCursor,
   selectionFingerprint,
   type SearchInput,
 } from "../api/query.js";
 import { RequestContext } from "../runtime/context.js";
+import { compileTextQuery } from "./text.js";
 import { QueryStore, type ChronologicalSelection } from "./store.js";
 
 export const forumQueriesLayer = Layer.effect(
@@ -40,13 +42,7 @@ export const forumQueriesLayer = Layer.effect(
     return {
       search: (input: SearchInput) =>
         Effect.gen(function* () {
-          if (
-            input.resource === "agents" ||
-            (!("id" in input) &&
-              (input.tags.length > 0 ||
-                Option.isSome(input.q) ||
-                input.order === "relevance"))
-          )
+          if (input.resource === "agents")
             return yield* new NotImplemented({
               ...fields("not-implemented"),
               status: 501,
@@ -66,15 +62,26 @@ export const forumQueriesLayer = Layer.effect(
               post: { ...value, reply_to: Option.getOrNull(parentId) },
             };
           }
+          const match = yield* Option.match(input.q, {
+            onNone: () => Effect.succeed(Option.none<string>()),
+            onSome: (q) =>
+              compileTextQuery(q).pipe(
+                Effect.map(Option.some),
+                Effect.mapError(badRequest),
+              ),
+          });
           const fingerprint = yield* selectionFingerprint(input).pipe(
             Effect.mapError(unavailable),
           );
           const read = input.readCursor;
           const token = Option.orElse(input.pageCursor, () => read);
           const order =
-            Option.isSome(read) || input.order === "oldest"
-              ? "oldest"
-              : "newest";
+            input.order === "relevance"
+              ? "relevance"
+              : Option.isSome(read) || input.order === "oldest"
+                ? "oldest"
+                : "newest";
+          let offset = 0;
           let boundary: ChronologicalSelection["boundary"] = Option.none();
           if (Option.isSome(token)) {
             const cursor = yield* decodeCursor(token.value).pipe(
@@ -82,13 +89,14 @@ export const forumQueriesLayer = Layer.effect(
             );
             if (
               cursor.resource !== "posts" ||
-              !("boundary" in cursor) ||
               cursor.fingerprint !== fingerprint ||
               cursor.purpose !== (Option.isSome(read) ? "read" : "page") ||
               cursor.order !== order
             )
               return yield* badRequest();
-            boundary = Option.some(cursor.boundary);
+            if ("boundary" in cursor) boundary = Option.some(cursor.boundary);
+            else if (cursor.order === "relevance") offset = cursor.offset;
+            else return yield* badRequest();
           }
           const page = yield* store
             .page({
@@ -97,6 +105,10 @@ export const forumQueriesLayer = Layer.effect(
               order,
               limit: input.limit,
               boundary,
+              tags: input.tags,
+              tagMatch: input.tagMatch,
+              match,
+              offset,
             })
             .pipe(Effect.mapError(unavailable));
           const common = {
@@ -105,6 +117,28 @@ export const forumQueriesLayer = Layer.effect(
             resource: "posts" as const,
             fingerprint,
           };
+          if (order === "relevance") {
+            const nextOffset = yield* checkedOffsetAddition(
+              offset,
+              page.posts.length,
+            ).pipe(Effect.mapError(badRequest));
+            const pageCursor = page.hasMore
+              ? yield* encodeCursor({
+                  ...common,
+                  purpose: "page",
+                  order: "relevance",
+                  offset: nextOffset,
+                }).pipe(Effect.mapError(unavailable))
+              : null;
+            return {
+              resource: "posts" as const,
+              posts: page.posts.map(({ parentId, ...post }) => ({
+                ...post,
+                reply_to: Option.getOrNull(parentId),
+              })),
+              pageCursor,
+            };
+          }
           const last = Option.fromNullable(page.posts.at(-1));
           const greatest =
             order === "newest" ? Option.fromNullable(page.posts[0]) : last;

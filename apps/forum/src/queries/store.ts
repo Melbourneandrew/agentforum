@@ -23,14 +23,18 @@ const TagRow = Schema.Struct({ postId: Nano21, tag: Tag });
 export interface ChronologicalSelection {
   readonly author: Option.Option<string>;
   readonly parent: Option.Option<string>;
-  readonly order: "newest" | "oldest";
+  readonly order: "newest" | "oldest" | "relevance";
+  readonly tags?: readonly string[];
+  readonly tagMatch?: "all" | "any";
+  readonly match?: Option.Option<string>;
+  readonly offset?: number;
   readonly limit: number;
   readonly boundary: Option.Option<
     | { readonly sequence: string; readonly id: string }
     | { readonly sequence: "0" }
   >;
 }
-const projection = `id,author_id AS authorId,parent_id AS parentId,body,
+const projection = `posts.id,author_id AS authorId,parent_id AS parentId,posts.body,
   CAST(publication_order AS TEXT) AS publicationOrder,published_at AS publishedAt`;
 
 /** Request-local direct D1 adapter. Two bounded reads, not N+1 per Post. */
@@ -96,6 +100,27 @@ export const makeQueryStore = (db: D1Database) => {
           conditions.push("parent_id=?");
           values.push(input.parent.value);
         }
+        const tags = [...new Set(input.tags ?? [])];
+        if (tags.length > 0) {
+          if (input.tagMatch === "any") {
+            conditions.push(
+              `EXISTS (SELECT 1 FROM post_tags WHERE post_id=posts.id AND tag COLLATE BINARY IN (${tags.map(() => "?").join(",")}))`,
+            );
+            values.push(...tags);
+          } else {
+            for (const tag of tags) {
+              conditions.push(
+                "EXISTS (SELECT 1 FROM post_tags WHERE post_id=posts.id AND tag COLLATE BINARY=?)",
+              );
+              values.push(tag);
+            }
+          }
+        }
+        const match = input.match ?? Option.none();
+        if (Option.isSome(match)) {
+          conditions.push("post_fts MATCH ?");
+          values.push(match.value);
+        }
         const ascending = input.order === "oldest";
         if (Option.isSome(input.boundary) && "id" in input.boundary.value) {
           const boundary = input.boundary.value;
@@ -106,10 +131,15 @@ export const makeQueryStore = (db: D1Database) => {
           values.push(boundary.sequence, boundary.sequence, boundary.id);
         }
         const direction = ascending ? "ASC" : "DESC";
+        const relevance = input.order === "relevance";
+        const ordering = relevance
+          ? "bm25(post_fts) ASC,publication_order DESC,posts.id COLLATE BINARY ASC"
+          : `publication_order ${direction},posts.id COLLATE BINARY ${direction}`;
         values.push(input.limit + 1);
+        if (relevance) values.push(input.offset ?? 0);
         // Only fixed SQL fragments interpolate. All request values are bindings.
         const selected = yield* rows(
-          `SELECT ${projection} FROM posts ${conditions.length ? "WHERE " + conditions.join(" AND ") : ""} ORDER BY publication_order ${direction},id COLLATE BINARY ${direction} LIMIT ?`,
+          `SELECT ${projection} FROM posts ${Option.isSome(match) ? "JOIN post_fts ON post_fts.rowid=posts.publication_order" : ""} ${conditions.length ? "WHERE " + conditions.join(" AND ") : ""} ORDER BY ${ordering} LIMIT ? ${relevance ? "OFFSET ?" : ""}`,
           values,
         );
         const posts = yield* hydrate(selected.slice(0, input.limit));
