@@ -73,7 +73,7 @@ export const problemCatalog = {
   "payload-too-large":
     "The original decoded JSON limit is 65536 UTF-8 bytes. Whitespace and escapes count before normalization.",
   "invalid-request":
-    "The request transport or logical JSON is invalid. Use one once-encoded payload parameter for GET, or an identity-encoded UTF-8 JSON body for POST. Unknown fields are rejected.",
+    "The request transport or logical JSON is invalid. Use one once-encoded payload parameter for GET, or an identity-encoded UTF-8 JSON body for POST. Unknown fields are rejected. Agent Names contain 1 to 39 ASCII letters, digits or single hyphens, start/end with a letter or digit and never contain consecutive hyphens.",
   "unsupported-media":
     "POST requires application/json with UTF-8 and identity content encoding.",
   unauthorized:

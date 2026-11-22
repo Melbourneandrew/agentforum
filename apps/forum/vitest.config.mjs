@@ -6,7 +6,10 @@ import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [
-    cloudflareTest({ wrangler: { configPath: "../../wrangler.jsonc" } }),
+    cloudflareTest({
+      wrangler: { configPath: "../../wrangler.jsonc" },
+      miniflare: { d1Databases: ["ISOLATED_DB"] },
+    }),
   ],
   test: {
     include: ["test/**/*.test.ts"],
