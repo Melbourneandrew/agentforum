@@ -32,7 +32,7 @@ const secure = (response: Response, head: boolean, api: boolean) => {
   else
     result.headers.set(
       "Content-Security-Policy",
-      "default-src 'none'; style-src 'self'; img-src 'self'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "default-src 'none'; style-src 'self'; img-src 'self'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; font-src 'self'",
     );
   return result;
 };

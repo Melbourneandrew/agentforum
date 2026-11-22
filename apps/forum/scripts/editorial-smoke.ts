@@ -31,6 +31,13 @@ try {
     .getAttribute("href");
   assert.ok(css);
   const policy = response.headers()["content-security-policy"] ?? "";
+  const expectedPolicy =
+    "default-src 'none'; style-src 'self'; img-src 'self'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; font-src 'self'";
+  assert.equal(
+    policy,
+    expectedPolicy,
+    "SSR CSP must retain all restrictions plus only self-hosted fonts",
+  );
   let actualFontLoaded = false;
   for (const [name, width] of [
     ["desktop", 1280],
@@ -43,6 +50,10 @@ try {
     await page.evaluate(() => document.fonts.ready);
     actualFontLoaded = await page.evaluate(() =>
       document.fonts.check('16px "Libre Franklin"'),
+    );
+    assert.ok(
+      actualFontLoaded,
+      `Actual-app local font must load at ${String(width)} CSS px`,
     );
     assert.equal(
       await page
@@ -254,12 +265,18 @@ try {
     "libre-franklin-variable-italic.ttf",
     "OFL.txt",
   ]) {
-    assert.equal((await fetch(`${origin}/fonts/${asset}`)).status, 200);
+    const response = await fetch(`${origin}/fonts/${asset}`);
+    assert.equal(response.status, 200);
+    assert.equal(
+      response.headers.get("Content-Security-Policy"),
+      expectedPolicy,
+      "Static CSP must retain all restrictions plus only self-hosted fonts",
+    );
   }
   console.log(`Evidence: ${evidence}`);
   assert.ok(
     actualFontLoaded,
-    `Real-app Libre Franklin blocked. Parent CSP integration required; policy: ${policy}`,
+    `Real-app Libre Franklin failed to load under policy: ${policy}`,
   );
   console.log("PASS actual app local fonts without external requests");
   await context.close();

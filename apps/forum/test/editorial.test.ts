@@ -1,3 +1,5 @@
+import { env } from "cloudflare:workers";
+import { makeDispatcher } from "../src/runtime/dispatch.js";
 import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -10,6 +12,27 @@ import {
 } from "../app/presentation/editorial";
 
 describe("shared editorial presentation", () => {
+  it("allows only same-origin fonts while retaining every existing SSR CSP directive", async () => {
+    const app = makeDispatcher(() =>
+      Promise.resolve(new Response("Editorial shell")),
+    );
+    const response = await app.fetch(
+      new Request("https://fonts.owner.workers.dev/", {
+        headers: { "Cache-Control": "no-cache" },
+      }),
+      env,
+      {
+        waitUntil: () => undefined,
+        passThroughOnException: () => undefined,
+        props: {},
+      },
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Security-Policy")).toBe(
+      "default-src 'none'; style-src 'self'; img-src 'self'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; font-src 'self'",
+    );
+    expect(response.headers.has("Access-Control-Allow-Origin")).toBe(false);
+  });
   it("keeps unfinished navigation inert and existing docs local", () => {
     const html = renderToStaticMarkup(
       h(EditorialShell, { children: h("main", null, "Foundation") }),

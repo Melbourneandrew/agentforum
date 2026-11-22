@@ -58,12 +58,12 @@ SHA-256:
 - `libre-franklin-variable-italic.ttf`: `b8d2f40203bd4d90fe3e805953d9b79d62a6486db756d984b0d8ef4435b367ba`
 - `OFL.txt`: `2710268527181a27b8e938617551bae29e714e6525247be6679bf897a9942a60`
 
-**Parent integration required:** the base runtime CSP and static `_headers`
-currently have `default-src 'none'` without `font-src`. The integration owner
-must add **only `font-src 'self'`** to both policies in
-`src/runtime/dispatch.ts` and `public/_headers`. Do not relax script, form,
-mutation, framing or renderer protections. WO-48 does not own the dispatcher;
-real-app local-font acceptance remains blocked until this is coordinated.
+**Parent-approved narrow integration:** both `src/runtime/dispatch.ts` and
+`public/_headers` append only `font-src 'self'` to the existing CSP. All other
+directives remain unchanged: scripts/forms/framing stay denied and no external
+font sources or CORS changes are introduced. This resolves the actual-app font
+blocker recorded on the earlier PR head. Parent retains independent review and
+merge coordination; the exception does not expand ownership of either file.
 
 ## Verification and screenshot reproduction
 
@@ -92,6 +92,5 @@ Screenshots default to `/tmp/wo48-evidence` and are not committed build inputs.
 
 `pnpm bundle:smoke` remains the existing production workerd/D1/no-JS regression
 gate. Exact-head CI does not currently invoke the additional editorial script;
-run it explicitly and preserve the result. A passing baseline CI cannot waive
-the CSP/font blocker. WO-36 owns real-data, assembled-page visual acceptance;
+run it explicitly and preserve the result. A passing baseline CI does not substitute for the explicit actual-app font check. WO-36 owns real-data, assembled-page visual acceptance;
 these component fixtures do not establish that acceptance or provider readiness.
