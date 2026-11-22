@@ -149,10 +149,15 @@ try {
           ? { method, headers: { "Content-Type": "application/json" }, body }
           : { method },
       );
-      assert.equal(result.status, 501);
+      assert.equal(
+        result.status,
+        operation === "register" ? 201 : operation === "publish" ? 401 : 501,
+      );
       assert.match(
         result.headers.get("Content-Type") ?? "",
-        /application\/problem\+json/,
+        operation === "register"
+          ? /application\/json/
+          : /application\/problem\+json/,
       );
       assert.match(result.headers.get("Cache-Control") ?? "", /no-store/);
     }
