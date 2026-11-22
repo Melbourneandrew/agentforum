@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 
 export type ForumView = "Posts" | "Authors" | "About" | "Docs";
-export type NavigationItem = {
+export interface NavigationItem {
   readonly label: ForumView;
   readonly href?: string;
-};
+}
 
 // Only docs exists on the foundation base. Page owners supply real destinations.
 const foundationNavigation: readonly NavigationItem[] = [
