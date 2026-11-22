@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,6 +8,13 @@ import { setTimeout } from "node:timers/promises";
 import { gzipSync } from "node:zlib";
 import { chromium } from "playwright";
 import { Schema } from "effect";
+import { Agent, request as httpsRequest } from "node:https";
+import {
+  RegistrationResult,
+  PostResult,
+  PostLookupResult,
+  PostPageResult,
+} from "../src/api/contracts.js";
 
 const files = (await readdir("dist/server", { recursive: true })).filter(
   (path) => /\.m?js$/.test(path),
@@ -32,6 +39,7 @@ const environment = {
   WRANGLER_SEND_METRICS: "false",
 };
 let server: ReturnType<typeof spawn> | undefined;
+let tlsAgent: Agent | undefined;
 let migration: ReturnType<typeof spawn> | undefined;
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 const controller = new AbortController();
@@ -44,6 +52,32 @@ const interrupt = () => {
 process.on("SIGINT", interrupt);
 process.on("SIGTERM", interrupt);
 try {
+  // Ephemeral local transport certificate, never an application setup secret.
+  const key = join(state, "localhost.key");
+  const certificate = join(state, "localhost.crt");
+  execFileSync(
+    "openssl",
+    [
+      "req",
+      "-x509",
+      "-newkey",
+      "rsa:2048",
+      "-nodes",
+      "-keyout",
+      key,
+      "-out",
+      certificate,
+      "-days",
+      "1",
+      "-subj",
+      "/CN=localhost",
+      "-addext",
+      "subjectAltName=IP:127.0.0.1,DNS:localhost",
+    ],
+    { stdio: "ignore" },
+  );
+  const ca = await readFile(certificate);
+  tlsAgent = new Agent({ ca }); // Certificate verification stays enabled.
   migration = spawn(
     "pnpm",
     [
@@ -74,53 +108,67 @@ try {
     migration = undefined;
   }
   controller.signal.throwIfAborted();
-  server = spawn(
-    "pnpm",
-    [
-      "exec",
-      "wrangler",
-      "dev",
-      "--config",
-      "dist/server/wrangler.json",
-      "--local",
-      "--no-bundle",
-      "--persist-to",
-      state,
-      "--inspector-port",
-      "0",
-      "--ip",
-      "127.0.0.1",
-      "--port",
-      "8792",
-    ],
-    { env: environment, detached: true, stdio: ["ignore", "pipe", "pipe"] },
-  );
-  let log = "";
-  server.stdout?.on("data", (chunk: Buffer) => {
-    log += chunk.toString();
-  });
-  server.stderr?.on("data", (chunk: Buffer) => {
-    log += chunk.toString();
-  });
-  const origin = "http://127.0.0.1:8792";
-  let ready = false;
-  for (let i = 0; i < 150; i++) {
-    controller.signal.throwIfAborted();
-    if (server.exitCode !== null)
-      throw new Error(`Production runtime exited: ${log}`);
-    try {
-      if (
-        (await boundedFetch(origin, { signal: AbortSignal.timeout(500) })).ok
-      ) {
-        ready = true;
-        break;
+  const startServer = () =>
+    spawn(
+      "pnpm",
+      [
+        "exec",
+        "wrangler",
+        "dev",
+        "--config",
+        "dist/server/wrangler.json",
+        "--local",
+        "--no-bundle",
+        "--persist-to",
+        state,
+        "--inspector-port",
+        "0",
+        "--ip",
+        "127.0.0.1",
+        "--port",
+        "8792",
+        "--local-protocol",
+        "https",
+        "--local-upstream",
+        "127.0.0.1:8792",
+        "--upstream-protocol",
+        "https",
+        "--https-key-path",
+        key,
+        "--https-cert-path",
+        certificate,
+        "--var",
+        "CANONICAL_ORIGIN:https://127.0.0.1:8792",
+      ],
+      { env: environment, detached: true, stdio: ["ignore", "pipe", "pipe"] },
+    );
+  const origin = "https://127.0.0.1:8792";
+  const waitReady = async (child: ReturnType<typeof spawn>) => {
+    let log = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
+      log += chunk.toString();
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      log += chunk.toString();
+    });
+    for (let i = 0; i < 150; i++) {
+      controller.signal.throwIfAborted();
+      if (child.exitCode !== null)
+        throw new Error(`Production runtime exited: ${log}`);
+      try {
+        if (
+          (await boundedFetch(origin, { signal: AbortSignal.timeout(500) })).ok
+        )
+          return;
+      } catch {
+        /* startup only */
       }
-    } catch {
-      /* startup only */
+      await setTimeout(100);
     }
-    await setTimeout(100);
-  }
-  assert.ok(ready, `Production runtime failed readiness: ${log}`);
+    throw new Error(`Production runtime failed readiness: ${log}`);
+  };
+  server = startServer();
+  await waitReady(server);
   const response = await boundedFetch(origin);
   const html = await response.text();
   assert.match(html, /One installation/);
@@ -170,6 +218,167 @@ try {
     assert.equal(result.status, 204);
     assert.equal(await result.text(), "");
   }
+  const call = (
+    operation: string,
+    input: unknown,
+    method: string,
+    credential?: string,
+  ) => {
+    const body = JSON.stringify(input);
+    return boundedFetch(
+      `${origin}/v1/${operation}` +
+        (method === "GET" ? `?payload=${encodeURIComponent(body)}` : ""),
+      {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          ...(credential ? { Authorization: `Bearer ${credential}` } : {}),
+        },
+        ...(method === "POST" ? { body } : {}),
+      },
+    );
+  };
+  const badShape = () => {
+    throw new Error("Invalid integration response shape");
+  };
+  const retained: {
+    key: string;
+    author: string;
+    postId: string;
+    bookmark: string;
+  }[] = [];
+  for (const method of ["GET", "POST"]) {
+    const registration = await call("register", {}, method);
+    assert.equal(registration.status, 201);
+    const identity = await Schema.decodeUnknownPromise(RegistrationResult)(
+      await registration.json(),
+    ).catch(badShape);
+    const initial = await call("search", { author: identity.id }, method);
+    assert.equal(initial.status, 200);
+    const empty = await Schema.decodeUnknownPromise(PostPageResult)(
+      await initial.json(),
+    ).catch(badShape);
+    assert.equal(empty.posts.length, 0);
+    const body = "---\nnot: metadata\n---\nraw 😀 content";
+    const tags = [" A ", "a", " A ", "x:y/z"];
+    const published = await call(
+      "publish",
+      { body, tags },
+      method,
+      identity.apiKey,
+    );
+    assert.equal(published.status, 201);
+    const post = await Schema.decodeUnknownPromise(PostResult)(
+      await published.json(),
+    ).catch(badShape);
+    assert.ok(
+      post.authorId === identity.id &&
+        post.body === body &&
+        post.tags.join("|") === " A |a|x:y/z",
+      "Publication facts/content changed",
+    );
+    const alternate = method === "GET" ? "POST" : "GET";
+    const lookup = await call("search", { id: post.id }, alternate);
+    assert.equal(lookup.status, 200);
+    const found = await Schema.decodeUnknownPromise(PostLookupResult)(
+      await lookup.json(),
+    ).catch(badShape);
+    assert.ok(
+      JSON.stringify(found.post) === JSON.stringify(post),
+      "Lookup differs from accepted Post",
+    );
+    const replyResponse = await call(
+      "publish",
+      { body: "correction by reply", reply_to: post.id },
+      alternate,
+      identity.apiKey,
+    );
+    assert.equal(replyResponse.status, 201);
+    const reply = await Schema.decodeUnknownPromise(PostResult)(
+      await replyResponse.json(),
+    ).catch(badShape);
+    assert.ok(
+      reply.reply_to === post.id && reply.authorId === identity.id,
+      "Reply attribution failed",
+    );
+    let bookmark = empty.readCursor;
+    for (const expected of [post.id, reply.id]) {
+      const unread = await call(
+        "search",
+        { author: identity.id, readCursor: bookmark, limit: 1 },
+        alternate,
+      );
+      assert.equal(unread.status, 200);
+      const page = await Schema.decodeUnknownPromise(PostPageResult)(
+        await unread.json(),
+      ).catch(badShape);
+      assert.ok(
+        page.posts.length === 1 && page.posts[0]?.id === expected,
+        "Partial unread page skipped/repeated a Post",
+      );
+      bookmark = page.readCursor;
+    }
+    const poll = await call(
+      "search",
+      { author: identity.id, readCursor: bookmark },
+      method,
+    );
+    const polled = await Schema.decodeUnknownPromise(PostPageResult)(
+      await poll.json(),
+    ).catch(badShape);
+    assert.ok(
+      polled.posts.length === 0 && polled.readCursor === bookmark,
+      "Empty poll advanced checkpoint",
+    );
+    const failed = await call(
+      "search",
+      { author: identity.id, readCursor: "invalid!" },
+      method,
+    );
+    assert.equal(failed.status, 400);
+    assert.ok(
+      !(await failed.text()).includes("readCursor"),
+      "Failed read supplied a checkpoint",
+    );
+    retained.push({
+      key: identity.apiKey,
+      author: identity.id,
+      postId: post.id,
+      bookmark,
+    });
+  }
+  await stop(server);
+  tlsAgent.destroy();
+  tlsAgent = new Agent({ ca });
+  server = startServer();
+  await waitReady(server);
+  for (const item of retained) {
+    assert.equal(
+      (await call("search", { id: item.postId }, "GET")).status,
+      200,
+    );
+    assert.equal(
+      (
+        await call(
+          "publish",
+          { body: "retained credential after Worker restart" },
+          "POST",
+          item.key,
+        )
+      ).status,
+      201,
+    );
+    const resumed = await call(
+      "search",
+      { author: item.author, readCursor: item.bookmark },
+      "GET",
+    );
+    const page = await Schema.decodeUnknownPromise(PostPageResult)(
+      await resumed.json(),
+    ).catch(badShape);
+    assert.equal(page.posts.length, 1);
+  }
+  console.log("production_agent_loop_and_restart_passed");
   controller.signal.throwIfAborted();
   browser = await chromium.launch({
     headless: true,
@@ -181,7 +390,10 @@ try {
   try {
     controller.signal.throwIfAborted();
     console.log("production_smoke_browser_started");
-    const context = await browser.newContext({ javaScriptEnabled: false });
+    const context = await browser.newContext({
+      javaScriptEnabled: false,
+      ignoreHTTPSErrors: true,
+    });
     const page = await context.newPage();
     await page.goto(origin);
     assert.match(
@@ -209,6 +421,7 @@ try {
       await stop(server);
     }
   } finally {
+    tlsAgent?.destroy();
     await rm(state, { recursive: true, force: true });
     process.off("SIGINT", interrupt);
     process.off("SIGTERM", interrupt);
@@ -245,13 +458,59 @@ async function stop(child: ReturnType<typeof spawn> | undefined) {
   signal("SIGKILL");
 }
 
-function boundedFetch(input: string | URL, init?: RequestInit) {
-  return fetch(input, {
-    ...init,
-    signal: AbortSignal.any([
-      controller.signal,
-      AbortSignal.timeout(5_000),
-      ...(init?.signal ? [init.signal] : []),
-    ]),
+async function boundedFetch(
+  input: string | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const signal = AbortSignal.any([
+    controller.signal,
+    AbortSignal.timeout(5_000),
+    ...(init?.signal ? [init.signal] : []),
+  ]);
+  const url = new URL(input);
+  if (url.protocol !== "https:") return fetch(url, { ...init, signal });
+  if (!tlsAgent || (init?.body !== undefined && typeof init.body !== "string"))
+    throw new Error("Invalid local TLS request");
+  return new Promise((resolve, reject) => {
+    const request = httpsRequest(
+      url,
+      {
+        agent: tlsAgent,
+        signal,
+        method: init?.method ?? "GET",
+        headers: Object.fromEntries(new Headers(init?.headers)),
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        let bytes = 0;
+        response.on("data", (chunk: Buffer) => {
+          bytes += chunk.length;
+          if (bytes > 16 * 1024 * 1024) {
+            request.destroy(new Error("Local response exceeds bound"));
+            return;
+          }
+          chunks.push(chunk);
+        });
+        response.on("error", reject);
+        response.on("end", () => {
+          const headers = new Headers();
+          for (const [name, value] of Object.entries(response.headers))
+            if (value !== undefined)
+              for (const entry of Array.isArray(value) ? value : [value])
+                headers.append(name, entry);
+          const status = response.statusCode ?? 500;
+          resolve(
+            new Response(
+              status === 204 || init?.method === "HEAD"
+                ? null
+                : Buffer.concat(chunks).toString("utf8"),
+              { status, headers },
+            ),
+          );
+        });
+      },
+    );
+    request.on("error", reject);
+    request.end(init?.body);
   });
 }
