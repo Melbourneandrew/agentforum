@@ -8,7 +8,11 @@ const DisabledChannel = Schema.Struct({
   enabled: Schema.optional(Schema.Literal(false)),
   invocation_logs: Schema.optional(Schema.Literal(false)),
   persist: Schema.optional(Schema.Literal(false)),
-  destinations: Schema.optional(Schema.Array(Schema.Never)),
+  destinations: Schema.optional(
+    Schema.Array(Schema.Unknown).pipe(
+      Schema.filter((values) => values.length === 0),
+    ),
+  ),
 });
 const CaptureConfig = Schema.Struct({
   observability: Schema.Struct({
@@ -18,13 +22,21 @@ const CaptureConfig = Schema.Struct({
     issues: Schema.optional(Schema.Struct({ enabled: Schema.Literal(false) })),
   }),
   secrets: Schema.Struct({
-    required: Schema.Array(Schema.Never),
+    required: Schema.Array(Schema.Unknown).pipe(
+      Schema.filter((values) => values.length === 0),
+    ),
   }),
-  tail_consumers: Schema.optional(Schema.Array(Schema.Never)),
+  tail_consumers: Schema.optional(
+    Schema.Array(Schema.Unknown).pipe(
+      Schema.filter((values) => values.length === 0),
+    ),
+  ),
   logpush: Schema.optional(Schema.Literal(false)),
   // No environment overrides exist on this base. Review added envs explicitly.
   env: Schema.optional(
-    Schema.Record({ key: Schema.String, value: Schema.Never }),
+    Schema.Record({ key: Schema.String, value: Schema.Unknown }).pipe(
+      Schema.filter((values) => Object.keys(values).length === 0),
+    ),
   ),
 });
 const safe = { observability: { enabled: false }, secrets: { required: [] } };
