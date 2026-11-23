@@ -1,8 +1,11 @@
-// Actual built local Worker only. This independent check never sends a business
-// GET/POST, nor claims proposal-pending origin-aware routes are live.
+// Actual built local Worker only. Never send a business GET/POST.
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import {
+  discoveryPaths,
+  discoveryResponse,
+} from "../src/discovery/responses.js";
 import { discoveryRoot } from "./discovery.js";
 
 const origin = process.env.DISCOVERY_ORIGIN ?? "http://127.0.0.1:8795";
@@ -64,18 +67,42 @@ for (const path of ["/v1/register", "/v1/publish", "/v1/search"])
     assert.equal(response.status, 204, `${method} ${path}`);
     assert.equal(await response.text(), "");
   }
-for (const path of ["/docs/publication/", "/docs/retrieval/"]) {
+// All four origin-aware descriptions: compare exact pure-source output; never
+// issue GET/POST to business paths while checking the machine asset inventory.
+for (const path of discoveryPaths) {
   const response = await request(path);
   assert.equal(response.status, 200, path);
-  assert.ok(response.headers.get("Content-Type")?.includes("text/html"));
-  assert.ok((await response.text()).includes("/docs/openapi.json"));
+  const expected = discoveryResponse(path, origin);
+  assert.equal(
+    response.headers.get("Content-Type"),
+    expected.headers.get("Content-Type"),
+  );
+  assert.equal(response.headers.get("Link"), expected.headers.get("Link"));
+  assert.equal(await response.text(), await expected.text());
+  const head = await request(path, "HEAD");
+  assert.equal(head.status, path === "/v1" ? 204 : 200);
+  assert.equal(await head.text(), "");
+  if (path === "/.well-known/api-catalog")
+    assert.equal(head.headers.get("Link"), response.headers.get("Link"));
+  const options = await request(path, "OPTIONS");
+  assert.equal(options.status, 204);
+  assert.equal(await options.text(), "");
+  const hostile = await fetch(
+    origin + path + "?origin=evil.invalid&apiKey=synthetic-sensitive",
+    {
+      headers: {
+        "X-Forwarded-Host": "evil.invalid",
+        Cookie: "synthetic-sensitive",
+        Authorization: "Bearer synthetic-sensitive",
+      },
+    },
+  );
+  assert.equal(hostile.status, 200);
+  const text = await hostile.text();
+  assert.ok(
+    !text.includes("evil.invalid") && !text.includes("synthetic-sensitive"),
+  );
 }
-for (const path of ["/v1/register", "/v1/publish", "/v1/search"])
-  for (const method of ["HEAD", "OPTIONS"]) {
-    const response = await request(path, method);
-    assert.equal(response.status, 204);
-    assert.equal(await response.text(), "");
-  }
 console.log(
-  "Actual built-Worker static discovery passed: unauthenticated GET bytes/content types/parity, HEAD/OPTIONS and missing assets; no business GET/POST requests sent. Source-generated schema links have matching local docs destinations; dynamic discovery registration awaits verified WO-35 main proof and refresh.",
+  "Actual built-Worker discovery passed: exact static and origin-aware representations, guide parity/Skill, source-generated schema/public docs, formats/types, local links, safe methods, hostile caller nonreflection and missing assets; no business GET/POST requests sent.",
 );

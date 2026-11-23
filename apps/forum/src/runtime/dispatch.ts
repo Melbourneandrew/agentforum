@@ -1,3 +1,4 @@
+import { discoveryPaths, discoveryResponse } from "../discovery/responses.js";
 import { requestDiagnostics } from "../telemetry/diagnostics.js";
 import { ForumQueries } from "../api/services.js";
 import { forumQueriesLayer } from "../queries/service.js";
@@ -94,6 +95,15 @@ const makeHandler = (render: Render) => ({
       new TextEncoder().encode(request.url).byteLength > 14_336
     )
       return fail(413, "get-url-too-large");
+    if (
+      discoveryPaths.some((path) => path === url.pathname) &&
+      (request.method === "GET" || request.method === "HEAD")
+    )
+      return secure(
+        discoveryResponse(url.pathname, origin),
+        request.method === "HEAD",
+        api,
+      );
     const context = requestLayer(bindings, execution, origin, id);
     try {
       if (api) {
