@@ -11,9 +11,11 @@ import { Schema } from "effect";
 import { Agent, request as httpsRequest } from "node:https";
 import {
   RegistrationResult,
+  AgentLookupResult,
   PostResult,
   PostLookupResult,
   PostPageResult,
+  RelevancePageResult,
 } from "../src/api/contracts.js";
 
 const files = (await readdir("dist/server", { recursive: true })).filter(
@@ -253,14 +255,44 @@ try {
     const identity = await Schema.decodeUnknownPromise(RegistrationResult)(
       await registration.json(),
     ).catch(badShape);
+    const directoryResponse = await call(
+      "search",
+      { resource: "agents", name: identity.name.toLowerCase() },
+      method,
+    );
+    assert.equal(directoryResponse.status, 200);
+    const directory = await Schema.decodeUnknownPromise(AgentLookupResult)(
+      await directoryResponse.json(),
+      { onExcessProperty: "error" },
+    ).catch(badShape);
+    assert.ok(
+      directory.agent.name === identity.name &&
+        directory.agent.latestPublishingTime === null &&
+        directory.agent.posts.author === identity.id,
+      "Directory identity/privacy contract changed",
+    );
     const initial = await call("search", { author: identity.id }, method);
     assert.equal(initial.status, 200);
     const empty = await Schema.decodeUnknownPromise(PostPageResult)(
       await initial.json(),
     ).catch(badShape);
     assert.equal(empty.posts.length, 0);
-    const body = "---\nnot: metadata\n---\nraw 😀 content";
-    const tags = [" A ", "a", " A ", "x:y/z"];
+    const filter = {
+      author: identity.id,
+      tags: [" A ", "nul\0tag"],
+      q: "raw content",
+    };
+    const selected = async (selection: object) => {
+      const response = await call("search", selection, method);
+      assert.equal(response.status, 200);
+      return Schema.decodeUnknownPromise(PostPageResult)(
+        await response.json(),
+      ).catch(badShape);
+    };
+    const waiting = await selected(filter);
+    assert.equal(waiting.posts.length, 0);
+    const body = "---\nnot: metadata\n---\nraw 😀 content\0tailword";
+    const tags = [" A ", "a", " A ", "x:y/z", "nul\0tag"];
     const published = await call(
       "publish",
       { body, tags },
@@ -274,7 +306,7 @@ try {
     assert.ok(
       post.authorId === identity.id &&
         post.body === body &&
-        post.tags.join("|") === " A |a|x:y/z",
+        post.tags.join("|") === " A |a|x:y/z|nul\0tag",
       "Publication facts/content changed",
     );
     const alternate = method === "GET" ? "POST" : "GET";
@@ -289,7 +321,11 @@ try {
     );
     const replyResponse = await call(
       "publish",
-      { body: "correction by reply", reply_to: post.id },
+      {
+        body: "raw content correction by reply",
+        tags: filter.tags,
+        reply_to: post.id,
+      },
       alternate,
       identity.apiKey,
     );
@@ -301,6 +337,61 @@ try {
       reply.reply_to === post.id && reply.authorId === identity.id,
       "Reply attribution failed",
     );
+    let checkpoint = waiting.readCursor;
+    for (const expected of [post.id, reply.id]) {
+      const page = await selected({
+        ...filter,
+        readCursor: checkpoint,
+        limit: 1,
+      });
+      assert.ok(
+        page.posts.length === 1 && page.posts[0]?.id === expected,
+        "Filtered resume skipped/repeated a Post",
+      );
+      checkpoint = page.readCursor;
+    }
+    const settled = await selected({ ...filter, readCursor: checkpoint });
+    assert.ok(
+      settled.posts.length === 0 && settled.readCursor === checkpoint,
+      "Empty filtered poll advanced checkpoint",
+    );
+    const mismatched = await call(
+      "search",
+      { ...filter, readCursor: empty.readCursor },
+      method,
+    );
+    assert.equal(mismatched.status, 400);
+    assert.ok(
+      !(await mismatched.text()).includes("readCursor"),
+      "Failed filtered read supplied a checkpoint",
+    );
+    const relevanceResponse = await call(
+      "search",
+      { ...filter, order: "relevance" },
+      method,
+    );
+    assert.equal(relevanceResponse.status, 200);
+    // Strict decoding must reject even an extra readCursor, not silently strip it.
+    const ranked = await Schema.decodeUnknownPromise(RelevancePageResult)(
+      await relevanceResponse.json(),
+      { onExcessProperty: "error" },
+    ).catch(badShape);
+    const rankedIds = ranked.posts.map((item) => item.id).sort();
+    assert.ok(
+      rankedIds.join() === [post.id, reply.id].sort().join(),
+      "Relevance selection changed",
+    );
+    for (const probe of [
+      { input: { ...filter, q: '"content\0tailword"' }, count: 1 },
+      { input: { ...filter, q: '"content\0unpublished"' }, count: 0 },
+      { input: { ...filter, tags: ["nul"] }, count: 0 },
+    ]) {
+      const page = await selected(probe.input);
+      assert.ok(
+        page.posts.length === probe.count,
+        "NUL MATCH/Tag selection changed",
+      );
+    }
     let bookmark = empty.readCursor;
     for (const expected of [post.id, reply.id]) {
       const unread = await call(
@@ -347,6 +438,7 @@ try {
       bookmark,
     });
   }
+  console.log("production_fts_filters_nul_checkpoints_get_post_passed");
   await stop(server);
   tlsAgent.destroy();
   tlsAgent = new Agent({ ca });

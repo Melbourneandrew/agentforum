@@ -241,7 +241,10 @@ export const encodeCursor = (input: CursorEnvelope) =>
       () => new InvalidCursor(),
     ),
   );
-export const checkedOffsetAddition = (offset: number, returned: number) =>
+export const checkedOffsetAddition = (
+  offset: number,
+  returned: number,
+): Effect.Effect<number, InvalidOffset> =>
   Number.isSafeInteger(offset) &&
   offset >= 0 &&
   Number.isSafeInteger(returned) &&
