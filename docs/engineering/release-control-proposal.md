@@ -213,12 +213,13 @@ Proposed touch points, only after parent/35 approval:
   `makeDispatcher`, default NONE; forward to `requestDiagnostics`. No route,
   request-layer, correlation, authentication or capture changes.
 - `apps/forum/src/worker.ts` + bounded build-composition hook in
-  `apps/forum/vite.config.ts`: consume a build-embedded allowlisted value supplied
+  `apps/forum/vite.config.mjs`: consume a build-embedded allowlisted value supplied
   only by the authorized delivery builder. Proposed virtual module
   `virtual:agentforum/deployment`; ordinary/unauthorized builds embed NONE.
   The build hook receives explicit validated nonsecret build context from that
   builder, NOT an inferred host, Request, binding, CI flag or ambient credential.
-  Exact context transport is part of this still-unimplemented builder seam; do
+  The corresponding new virtual-module TypeScript declaration is also a proposed
+  shared hunk, not an existing interface. Exact context transport is part of this still-unimplemented builder seam; do
   not silently invent a provider handoff or admit arbitrary input JSON as trusted.
 - Focused telemetry/composition tests: hostile headers/hosts/bindings/caller fields
   cannot inject/override the pair; malformed/partial metadata -> NONE; valid
