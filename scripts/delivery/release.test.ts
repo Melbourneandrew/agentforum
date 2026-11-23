@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Effect, Either, Schema } from "effect";
+import { Deferred, Effect, Either, Fiber, Schema } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import { Identity, failure } from "./model.js";
 import {
@@ -314,14 +314,14 @@ const harness = (overrides: Partial<typeof ReleasePorts.Service> = {}) => {
           }),
       }),
   };
-  const run = (value: unknown = request, guard = coordinator) =>
-    outcome(
-      release(value).pipe(
-        Effect.provideService(ReleasePorts, ports),
-        Effect.provideService(ReleaseCoordinator, guard),
-      ),
+  const program = (value: unknown = request, guard = coordinator) =>
+    release(value).pipe(
+      Effect.provideService(ReleasePorts, ports),
+      Effect.provideService(ReleaseCoordinator, guard),
     );
-  return { events, run };
+  const run = (value: unknown = request, guard = coordinator) =>
+    outcome(program(value, guard));
+  return { events, run, program };
 };
 describe("WO-34 fail-closed orchestration contracts (not provider proof)", () => {
   it("does nothing without approved cross-entry serialization", async () => {
@@ -373,6 +373,23 @@ describe("WO-34 fail-closed orchestration contracts (not provider proof)", () =>
       expect(h.events).not.toContain("migrate");
       expect(h.events.at(-1)).toBe("acknowledged");
     }
+  });
+  it("retains ownership when interrupted during a migration", async () => {
+    const events = await Effect.runPromise(
+      Effect.gen(function* () {
+        const entered = yield* Deferred.make<boolean>();
+        const h = harness({
+          migrate: () =>
+            Deferred.succeed(entered, true).pipe(Effect.zipRight(Effect.never)),
+        });
+        const fiber = yield* Effect.fork(h.program());
+        yield* Deferred.await(entered);
+        yield* Fiber.interrupt(fiber);
+        return h.events;
+      }),
+    );
+    expect(events.at(-1)).toBe("uncertain");
+    expect(events).not.toContain("activate");
   });
   it("refuses unqualified rollback without running SQL", async () => {
     const h = harness();
