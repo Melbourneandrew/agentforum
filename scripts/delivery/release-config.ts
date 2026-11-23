@@ -275,7 +275,10 @@ export const prepareTarget = (input: {
           !confined(resolve(base, "../.."), migrations)
         )
           throw new Error("unsafe artifact path");
-        const workerFiles = files(base).filter(
+        const serverFiles = files(base).filter(
+          (path) => path !== resolve(input.builtConfig),
+        );
+        const workerFiles = serverFiles.filter(
           (path) => path.endsWith(".js") || path.endsWith(".mjs"),
         );
         if (
@@ -297,7 +300,7 @@ export const prepareTarget = (input: {
           digest: digest(readFileSync(path)),
         }));
         const fingerprints = [
-          ...workerFiles,
+          ...serverFiles,
           ...files(assets),
           ...migrationFiles,
         ].map((path) => [path, digest(readFileSync(path))]);

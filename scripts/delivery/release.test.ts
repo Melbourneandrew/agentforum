@@ -177,6 +177,16 @@ describe("WO-34 complete built target", () => {
       (await Effect.runPromise(prepareTarget(f.input))).artifact.artifactDigest,
     ).not.toBe(before);
   });
+  it("fingerprints non-JavaScript Worker modules as part of the complete artifact", async () => {
+    const f = fixture();
+    writeFileSync(join(f.server, "template.txt"), "before");
+    const first = await Effect.runPromise(prepareTarget(f.input));
+    writeFileSync(join(f.server, "template.txt"), "after");
+    const second = await Effect.runPromise(prepareTarget(f.input));
+    expect(second.artifact.artifactDigest).not.toBe(
+      first.artifact.artifactDigest,
+    );
+  });
   it("fails closed for authorization, unresolved/conflicting targets and incomplete routing", async () => {
     const f = fixture();
     for (const input of [
