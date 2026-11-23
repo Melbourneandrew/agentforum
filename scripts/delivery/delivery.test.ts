@@ -7,6 +7,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Effect, Either, Option, Schema } from "effect";
@@ -48,6 +49,8 @@ interface Reply {
   readonly result?: unknown;
   readonly raw?: unknown;
   readonly throws?: boolean;
+  readonly text?: string;
+  readonly after?: () => void;
 }
 const subdomain: Reply = {
   method: "GET",
@@ -111,6 +114,9 @@ const fixture = (
       expect(init?.body).toBe(JSON.stringify({ name: request.databaseName }));
     if (reply.throws)
       throw new Error("fixture dependency payload MUST NOT ESCAPE");
+    reply.after?.();
+    if (reply.text !== undefined)
+      return new Response(reply.text, { status: reply.status ?? 200 });
     return await Promise.resolve(
       Response.json(reply.raw ?? { success: true, result: reply.result }, {
         status: reply.status ?? 200,
@@ -289,6 +295,81 @@ describe("authorized CLI with explicit Cloudflare API fixtures (not provider exe
       expect(existsSync(f.path)).toBe(false);
     },
   );
+  it("rejects a non-JSON successful HTTP response without exposing provider output", async () => {
+    const f = fixture([{ ...subdomain, text: "private dependency output" }]);
+    const result = await f.run();
+    expect(errorCode(result)).toBe("provider-invalid-json");
+    expect(JSON.stringify(result)).not.toContain("private dependency output");
+    expect(f.output).toEqual([]);
+  });
+  it.each([401, 403])(
+    "D1 creation denial %i retains intent and is not readiness",
+    async (status) => {
+      const f = fixture([
+        subdomain,
+        missingWorker,
+        {
+          ...create,
+          status,
+          raw: {
+            success: false,
+            errors: [{ message: "untrusted provider body" }],
+          },
+        },
+      ]);
+      expect(errorCode(await f.run())).toBe("provider-denied");
+      expect(f.journal().state).toBe("intent");
+      expect(f.output).toEqual([]);
+      expect(f.transport).toHaveBeenCalledTimes(3);
+    },
+  );
+  it("a denied Worker settings read is not mistaken for a missing Worker", async () => {
+    const f = fixture([subdomain, { ...missingWorker, status: 403 }]);
+    expect(errorCode(await f.run())).toBe("provider-denied");
+    expect(f.transport).toHaveBeenCalledTimes(2);
+    expect(existsSync(f.path)).toBe(false);
+  });
+  it("loss of D1 after retained provisioning never creates replacement storage", async () => {
+    const first = fixture([subdomain, missingWorker, create]);
+    await first.run();
+    const original = readFileSync(first.path, "utf8");
+    const retry = fixture(
+      [subdomain, missingWorker, { ...lookup, status: 404 }],
+      request,
+      first.path,
+    );
+    expect(errorCode(await retry.run())).toBe("provider-http-failure");
+    expect(retry.transport).toHaveBeenCalledTimes(3);
+    expect(readFileSync(first.path, "utf8")).toBe(original);
+    expect(retry.output).toEqual([]);
+  });
+  it("failure recording a returned create identity retains intent and prevents automatic recreation", async () => {
+    const path = join(directory(), "identity.json");
+    const f = fixture(
+      [
+        subdomain,
+        missingWorker,
+        {
+          ...create,
+          after: () => {
+            writeFileSync(`${path}.pending`, "blocked final identity write");
+          },
+        },
+      ],
+      request,
+      path,
+    );
+    expect(errorCode(await f.run())).toBe(
+      "identity-write-failed-retain-journal",
+    );
+    expect(f.journal().state).toBe("intent");
+    expect(f.output).toEqual([]);
+    const retry = fixture([], request, path);
+    expect(errorCode(await retry.run())).toBe(
+      "uncertain-create-requires-explicit-bind",
+    );
+    expect(retry.transport).not.toHaveBeenCalled();
+  });
   it.each([
     { success: false, result: { subdomain: "fixture-owner" } },
     { success: true, result: {} },
@@ -477,5 +558,62 @@ describe("real local identity-file safeguards", () => {
       ),
     );
     expect(Option.isNone(empty)).toBe(true);
+  });
+});
+
+describe("actual CLI executable, local-only paths with explicitly isolated environment", () => {
+  const execute = (args: readonly string[]) =>
+    spawnSync(
+      process.execPath,
+      ["node_modules/tsx/dist/cli.mjs", "scripts/delivery/main.ts", ...args],
+      {
+        cwd: root,
+        encoding: "utf8",
+        timeout: 10_000,
+        // Never inherit real credentials or a provider login directory.
+        env: {
+          PATH: process.env.PATH ?? "",
+          HOME: directory(),
+          CLOUDFLARE_API_TOKEN: "fixture-only-not-a-credential",
+          WRANGLER_SEND_METRICS: "false",
+        },
+      },
+    );
+  it("runs local plan without touching provider/identity even with a fake token supplied", () => {
+    const folder = directory();
+    const path = join(folder, "request.json");
+    writeFileSync(path, JSON.stringify(request));
+    const result = execute(["plan", "--request", path]);
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe("");
+    const output: unknown = JSON.parse(result.stdout);
+    expect(output).toMatchObject({
+      status: "plan-only-not-installed",
+      providerExecution: "not-run",
+    });
+    expect(result.stdout).not.toContain("fixture-only-not-a-credential");
+  });
+  it("missing authorization exits before reading a nonexistent request or attempting provider access", () => {
+    const result = execute([
+      "provision",
+      "--request",
+      "/nonexistent-fixture-request",
+    ]);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    const output: unknown = JSON.parse(result.stderr);
+    expect(output).toMatchObject({
+      status: "not-installed",
+      stage: "authorization",
+      code: "explicit-provider-source-confirmation-required",
+    });
+    expect(result.stderr).not.toContain("fixture-only-not-a-credential");
+  });
+  it("cancellation reports installation not completed and exits unsuccessfully", () => {
+    const result = execute(["--cancel"]);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain('"code":"cancelled"');
+    expect(result.stderr).toContain("Installation not completed");
   });
 });
