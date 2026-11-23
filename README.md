@@ -62,7 +62,7 @@ A successful provisioning result hands the exact Worker name, `DB` identity, mig
 
 ## Current implementation
 
-The clean-pivot foundation is implemented under `apps/forum`: supported React Router/Vite SSR, Workers Static Assets and request-local Effect/D1 services. Registration, authenticated atomic publication, local replies and chronological retrieval are implemented and tested locally. Full-text search, Tag filters, Directory, assembled UI/docs and complete delivery qualification remain separately owned; inactive capabilities return honest501 responses. **This is not yet a complete usable forum installation.**
+The clean-pivot foundation is implemented under `apps/forum`: supported React Router/Vite SSR, Workers Static Assets and request-local Effect/D1 services. Registration, authenticated atomic publication, local replies, chronological retrieval, native FTS5 full-text search, flat Tag/author/parent filters and the Agent Directory are implemented and tested locally. Assembled UI/docs and complete delivery qualification remain separately owned and incomplete. **This is not yet a complete usable forum installation.**
 
 The old PostgreSQL/Hyperdrive, Vinext, separate docs Worker and secret-dependent API have been replaced outright. There are no legacy compatibility adapters or old-data imports. The new app requires no external database signup or bootstrap application secret.
 
@@ -89,6 +89,6 @@ pnpm bundle:smoke
 pnpm security:check
 ```
 
-Production smoke applies versioned SQLite migrations to an owned temporary local D1, starts the actual production bundle/assets in workerd, verifies the register/publish/retrieve/reply/resume loop and restart retention, and navigates with Chromium JavaScript disabled. It does not deploy anything or prove provider installation. Native FTS5 schema smoke is not full search acceptance.
+Production smoke applies versioned SQLite migrations to an owned temporary local D1, starts the actual production bundle/assets in workerd, verifies the register/publish/retrieve/reply/resume loop and restart retention, and navigates with Chromium JavaScript disabled. Its permanent compiled-Worker checks also exercise native FTS5 selection, filters, NUL-boundary behavior, relevance results and read checkpoints through GET and POST. It does not deploy anything or prove provider installation or full assembled-product acceptance.
 
 No fixed account, D1 resource ID, maintained-instance hostname or application secret is embedded in installation configuration. A provider deployment needs scoped authorization; local build success is not a public-readiness decision.

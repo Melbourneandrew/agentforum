@@ -2,7 +2,7 @@
 
 ## Authority and evidence boundary
 
-Base: verified WO-47 main `c2978c67f014447cc6bdf7e57263e62f7344dcb6`, successful main Bootstrap run45084242358. See [foundation handoff](foundation-handoff.md). The current delivery/runtime/harness ADRs and Instance Deployment requirements govern; historical local Codex ownership is retained, not historical Neon/pepper/Hyperdrive instructions.
+Base: verified WO-47 main `c2978c67f014447cc6bdf7e57263e62f7344dcb6`, successful main Bootstrap run45084242358. This component was subsequently refreshed onto the combined WO-38/39 base `022ba1bce8d7d95f3f36ff0ed9843765f530359d`, independently verified with successful actual-main Bootstrap run45092224562 (310 tests). The combined base includes permanent compiled-Worker FTS/filter/NUL/checkpoint GET/POST smoke; final component-head local/CI receipts are recorded on PR #33 and WO-33, not inferred from the base run. See [foundation handoff](foundation-handoff.md). The current delivery/runtime/harness ADRs and Instance Deployment requirements govern; historical local Codex ownership is retained, not historical Neon/pepper/Hyperdrive instructions.
 
 This change owns root README and new `scripts/delivery` modules/tests only. No provider API was invoked for implementation or testing. Explicit local transport fixtures exercise the Cloudflare v4 wire contracts used by pinned Wrangler; they are **not provider permission, provisioning, deployment or readiness evidence**. No account/credential coordination, secret handling/rotation, resource creation, migrations, deployment, workflow activation or public activation has been performed or authorized. WO-35 telemetry/privacy remains outside this lane.
 
