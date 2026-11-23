@@ -193,6 +193,18 @@ const qualify = async () => {
         authorizeTarget: true,
       }),
     );
+    const dictionary = Schema.Record({
+      key: Schema.String,
+      value: Schema.Unknown,
+    });
+    const builtObject = Schema.decodeUnknownSync(dictionary)(raw);
+    const targetObject = Schema.decodeUnknownSync(dictionary)(prepared.target);
+    for (const field of ["observability", "tail_consumers", "logpush"])
+      assert.deepEqual(
+        targetObject[field],
+        builtObject[field],
+        "Built capture policy changed",
+      );
     // Synthetic resolved native config is a LOCAL fixture only. This is not
     // evidence that Builds supplies account/origin/auth or durable ownership.
     step = "native-cli-inputs";
@@ -427,6 +439,33 @@ const qualify = async () => {
         1,
       );
     }
+    step = "accepted-docs32-static-contract";
+    for (const path of ["/docs/", "/docs/llms.txt", "/docs/openapi.json"]) {
+      const response = await localFetch(new URL(path, base), {
+        signal: AbortSignal.timeout(5000),
+      });
+      assert.equal(response.status, 200);
+      const text = await response.text();
+      if (path === "/docs/openapi.json") {
+        const contract = Schema.decodeUnknownSync(
+          Schema.parseJson(
+            Schema.Struct({
+              servers: Schema.Array(
+                Schema.Struct({ url: Schema.Literal("/") }),
+              ),
+            }),
+          ),
+        )(text);
+        assert.ok(contract.servers.length > 0);
+        assert.equal(
+          text,
+          await readFile(
+            resolve("apps/forum/public/docs/openapi.json"),
+            "utf8",
+          ),
+        );
+      }
+    }
     step = "current-scaffold-readiness-rejection";
     const notReady = await Effect.runPromise(
       Effect.either(
@@ -437,7 +476,7 @@ const qualify = async () => {
             artifactDigest: prepared.artifact.artifactDigest,
             version: "local-only-no-provider-version",
           },
-          "/accepted-contract.json",
+          "/docs/openapi.json",
         ).pipe(
           Effect.provideService(ReadinessHttp, {
             request: (request) =>
@@ -477,6 +516,8 @@ const qualify = async () => {
         sourceRevision,
         artifactDigest: prepared.artifact.artifactDigest,
         builtConfig: "apps/forum/dist/server/wrangler.json",
+        capturePolicy: "complete-built-object-preserved",
+        docs32: "actual-static-contract-served",
         nativeCliIdentity: "local-fixture-converged",
         migrations: "real-local-repeat-retained",
         worker: "real-built-worker-restarted",

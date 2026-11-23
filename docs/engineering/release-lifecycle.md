@@ -98,8 +98,10 @@ serialization or Worker upload/recovery.
    existing production smoke. It has **not** been added to Bootstrap. Production
    aliases cannot honestly be supplied as working commands before the production
    entry/ownership mechanism exists.
-4. Full UI/docs/discovery and accepted explicit contract-path/origin finalization
-   interfaces. Basic surface probes are not comprehensive product qualification.
+4. Full UI/root discovery and final origin composition. Merged Docs32 supplies
+   `/docs/openapi.json` (same-origin server `/`) and a separate docs index at
+   `/docs/llms.txt`; neither completes WO30 root discovery or the observation UI.
+   Basic surface probes are not comprehensive product qualification.
 5. Authorized provider install/update/recovery qualification belongs WO-37 and the
    existing provider owner. No provider calls, credentials, remote SQL, resource
    mutation or public activation are authorized by this local entry.
@@ -122,3 +124,16 @@ serialization or Worker upload/recovery.
 Local tests, an open PR, successful Bootstrap and a provider URL each establish
 only their own evidence. None alone means the installation is ready, remotely
 activated, globally serialized, or WO-34/WO-33 complete.
+
+## Parent-reviewed integration base and pending mechanism
+
+WO34 refreshed onto verified main `3e6953f502a9d90c60cf6270fe37081d05f31b28`,
+including Docs32 and WO35. Derived targets preserve the complete current built
+capture object (off/redaction/issues/logs/traces/persist/destinations); no frozen
+older `enabled:false` replacement. The local qualifier serves the actual Docs32
+contract while still requiring unfinished UI/root discovery to fail readiness.
+
+The exact, unapplied control DDL/bootstrap/ownership/quiescence/root-entry test
+proposal and separately gated trusted metadata composition hunk are in
+[the control proposal](release-control-proposal.md). Neither mechanism nor metadata
+is implemented/authorized merely because this component is locally qualified.

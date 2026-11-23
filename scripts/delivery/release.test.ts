@@ -179,6 +179,41 @@ describe("WO-34 complete built target", () => {
       (await Effect.runPromise(prepareTarget(f.input))).artifact.artifactDigest,
     ).not.toBe(before);
   });
+  it("preserves every actual merged WO35 capture field without freezing the older root object", async () => {
+    const f = fixture();
+    const source = Schema.decodeUnknownSync(
+      Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+    )(
+      await Effect.runPromise(
+        decodeConfig(readFileSync("wrangler.jsonc", "utf8")),
+      ),
+    );
+    const raw = {
+      ...f.raw,
+      observability: source.observability,
+      tail_consumers: source.tail_consumers,
+      logpush: source.logpush,
+    };
+    const result = await Effect.runPromise(prepareTarget({ ...f.input, raw }));
+    const target = Schema.decodeUnknownSync(
+      Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+    )(result.target);
+    expect(target.observability).toEqual(source.observability);
+    expect(target.observability).toEqual({
+      enabled: false,
+      redact_query_string: true,
+      issues: { enabled: false },
+      logs: {
+        enabled: false,
+        invocation_logs: false,
+        persist: false,
+        destinations: [],
+      },
+      traces: { enabled: false, persist: false, destinations: [] },
+    });
+    expect(target.tail_consumers).toEqual(source.tail_consumers);
+    expect(target.logpush).toEqual(source.logpush);
+  });
   it("fingerprints non-JavaScript Worker modules as part of the complete artifact", async () => {
     const f = fixture();
     writeFileSync(join(f.server, "template.txt"), "before");
@@ -456,7 +491,7 @@ describe("WO-34 fail-closed orchestration contracts (not provider proof)", () =>
     const program = inspectReadiness(
       artifact,
       { ...artifact, version: "fixture" },
-      "/accepted-contract.json",
+      "/docs/openapi.json",
     ).pipe(
       Effect.provideService(ReadinessHttp, {
         request: (req) =>
@@ -468,5 +503,81 @@ describe("WO-34 fail-closed orchestration contracts (not provider proof)", () =>
     );
     expect(code(await outcome(program))).toBe("incomplete-observation-or-docs");
     expect(seen).toEqual(["/", "/docs/"]);
+  });
+});
+
+// These are contract-probe fixtures, not complete-product/provider acceptance.
+describe("accepted Docs32 OpenAPI origin contract", () => {
+  const actual = Schema.decodeUnknownSync(
+    Schema.parseJson(
+      Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+    ),
+  )(readFileSync("apps/forum/public/docs/openapi.json", "utf8"));
+  const probe = (servers: readonly { url: string }[]) => {
+    const calls: { path: string; method: string }[] = [];
+    const program = inspectReadiness(artifact, {
+      ...artifact,
+      version: "local-contract-probe",
+    }).pipe(
+      Effect.provideService(ReadinessHttp, {
+        request: (request) =>
+          Effect.sync(() => {
+            const path = new URL(request.url).pathname;
+            calls.push({ path, method: request.method });
+            if (path === "/" || path === "/docs/")
+              return new Response("<main>contract probe fixture</main>");
+            if (path === "/llms.txt" || path === "/skill.md")
+              return new Response(
+                `${identity.defaultOrigin}/docs/ ${identity.defaultOrigin}/v1`,
+              );
+            if (path === "/docs/openapi.json")
+              return new Response(JSON.stringify({ ...actual, servers }));
+            if (path === "/v1/search")
+              return new Response(
+                JSON.stringify({ posts: [], readCursor: "fixture-checkpoint" }),
+              );
+            return new Response("", { status: 404 });
+          }),
+      }),
+    );
+    return { program, calls };
+  };
+  for (const url of ["/", identity.defaultOrigin])
+    it(`accepts the same-origin contract server ${url} with read-only probes`, async () => {
+      const h = probe([{ url }]);
+      const result = await Effect.runPromise(h.program);
+      expect(result.checks.contract).toBe(true);
+      expect(h.calls.filter((call) => call.path.startsWith("/v1/"))).toEqual([
+        { path: "/v1/search", method: "GET" },
+        { path: "/v1/search", method: "POST" },
+      ]);
+    });
+  for (const url of [
+    "//foreign.example",
+    "https://foreign.example",
+    `${identity.defaultOrigin}/foreign`,
+    "",
+    `${identity.defaultOrigin}?foreign=1`,
+  ])
+    it(`rejects noncanonical contract server ${url}`, async () => {
+      const h = probe([{ url }]);
+      expect(code(await outcome(h.program))).toBe("contract-origin-mismatch");
+      expect(h.calls.some((call) => call.path.startsWith("/v1/"))).toBe(false);
+    });
+  it("rejects an invented contract path before HTTP", async () => {
+    const h = probe([{ url: "/" }]);
+    const result = await outcome(
+      inspectReadiness(
+        artifact,
+        { ...artifact, version: "fixture" },
+        "/invented.json",
+      ).pipe(
+        Effect.provideService(ReadinessHttp, {
+          request: () => Effect.die("must not access HTTP"),
+        }),
+      ),
+    );
+    expect(code(result)).toBe("unsupported-contract-path");
+    expect(h.calls).toEqual([]);
   });
 });

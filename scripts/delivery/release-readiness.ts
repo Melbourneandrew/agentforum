@@ -12,17 +12,18 @@ export class ReadinessHttp extends Context.Tag("delivery/ReadinessHttp")<
     ) => Effect.Effect<Response, DeliveryError>;
   }
 >() {}
-// Contract location is explicit input from the accepted docs/build interface;
-// this module does not invent a new public route or discovery endpoint.
+// Accepted Docs32 static contract. The documentation index is NOT the root
+// System Discovery Guide; missing WO-30 assets must still fail readiness.
+export const DOCS_OPENAPI_PATH = "/docs/openapi.json";
 export const inspectReadiness = (
   artifact: Artifact,
   activation: Activation,
-  contractPath: string,
+  contractPath: string = DOCS_OPENAPI_PATH,
 ) =>
   Effect.gen(function* () {
-    if (!/^\/[a-zA-Z0-9/_-]+\.json$/.test(contractPath))
+    if (contractPath !== DOCS_OPENAPI_PATH)
       return yield* Effect.fail(
-        failure("configuration", "contract-path-required"),
+        failure("configuration", "unsupported-contract-path"),
       );
     if (
       activation.sourceRevision !== artifact.sourceRevision ||
@@ -84,7 +85,9 @@ export const inspectReadiness = (
     );
     if (
       !contract.servers.length ||
-      contract.servers.some((server) => server.url !== origin)
+      contract.servers.some(
+        (server) => server.url !== "/" && server.url !== origin,
+      )
     )
       return yield* Effect.fail(
         failure("readiness", "contract-origin-mismatch"),
