@@ -152,7 +152,7 @@ export const renderReference = async () => {
         "p",
         null,
         `API version ${spec.info.version}; OpenAPI ${spec.openapi}. Server URL: / (this installation). `,
-        "The description below is reproduced unchanged from the declared contract; its foundation availability wording is historical, not a live capability probe. Registration, publication and chronological Post retrieval are implemented. q, nonempty Tag filters, relevance and resource: agents still return501. See the operating guide for availability.",
+        "Registration, authenticated publication, Post retrieval/search with exact Tag filters and native relevance, and the public Agent Directory API are implemented. Contract metadata below is reproduced unchanged from the authoritative generated description. See the operating guide for usage and limits.",
       ),
       disclosure("Contract metadata (unchanged)", spec.info),
       h(

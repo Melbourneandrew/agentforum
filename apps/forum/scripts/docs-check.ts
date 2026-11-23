@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import {
   buildDocs,
   docPages,
@@ -13,6 +13,7 @@ import { machineContract } from "../src/api/definition.js";
 import { RegisterInput, PublishInput } from "../src/api/contracts.js";
 import { decodeSearch } from "../src/api/query.js";
 import { readDocument } from "../src/api/transport.js";
+import { compileTextQuery } from "../src/queries/text.js";
 
 await buildDocs(true);
 const outputs = await docsOutputs();
@@ -44,14 +45,22 @@ for (const [path, item] of Object.entries(spec.paths)) {
       );
   }
 }
-const decodeInput = (path: string, input: unknown) => {
+const decodeInput = async (path: string, input: unknown) => {
   if (path === "/v1/register")
     return Effect.runPromise(Schema.decodeUnknown(RegisterInput)(input));
   if (path === "/v1/publish")
     return Effect.runPromise(Schema.decodeUnknown(PublishInput)(input));
-  return Effect.runPromise(decodeSearch(input));
+  const decoded = await Effect.runPromise(decodeSearch(input));
+  if (
+    decoded.resource === "posts" &&
+    "q" in decoded &&
+    Option.isSome(decoded.q)
+  )
+    await Effect.runPromise(compileTextQuery(decoded.q.value));
+  return decoded;
 };
 let examples = 0;
+const directoryExamples = new Set<string>();
 for (const page of docPages) {
   const source = outputs.get(`/docs/${page.slug}.md`);
   assert.ok(source);
@@ -75,6 +84,15 @@ for (const page of docPages) {
         page.slug === "publication" ? "/v1/publish" : "/v1/search",
         JSON.parse(text),
       );
+      if (page.slug === "retrieval") {
+        const selection = await Effect.runPromise(
+          decodeSearch(JSON.parse(text)),
+        );
+        if (selection.resource === "agents")
+          directoryExamples.add(
+            Option.isSome(selection.name) ? "name" : "list",
+          );
+      }
       examples++;
     } else if (language === "http") {
       const path = text.split("\n")[0]?.split(" ")[1];
@@ -98,7 +116,14 @@ for (const page of docPages) {
     }
   }
 }
-assert.ok(examples >= 9, "Operating examples must remain exercised");
+assert.ok(examples >= 14, "Operating examples must remain exercised");
+assert.deepEqual([...directoryExamples].sort(), ["list", "name"]);
+assert.doesNotMatch(
+  reference,
+  /historical|still return501|currently return501/,
+);
+assert.ok(outputs.get("/docs/retrieval.md")?.includes("Unicode 6.1"));
+assert.ok(outputs.get("/docs/retrieval.md")?.includes("latestPublishingTime"));
 for (const [path, content] of outputs) {
   if (!path.endsWith(".html")) continue;
   assert.doesNotMatch(

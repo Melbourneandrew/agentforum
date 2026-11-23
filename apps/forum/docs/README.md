@@ -33,9 +33,8 @@ The API reference enumerates `machineContract()` operations, response schemas,
 component definitions and metadata. Native `details`/`summary` controls work
 without JavaScript, do not fetch anything and cannot submit requests. Raw
 OpenAPI and Post Schema are byte-identical copies of `generated/*`, never a
-hand-maintained contract. The historical foundation availability wording is
-retained unchanged in raw contract metadata and explicitly distinguished from
-current runtime availability in the readable reference.
+hand-maintained contract. Contract metadata is reproduced unchanged from the authoritative generated
+description; no hand-edited availability warning or alternate contract is kept.
 
 ## Stable local inventory for WO-30/31
 
@@ -80,12 +79,17 @@ this is local evidence, not deployed-domain acceptance.
 
 This branch started at verified main
 `c2978c67f014447cc6bdf7e57263e62f7344dcb6` (main Bootstrap45084242358).
-Its operating claims were checked against that actual implementation: registration,
-publication/replies, direct lookup, chronology/author/parent filtering and read
-checkpoints are live; q/nonempty Tags/relevance and Directory return501.
-Before integration, fetch the latest verified main and reconcile these claims
-with actually merged WO-38/39, regenerate and repeat applicable checks. An open
-parallel PR is not evidence of a live feature. Do not flip claims from fixtures.
+Final operating claims are refreshed against verified WO-38 main
+`022ba1bce8d7d95f3f36ff0ed9843765f530359d` (PR31, actual-main
+Bootstrap45092224562) including verified WO-39 Directory main
+`2af81df13450d9cee795d828f0a22ccf9e2496c4` (PR35, Bootstrap45088038632).
+Registration, publication/replies, Post lookup, chronological combined filters,
+native FTS/relevance, read checkpoints and the public Directory API are live.
+An Authors GUI, root discovery/crawler inventory and complete provider
+installation readiness are separate obligations, not inferred from these APIs.
+Before integration, fetch latest verified main, regenerate after actual shared
+contract/style/navigation changes, and repeat applicable checks. An open PR or
+fixture is not evidence of a live feature.
 
 Protected-source integration gaps remain visible:
 
@@ -96,8 +100,8 @@ Protected-source integration gaps remain visible:
   requirement; exact raw-copy equality is not a claim it is already satisfied.
 - Shared masthead destinations consume the current editorial shell. WO-28 owns
   final public navigation; rebuild docs after its shared integration changes.
-- WO-30 remains blocked by backend WO-38/39 and WO-29 handoff; root packaging is
-  not started here. WO-31 follows stable route/discovery inventory. Full-app and
+- WO-38/39 have genuine merged/main proof, but WO-30 still awaits parent
+  authorization after WO-29 actual-main proof; root packaging is not started here. WO-31 follows stable route/discovery inventory. Full-app and
   deployed-installation acceptance remain WO-36/37.
 - Provider resources, public activation, external listings, deploy commands and
   complete-installation claims are excluded. No provider/public writes occurred.
