@@ -124,10 +124,12 @@ Owned processes/TLS/D1 state are cleaned up. Screenshots default to
 
 This script is standalone, not a parent-owned CI/bundle-smoke edit. Retain its
 final-head evidence separately from complete fail-fast local gates and exact-head
-remote CI. Refreshed onto verified Docs main
-`870246aa0dd8791962d655b65a57baa0908614a5` only after actual-main Bootstrap
-`45097291471` passed, following the earlier verified WO-38 integration. No WO-27
-code is stacked here. Negative route tests are scoped to Authors/About/unknown
+remote CI. Finally refreshed onto verified WO-35 main
+`3e6953f502a9d90c60cf6270fe37081d05f31b28` only after actual-main Bootstrap
+`45098907913` passed, containing the earlier verified Docs/WO-38 integrations.
+The full diagnostics wrapper, telemetry sources/tests and exact-off capture config
+are preserved byte-for-byte; dispatcher differs from that base only by the owned
+Authors/About admission hunk. No WO-27 code is stacked here. Negative route tests are scoped to Authors/About/unknown
 paths, not a permanent absence of future Post routes.
 
 The merged Docs generator now supplies the existing shell's navigation prop with
