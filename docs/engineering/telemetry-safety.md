@@ -18,8 +18,9 @@ attributes. Dependency failure is mapped from the existing safe503 boundary to
 `dependency-unavailable` / `d1`; unexpected failures remain `internal-error`.
 This does not claim which internal step failed. There is no exception inspection.
 Environment and release are deliberately not inferred from request hosts, bindings,
-credentials or incoming headers; deployment composition must supply bounded,
-trusted metadata before any future provider adapter enables those dimensions.
+credentials or incoming headers. Bounded, trusted deployment environment/release
+metadata is explicitly **pending WO-34 composition** before any future provider
+adapter enables those dimensions. No runtime binding is inferred as metadata.
 
 The version00 W3C validator bounds `traceparent` to55 characters, rejects zero IDs
 and unsupported versions/flags, and bounds `tracestate` to512 characters/32 unique
@@ -39,10 +40,12 @@ export is absent/off, so no fake exporter success or delivery guarantee exists.
 If later implemented, export needs authorized supported configuration, bounded
 `ctx.waitUntil`, best-effort nonfatal failure and capture-proof tests first.
 
-## Exact narrow root configuration proposal (parent owns application)
+## Applied narrow root configuration defense
 
-Replace only `observability` in root `wrangler.jsonc` with this object, using
-controls present in pinned Wrangler4.156.2's local `config-schema.json`:
+With explicit parent authorization, only the `observability` object in root
+`wrangler.jsonc` is replaced by the following defense-in-depth settings. Every
+field is supported by pinned Wrangler4.156.2's local `config-schema.json`; focused
+tests check the schema definitions and reject removal or unsafe configuration:
 
 ```json
 {
@@ -63,9 +66,12 @@ Keep `tail_consumers` absent/empty and `logpush` absent/false. Apply the same
 fail-closed policy to any generated environment/install config. Do not add
 sampling as a substitute for suppression. No package, lockfile, CI or task patch
 is needed: the existing test glob discovers both focused workerd suites. This
-branch does not edit root Wrangler, package/lock/tasks/CI or root README. Existing
-`observability.enabled=false` is locally asserted; the explicit proposal is
-additional defense, not a claim that every provider default universally redacts.
+branch edits only the authorized root observability object, not root
+package/lock/tasks/CI or README. `workers_dev=false`, `preview_urls=false`,
+`secrets.required=[]`, assets and D1 names/migration settings are preserved.
+The explicit off/redaction settings are additional defense, not provider capture
+proof or a claim that every provider default universally redacts. Production
+build/config validation is local only; remote capture-readiness gates remain unrun.
 
 ## Evidence boundary and blocked provider gates
 
