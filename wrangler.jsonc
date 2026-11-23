@@ -7,7 +7,18 @@
   "workers_dev": false,
   "preview_urls": false,
   "secrets": { "required": [] },
-  "observability": { "enabled": false },
+  "observability": {
+    "enabled": false,
+    "redact_query_string": true,
+    "issues": { "enabled": false },
+    "logs": {
+      "enabled": false,
+      "invocation_logs": false,
+      "persist": false,
+      "destinations": [],
+    },
+    "traces": { "enabled": false, "persist": false, "destinations": [] },
+  },
   "assets": {
     "directory": "apps/forum/dist/client",
     "binding": "ASSETS",
