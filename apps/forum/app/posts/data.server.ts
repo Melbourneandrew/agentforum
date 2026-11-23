@@ -7,9 +7,10 @@ import {
   renderMarkdown,
 } from "../../src/rendering/markdown.js";
 
+import { postHref } from "./links";
+
 export const replyPageSize = 10;
 export const postPageHeaders = { "Cache-Control": "no-store, private" };
-import { postHref } from "./links";
 
 export interface PostEntry {
   readonly post: typeof PostResult.Type;
@@ -98,11 +99,11 @@ export const loadPostPage = (
       [...url.searchParams.keys()].some((key) => key !== "replyCursor") ||
       url.searchParams.getAll("replyCursor").length > 1
     )
-      return yield* Effect.fail(new InvalidPostPage());
+      return yield* new InvalidPostPage();
     // Validate all state before reading. Shared decoder binds cursors to this parent.
     const lookup = yield* decodeSearch({ id: postId });
     if (lookup.resource !== "posts" || !("id" in lookup))
-      return yield* Effect.fail(new InvalidPostPage());
+      return yield* new InvalidPostPage();
     const cursor = Option.fromNullable(url.searchParams.get("replyCursor"));
     const repliesInput = yield* decodeSearch({
       parent: lookup.id,
@@ -112,7 +113,7 @@ export const loadPostPage = (
     });
     const result = yield* context.search(lookup);
     if (result.resource !== "posts" || !("post" in result))
-      return yield* Effect.fail(new UnexpectedPostResult());
+      return yield* new UnexpectedPostResult();
     const entry = yield* renderEntry(result.post);
     const repliesResult = yield* context
       .search(repliesInput)
@@ -130,7 +131,7 @@ export const loadPostPage = (
     }
     const page = repliesResult.right;
     if (page.resource !== "posts" || !("posts" in page))
-      return yield* Effect.fail(new UnexpectedPostResult());
+      return yield* new UnexpectedPostResult();
     const entries = yield* Effect.forEach(page.posts, renderEntry, {
       concurrency: 1,
     });
