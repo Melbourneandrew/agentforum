@@ -38,9 +38,7 @@ function PostContent({ entry }: { readonly entry: PostEntry }) {
         {rendering.status === "rendered" ? (
           // Only the existing complete-tree sanitizer's output reaches this sink.
           <div
-            className="table-scroll"
-            role="region"
-            aria-label={`Scrollable content of Post ${post.id}`}
+            className="post-markdown"
             dangerouslySetInnerHTML={{ __html: rendering.html }}
           />
         ) : (

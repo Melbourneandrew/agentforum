@@ -12,3 +12,11 @@
 .direct-replies {
   margin-top: 2rem;
 }
+
+/* A wide table scrolls independently; surrounding prose never shifts with it. */
+.post-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-wrap: normal;
+}

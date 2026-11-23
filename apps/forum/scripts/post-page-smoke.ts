@@ -247,6 +247,26 @@ try {
           document.fonts.check('italic 16px "Libre Franklin"'),
       ),
     );
+    assert.ok(
+      await page.evaluate(
+        () =>
+          ["normal", "italic"].every((style) =>
+            Array.from(document.fonts).some(
+              (face) =>
+                face.family.includes("Libre Franklin") &&
+                face.style === style &&
+                face.status === "loaded",
+            ),
+          ) &&
+          getComputedStyle(document.body).fontFamily.includes("Libre Franklin"),
+      ),
+      "Actual local normal/italic faces must be registered, loaded and used",
+    );
+    assert.equal(
+      await page.getByRole("table").count(),
+      1,
+      "Scrollable table must retain table semantics",
+    );
     assert.deepEqual(
       await page.locator(".post-tags li").allTextContents(),
       tags,
@@ -272,12 +292,27 @@ try {
   await page.goto(origin + path);
   await page.keyboard.press("Tab");
   assert.equal(await page.locator(":focus").innerText(), "Skip to content");
+  assert.ok(
+    await page
+      .locator(":focus")
+      .evaluate((element) => getComputedStyle(element).outlineStyle !== "none"),
+    "Keyboard focus must be visible",
+  );
+  await page.screenshot({ path: join(evidence, "post-keyboard-focus.png") });
   await page.keyboard.press("Enter");
   assert.equal(
     await page.locator(":focus").getAttribute("id"),
     "forum-content",
   );
-  const scroll = page.locator(".post-content .table-scroll").first();
+  await page.evaluate(() => document.fonts.ready);
+  const heading = page.getByRole("heading", {
+    name: "Coordination report",
+    exact: true,
+  });
+  const headingLeft = await heading.evaluate(
+    (element) => element.getBoundingClientRect().left,
+  );
+  const scroll = page.locator(".post-content table").first();
   assert.ok(
     await scroll.evaluate(
       (element) => element.scrollWidth > element.clientWidth,
@@ -289,6 +324,23 @@ try {
   assert.ok(
     await scroll.evaluate((element) => element.scrollLeft > 0),
     "Native scroll region must support keyboard scrolling",
+  );
+  assert.equal(
+    await heading.evaluate((element) => element.getBoundingClientRect().left),
+    headingLeft,
+    "Table scrolling must not shift prose",
+  );
+  const code = page.locator(".post-content pre").first();
+  await code.focus();
+  await page.keyboard.press("ArrowRight");
+  await setTimeout(150);
+  assert.ok(
+    await code.evaluate((element) => element.scrollLeft > 0),
+    "Code must scroll independently with the keyboard",
+  );
+  assert.equal(
+    await heading.evaluate((element) => element.getBoundingClientRect().left),
+    headingLeft,
   );
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
@@ -304,6 +356,13 @@ try {
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
+  );
+  assert.ok(
+    await page
+      .locator(".post-markdown")
+      .first()
+      .evaluate((element) => element.scrollWidth <= element.clientWidth),
+    "Zoomed prose must not share a horizontal scroller with tables/code",
   );
   await page.screenshot({
     path: join(evidence, "post-text-zoom.png"),

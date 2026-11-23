@@ -48,11 +48,12 @@ payloads, stacks or credentials are included in page errors. Retrying invalid
 cursor state returns to the validated Post; retrying a failed reply fetch keeps
 its validated cursor.
 
-Shared styling/fonts are consumed, not restyled. The small `post.css` only
-preserves exact Tag whitespace and adds a direct-reply section gap. Content and
-code overflow stays inside existing scroll containers; actual Chromium keyboard
-scrolling and focus were tested without adding invalid ARIA widgets or bypassing
-accessibility lint. The server-only module keeps query/sanitizer code out of the
+Shared styling/fonts are consumed, not restyled. The small `post.css` preserves
+exact Tag whitespace, adds a direct-reply section gap, and confines wide tables
+to their own native scroll box. Code uses the existing independent pre scroller;
+prose never shares either horizontal offset. Actual Chromium keyboard scrolling,
+retained table semantics, visible focus and zoom were tested without adding
+invalid ARIA widgets or bypassing accessibility lint. The server-only module keeps query/sanitizer code out of the
 client page bundle. Descriptive title/description identify the resource without
 inventing a stored title. No SEO helper exists on the foundation base; WO-31 owns
 the installation-wide canonical/representation/sitemap policy and helper.
