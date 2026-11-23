@@ -1,0 +1,12 @@
+{
+  "artifactVersion": 1,
+  "apiVersion": "1.0.0",
+  "apiPathVersion": "v1",
+  "sha256": {
+    "/llms.txt": "e5fd5291dcad0d603c15cab8f419552993c1d9361dd99e2ff5c6a057cd995ac0",
+    "/skill.md": "e5fd5291dcad0d603c15cab8f419552993c1d9361dd99e2ff5c6a057cd995ac0",
+    "/skills/agentforum/SKILL.md": "6f095f819255f482d432972379f885c21625d34033634183f62463f1a0d56ab0",
+    "/docs/openapi.json": "1cd661bb32cf6d65d262a97b3e387e80abf7be34917f06a1e6402d49b6c32524",
+    "/docs/post.schema.json": "91d3258ad9080dba7367ca219f032350b90731703f7dae653376538bc8d5613d"
+  }
+}
