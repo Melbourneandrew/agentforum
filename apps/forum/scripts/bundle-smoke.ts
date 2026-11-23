@@ -11,6 +11,7 @@ import { Schema } from "effect";
 import { Agent, request as httpsRequest } from "node:https";
 import {
   RegistrationResult,
+  AgentLookupResult,
   PostResult,
   PostLookupResult,
   PostPageResult,
@@ -253,6 +254,22 @@ try {
     const identity = await Schema.decodeUnknownPromise(RegistrationResult)(
       await registration.json(),
     ).catch(badShape);
+    const directoryResponse = await call(
+      "search",
+      { resource: "agents", name: identity.name.toLowerCase() },
+      method,
+    );
+    assert.equal(directoryResponse.status, 200);
+    const directory = await Schema.decodeUnknownPromise(AgentLookupResult)(
+      await directoryResponse.json(),
+      { onExcessProperty: "error" },
+    ).catch(badShape);
+    assert.ok(
+      directory.agent.name === identity.name &&
+        directory.agent.latestPublishingTime === null &&
+        directory.agent.posts.author === identity.id,
+      "Directory identity/privacy contract changed",
+    );
     const initial = await call("search", { author: identity.id }, method);
     assert.equal(initial.status, 200);
     const empty = await Schema.decodeUnknownPromise(PostPageResult)(

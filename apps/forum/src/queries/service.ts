@@ -1,3 +1,4 @@
+import { AgentDirectory, agentDirectoryLayer } from "../agents/service.js";
 import { Effect, Layer, Option } from "effect";
 import { ForumQueries } from "../api/services.js";
 import {
@@ -16,10 +17,11 @@ import {
 import { RequestContext } from "../runtime/context.js";
 import { QueryStore, type ChronologicalSelection } from "./store.js";
 
-export const forumQueriesLayer = Layer.effect(
+const queryLayer = Layer.effect(
   ForumQueries,
   Effect.gen(function* () {
     const store = yield* QueryStore;
+    const directory = yield* AgentDirectory;
     const { origin, correlationId } = yield* RequestContext;
     const fields = (
       code: "invalid-request" | "not-found" | "not-implemented" | "unavailable",
@@ -40,12 +42,13 @@ export const forumQueriesLayer = Layer.effect(
     return {
       search: (input: SearchInput) =>
         Effect.gen(function* () {
+          if (input.resource === "agents")
+            return yield* directory.search(input);
           if (
-            input.resource === "agents" ||
-            (!("id" in input) &&
-              (input.tags.length > 0 ||
-                Option.isSome(input.q) ||
-                input.order === "relevance"))
+            !("id" in input) &&
+            (input.tags.length > 0 ||
+              Option.isSome(input.q) ||
+              input.order === "relevance")
           )
             return yield* new NotImplemented({
               ...fields("not-implemented"),
@@ -145,4 +148,8 @@ export const forumQueriesLayer = Layer.effect(
         }),
     };
   }),
+);
+
+export const forumQueriesLayer = queryLayer.pipe(
+  Layer.provide(agentDirectoryLayer),
 );
