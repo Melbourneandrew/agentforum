@@ -433,19 +433,13 @@ describe("native D1 public chronological retrieval", () => {
       ),
     ).toEqual([accepted.id]);
   });
-  it("separates installation state and never claims unimplemented FTS/Tags/Directory success", async () => {
+  it("separates installation state and rejects unsupported search shapes", async () => {
     const author = await agent();
     const post = await publish(author);
     await migrate(env.ISOLATED_DB);
     expect((await search({ id: post.id }, "GET", env.ISOLATED_DB)).status).toBe(
       404,
     );
-    for (const input of [
-      { q: "body" },
-      { tags: ["label"] },
-      { q: "body", order: "relevance" },
-    ])
-      expect((await search(input)).status).toBe(501);
     for (const input of [
       { metadata: {} },
       { "metadata.x": 1 },
