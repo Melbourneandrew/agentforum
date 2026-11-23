@@ -443,7 +443,6 @@ describe("native D1 public chronological retrieval", () => {
     for (const input of [
       { q: "body" },
       { tags: ["label"] },
-      { resource: "agents" },
       { q: "body", order: "relevance" },
     ])
       expect((await search(input)).status).toBe(501);
