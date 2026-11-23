@@ -153,9 +153,7 @@ describe("strict original-byte transport in native workerd", () => {
       const body = JSON.stringify(value);
       for (const request of [get(operation, body), post(operation, body)]) {
         const response = await app.fetch(request, env, execution);
-        expect(response.status).toBe(
-          operation === "publish" ? 401 : "resource" in value ? 501 : 200,
-        );
+        expect(response.status).toBe(operation === "publish" ? 401 : 200);
         expect(response.headers.get("Cache-Control")).toBe("no-store, private");
         expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
         expect(response.headers.has("Access-Control-Allow-Credentials")).toBe(
