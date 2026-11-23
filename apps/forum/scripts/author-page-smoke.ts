@@ -488,6 +488,64 @@ try {
     .click();
   assert.equal(new URL(page.url()).pathname, "/docs/");
   assert.ok((await page.locator("body").innerText()).includes("Agent Forum"));
+  for (const path of [
+    "/docs/",
+    "/docs/publication/",
+    "/docs/retrieval/",
+    "/docs/api/",
+  ]) {
+    assert.equal((await page.goto(origin + path))?.status(), 200);
+    const navigation = page.getByRole("navigation", {
+      name: "Main navigation",
+    });
+    assert.deepEqual(
+      await navigation
+        .locator("a")
+        .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
+      ["/authors", "/about", "/docs/"],
+    );
+    assert.equal(
+      await navigation.locator('[aria-disabled="true"]').innerText(),
+      "Posts",
+    );
+    await navigation
+      .getByRole("link", { name: "Authors", exact: true })
+      .click();
+    assert.equal(new URL(page.url()).pathname, "/authors");
+    assert.equal(
+      await page.locator('section[aria-label="Local Authors"] h2 a').count(),
+      10,
+    );
+    await page
+      .getByRole("navigation", { name: "Main navigation" })
+      .getByRole("link", { name: "Docs", exact: true })
+      .click();
+    assert.equal(new URL(page.url()).pathname, "/docs/");
+    await page.goto(origin + path);
+    await page
+      .getByRole("navigation", { name: "Main navigation" })
+      .getByRole("link", { name: "About", exact: true })
+      .click();
+    assert.equal(new URL(page.url()).pathname, "/about");
+    assert.equal(await page.locator("h1").innerText(), "About");
+  }
+  // Reuse the merged Docs owner's complete production browser suite while this
+  // actual HTTPS Worker and disposable migrated D1 are still alive.
+  const previousDocsOrigin = process.env.DOCS_ORIGIN;
+  const previousDocsEvidence = process.env.DOCS_EVIDENCE;
+  try {
+    process.env.DOCS_ORIGIN = origin;
+    process.env.DOCS_EVIDENCE = join(evidence, "docs");
+    await import("./docs-smoke.js");
+  } finally {
+    if (previousDocsOrigin === undefined) delete process.env.DOCS_ORIGIN;
+    else process.env.DOCS_ORIGIN = previousDocsOrigin;
+    if (previousDocsEvidence === undefined) delete process.env.DOCS_EVIDENCE;
+    else process.env.DOCS_EVIDENCE = previousDocsEvidence;
+  }
+  console.log(
+    "PASS all four generated Docs mastheads navigate to real Authors/About and back; Posts disabled; complete merged Docs production no-JS suite passed",
+  );
   console.log(
     "PASS real HTTPS registration/publication, directory ordering10+2, canonical identities, no activity, same-installation author-filtered JSON API navigation, no-JS Authors/About/docs, actual fonts/focus/reflow/text zoom and documented research only",
   );
