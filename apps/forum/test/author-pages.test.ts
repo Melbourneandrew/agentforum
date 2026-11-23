@@ -282,8 +282,8 @@ describe("real native D1 Authors pages", () => {
     for (const path of [
       "/authors/a/b",
       "/about/extra",
-      "/posts",
-      "/posts/" + nanoid(),
+      "/unknown-public-page",
+      "/authors/a/extra",
     ])
       expect((await request(path)).status).toBe(404);
     const api = await request(searchHref({ resource: "agents", limit: 10 }));

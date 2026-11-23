@@ -122,8 +122,11 @@ Owned processes/TLS/D1 state are cleaned up. Screenshots default to
 
 This script is standalone, not a parent-owned CI/bundle-smoke edit. Retain its
 final-head evidence separately from complete fail-fast local gates and exact-head
-remote CI. Refresh onto parent's verified WO-38 main proof before final gates;
-when WO-29 lands, read its generation/check commands and regenerate only if its
+remote CI. Refreshed onto verified WO-38 main
+`022ba1bce8d7d95f3f36ff0ed9843765f530359d` only after actual-main Bootstrap
+`45092224562` passed; no WO-27 code is stacked here. Negative route tests are
+scoped to Authors/About/unknown paths, not a permanent absence of future Post
+routes. When WO-29 lands, read its generation/check commands and regenerate only if its
 shared-source-derived docs check needs it (never introduce an independent theme).
 Parent owns protected contracts/config, independent review, merge, actual-main
 proof and final Complete. This delegated owner leaves PR open/In Review, does not
