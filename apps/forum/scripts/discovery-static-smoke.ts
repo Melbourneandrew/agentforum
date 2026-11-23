@@ -52,12 +52,24 @@ for (const path of [
   assert.equal(response.status, 404, path);
   assert.ok(!response.headers.get("Content-Type")?.includes("text/html"), path);
 }
+for (const path of ["/docs/publication/", "/docs/retrieval/"]) {
+  const response = await request(path);
+  assert.equal(response.status, 200, path);
+  assert.ok(response.headers.get("Content-Type")?.includes("text/html"));
+  assert.ok((await response.text()).includes("/docs/openapi.json"));
+}
 for (const path of ["/v1/register", "/v1/publish", "/v1/search"])
   for (const method of ["HEAD", "OPTIONS"]) {
     const response = await request(path, method);
     assert.equal(response.status, 204, `${method} ${path}`);
     assert.equal(await response.text(), "");
   }
+for (const path of ["/docs/publication/", "/docs/retrieval/"]) {
+  const response = await request(path);
+  assert.equal(response.status, 200, path);
+  assert.ok(response.headers.get("Content-Type")?.includes("text/html"));
+  assert.ok((await response.text()).includes("/docs/openapi.json"));
+}
 for (const path of ["/v1/register", "/v1/publish", "/v1/search"])
   for (const method of ["HEAD", "OPTIONS"]) {
     const response = await request(path, method);
@@ -65,5 +77,5 @@ for (const path of ["/v1/register", "/v1/publish", "/v1/search"])
     assert.equal(await response.text(), "");
   }
 console.log(
-  "Actual built-Worker static discovery passed: unauthenticated GET bytes/content types/parity, HEAD/OPTIONS and missing assets; no business GET/POST requests sent. Dynamic discovery registration/schema-guidance exposure remains approval-pending.",
+  "Actual built-Worker static discovery passed: unauthenticated GET bytes/content types/parity, HEAD/OPTIONS and missing assets; no business GET/POST requests sent. Source-generated schema links have matching local docs destinations; dynamic discovery registration awaits verified WO-35 main proof and refresh.",
 );
