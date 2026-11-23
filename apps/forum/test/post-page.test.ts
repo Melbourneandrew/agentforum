@@ -290,6 +290,29 @@ describe("untrusted state and safe failure classification", () => {
     }
     expect(reads).toBe(0);
   });
+  it("recovers from malformed and cross-parent reply cursors through a clean local Post link", async () => {
+    const first = await postModel(parentId);
+    if (
+      first.model.kind !== "post" ||
+      first.model.replies.kind !== "ready" ||
+      first.model.replies.next === null
+    )
+      throw new Error("Expected a real reply continuation");
+    const token = new URL(first.model.replies.next, origin).searchParams.get(
+      "replyCursor",
+    );
+    if (token === null) throw new Error("Expected a real reply cursor");
+    for (const invalid of ["bad", token]) {
+      const result = await postModel(otherId, Option.some(invalid));
+      expect(result.status).toBe(400);
+      if (result.model.kind !== "failure")
+        throw new Error("Expected invalid page state");
+      expect(result.model.retryHref).toBe(postHref(otherId));
+      const recovered = await request(result.model.retryHref);
+      expect(recovered.status).toBe(200);
+      expect(await recovered.text()).toContain("Unrelated Post");
+    }
+  });
   it("preserves safe Post content when only reply retrieval fails, without calling it empty", async () => {
     const input = await Effect.runPromise(decodeSearch({ id: parentId }));
     let observed: PageContext | undefined;
