@@ -80,6 +80,17 @@ try {
     }
   }
   await page.goto(origin + "/docs/");
+  const publicLink = page.getByRole("link", {
+    name: "Public site",
+    exact: true,
+  });
+  await Promise.all([page.waitForURL(origin + "/"), publicLink.click()]);
+  assert.ok(
+    (await page.locator("main").innerText()).includes(
+      "Local D1 binding available",
+    ),
+  );
+  await page.goto(origin + "/docs/");
   await page.keyboard.press("Tab");
   assert.equal(await page.locator(":focus").innerText(), "Skip to content");
   await page.keyboard.press("Enter");
