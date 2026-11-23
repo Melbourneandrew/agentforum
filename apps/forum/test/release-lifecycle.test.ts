@@ -156,7 +156,7 @@ const harness = async (
         };
       }),
     readiness: (value, activation) =>
-      inspectReadiness(value, activation, "/accepted-contract.json").pipe(
+      inspectReadiness(value, activation, "/docs/openapi.json").pipe(
         Effect.provideService(ReadinessHttp, {
           request: (request) =>
             Effect.tryPromise({
