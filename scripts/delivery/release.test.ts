@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   mkdtempSync,
   mkdirSync,
@@ -253,6 +255,34 @@ describe("WO-34 complete built target", () => {
         ),
       ),
     ).toBe(true);
+  });
+  it("rejects dirty local source before building or opening the runtime", () => {
+    const f = fixture();
+    const env = {
+      PATH: process.env.PATH ?? "",
+      HOME: f.root,
+      GIT_CONFIG_NOSYSTEM: "1",
+      GIT_CONFIG_GLOBAL: "/dev/null",
+    };
+    expect(
+      spawnSync("git", ["init", "--quiet"], { cwd: f.root, env }).status,
+    ).toBe(0);
+    const result = spawnSync(
+      process.execPath,
+      [
+        "--import",
+        import.meta.resolve("tsx"),
+        fileURLToPath(new URL("./release-local.ts", import.meta.url)),
+        "--qualify-local",
+      ],
+      { cwd: f.root, env, encoding: "utf8", timeout: 10000 },
+    );
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.stderr)).toEqual({
+      status: "local-qualification-failed",
+      step: "source-revision",
+      provider: "not-run",
+    });
   });
   it("parses actual JSONC without echoing invalid content", async () => {
     expect(

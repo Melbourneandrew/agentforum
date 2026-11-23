@@ -137,6 +137,25 @@ const qualify = async () => {
     });
   };
   try {
+    step = "source-revision";
+    const provenance = async () => {
+      const status = await execute(
+        "git",
+        ["status", "--porcelain=v1", "--untracked-files=normal"],
+        { cwd: root, env: environment },
+      );
+      assert.equal(
+        status.stdout,
+        "",
+        "Commit source changes before qualification",
+      );
+      const revision = await execute("git", ["rev-parse", "HEAD"], {
+        cwd: root,
+        env: environment,
+      });
+      return Schema.decodeUnknownSync(Revision)(revision.stdout.trim());
+    };
+    const sourceRevision = await provenance();
     step = "build";
     // Do not count a cached artifact as a fresh local build.
     await execute("pnpm", ["exec", "turbo", "run", "build", "--force"], {
@@ -146,12 +165,10 @@ const qualify = async () => {
       maxBuffer: 8 * 1024 * 1024,
     });
     step = "source-revision";
-    const revisionResult = await execute("git", ["rev-parse", "HEAD"], {
-      cwd: root,
-      env: environment,
-    });
-    const sourceRevision = Schema.decodeUnknownSync(Revision)(
-      revisionResult.stdout.trim(),
+    assert.equal(
+      await provenance(),
+      sourceRevision,
+      "Source changed during build",
     );
     const identity = Schema.decodeUnknownSync(Identity)({
       version: 1,

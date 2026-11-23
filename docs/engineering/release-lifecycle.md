@@ -42,13 +42,14 @@ with plain Wrangler and call it a ready installation.
 ## Executable local qualification
 
 From the repository root, with the pinned Node/pnpm, installed frozen dependencies
-and OpenSSL:
+and OpenSSL, with all source changes committed:
 
 ```sh
 pnpm exec tsx scripts/delivery/release-local.ts --qualify-local
 ```
 
-This entry only accepts that explicit argument. It performs a forced real build,
+This entry only accepts that explicit argument. It rejects dirty Git source and
+verifies the same clean HEAD after its forced real build, then
 uses `apps/forum/dist/server/wrangler.json`, derives/materializes a complete
 execution config in a temporary directory, converges synthetic resolved-native
 and CLI fixtures, applies **real local** Wrangler D1 migrations repeatedly, starts
