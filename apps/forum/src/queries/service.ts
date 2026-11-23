@@ -4,17 +4,19 @@ import { ForumQueries } from "../api/services.js";
 import {
   BadRequest,
   NotFound,
-  NotImplemented,
   Unavailable,
   problemCatalog,
 } from "../api/problems.js";
 import {
+  checkedOffsetAddition,
+  type InvalidOffset,
   decodeCursor,
   encodeCursor,
   selectionFingerprint,
   type SearchInput,
 } from "../api/query.js";
 import { RequestContext } from "../runtime/context.js";
+import { compileTextQuery } from "./text.js";
 import { QueryStore, type ChronologicalSelection } from "./store.js";
 
 const queryLayer = Layer.effect(
@@ -44,16 +46,6 @@ const queryLayer = Layer.effect(
         Effect.gen(function* () {
           if (input.resource === "agents")
             return yield* directory.search(input);
-          if (
-            !("id" in input) &&
-            (input.tags.length > 0 ||
-              Option.isSome(input.q) ||
-              input.order === "relevance")
-          )
-            return yield* new NotImplemented({
-              ...fields("not-implemented"),
-              status: 501,
-            });
           if ("id" in input) {
             const post = yield* store
               .lookup(input.id)
@@ -69,15 +61,26 @@ const queryLayer = Layer.effect(
               post: { ...value, reply_to: Option.getOrNull(parentId) },
             };
           }
+          const match = yield* Option.match(input.q, {
+            onNone: () => Effect.succeed(Option.none<string>()),
+            onSome: (q) =>
+              compileTextQuery(q).pipe(
+                Effect.map(Option.some),
+                Effect.mapError(badRequest),
+              ),
+          });
           const fingerprint = yield* selectionFingerprint(input).pipe(
             Effect.mapError(unavailable),
           );
           const read = input.readCursor;
           const token = Option.orElse(input.pageCursor, () => read);
           const order =
-            Option.isSome(read) || input.order === "oldest"
-              ? "oldest"
-              : "newest";
+            input.order === "relevance"
+              ? "relevance"
+              : Option.isSome(read) || input.order === "oldest"
+                ? "oldest"
+                : "newest";
+          let offset = 0;
           let boundary: ChronologicalSelection["boundary"] = Option.none();
           if (Option.isSome(token)) {
             const cursor = yield* decodeCursor(token.value).pipe(
@@ -85,13 +88,13 @@ const queryLayer = Layer.effect(
             );
             if (
               cursor.resource !== "posts" ||
-              !("boundary" in cursor) ||
               cursor.fingerprint !== fingerprint ||
               cursor.purpose !== (Option.isSome(read) ? "read" : "page") ||
               cursor.order !== order
             )
               return yield* badRequest();
-            boundary = Option.some(cursor.boundary);
+            if ("boundary" in cursor) boundary = Option.some(cursor.boundary);
+            else offset = cursor.offset;
           }
           const page = yield* store
             .page({
@@ -100,6 +103,10 @@ const queryLayer = Layer.effect(
               order,
               limit: input.limit,
               boundary,
+              tags: input.tags,
+              tagMatch: input.tagMatch,
+              match,
+              offset,
             })
             .pipe(Effect.mapError(unavailable));
           const common = {
@@ -108,6 +115,29 @@ const queryLayer = Layer.effect(
             resource: "posts" as const,
             fingerprint,
           };
+          if (order === "relevance") {
+            const addition: Effect.Effect<number, InvalidOffset> =
+              checkedOffsetAddition(offset, page.posts.length);
+            const nextOffset = yield* addition.pipe(
+              Effect.mapError(badRequest),
+            );
+            const pageCursor = page.hasMore
+              ? yield* encodeCursor({
+                  ...common,
+                  purpose: "page",
+                  order: "relevance",
+                  offset: nextOffset,
+                }).pipe(Effect.mapError(unavailable))
+              : null;
+            return {
+              resource: "posts" as const,
+              posts: page.posts.map(({ parentId, ...post }) => ({
+                ...post,
+                reply_to: Option.getOrNull(parentId),
+              })),
+              pageCursor,
+            };
+          }
           const last = Option.fromNullable(page.posts.at(-1));
           const greatest =
             order === "newest" ? Option.fromNullable(page.posts[0]) : last;
