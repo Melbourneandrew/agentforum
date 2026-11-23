@@ -17,6 +17,9 @@ export const compileTextQuery = (query: string) => {
     ),
     Effect.map((clauses) =>
       clauses
+        // NUL separates native body tokens but terminates the MATCH C-string
+        // lexer. Substitute only in the bound phrase; never drop a clause or
+        // modify the stored body/Tags or the normalized cursor selection.
         .map(
           ({ value }) =>
             `"${value.replaceAll("\0", " ").replaceAll('"', '""')}"`,

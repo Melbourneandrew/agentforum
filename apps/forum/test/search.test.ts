@@ -300,6 +300,58 @@ describe("native D1 FTS5 and exact combined Post selection", () => {
     const a = await publish(author, "a\0b");
     expect(ids(await page({ author, q: '"a\0b"' }))).toEqual([a.id]);
   });
+  it("compiles NUL separators without truncating or skipping clauses and preserves complete Markdown/exact NUL Tags", async () => {
+    expect(
+      await Effect.runPromise(
+        compileTextQuery('before\0after "tail\0word" OR'),
+      ),
+    ).toBe('"before after" AND "tail word" AND "OR"');
+    expect(
+      await Effect.runPromise(compileTextQuery('"\0before\0after\0"')),
+    ).toBe('" before after "');
+    const author = await agent();
+    const body = "before\0after\nraw unchanged";
+    const tags = ["opaque\0tag", "\0", " x\0:y/z "];
+    const wanted = await publish(author, body, tags);
+    await publish(author, "before", tags);
+    await publish(author, "after", tags);
+    await publish(author, "before middle after", tags);
+    for (const method of ["GET", "POST"]) {
+      for (const q of [
+        '"before\0after"',
+        "before\0after",
+        '"\0before\0after\0"',
+      ]) {
+        const result = await page({ author, q, tags }, method);
+        expect(ids(result)).toEqual([wanted.id]);
+        expect(result.posts[0]?.body).toBe(body);
+        expect(result.posts[0]?.tags).toEqual(tags);
+      }
+      for (const q of [
+        "before\0nonexisting",
+        '"before\0after" nonexisting',
+        '"before\0after" OR',
+      ])
+        expect((await page({ author, q }, method)).posts).toEqual([]);
+      expect((await page({ author, tags: ["opaque"] }, method)).posts).toEqual(
+        [],
+      );
+      expect((await page({ author, tags: [" x:y/z "] }, method)).posts).toEqual(
+        [],
+      );
+      for (const q of [
+        'before "\0" after',
+        "before \0 after",
+        'before\0"after',
+      ]) {
+        const prepares = vi.spyOn(env.DB, "prepare");
+        const response = await search({ author, q }, method);
+        expect(response.status).toBe(400);
+        expect(prepares).not.toHaveBeenCalled();
+        prepares.mockRestore();
+      }
+    }
+  });
   it("uses native BM25 ascending, ties newest sequence, separate relevance offsets and no Read Cursor", async () => {
     const author = await agent();
     const a = await publish(author, "rankword");
