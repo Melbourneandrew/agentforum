@@ -173,7 +173,7 @@ export const makeControlCoordinator = (input: {
         (slot,protocol,account_id,database_id,worker_name,default_origin,generation,phase,owner_id,executor_ref,source_revision,artifact_sha256)
         VALUES (1,1,?,?,?,?,1,'held',?,?,?,?)
         ON CONFLICT(slot) DO UPDATE SET generation=generation+1,phase='held',owner_id=excluded.owner_id,executor_ref=excluded.executor_ref,
-          source_revision=excluded.source_revision,artifact_sha256=excluded.artifact_sha256,effect_seq=0,effect_kind='none',effect_state='none',effect_ref=NULL,effect_receipt_json=NULL
+          source_revision=excluded.source_revision,artifact_sha256=excluded.artifact_sha256,effect_kind='none',effect_state='none',effect_ref=NULL,effect_receipt_json=NULL
         WHERE phase='idle' AND protocol=1 AND account_id=excluded.account_id AND database_id=excluded.database_id
           AND worker_name=excluded.worker_name AND default_origin=excluded.default_origin AND generation<9007199254740991
         RETURNING *`,
@@ -201,7 +201,6 @@ export const makeControlCoordinator = (input: {
           if (
             !ownerMatches(acquired, ownerId, acquired.generation) ||
             acquired.effect_state !== "none" ||
-            acquired.effect_seq !== 0 ||
             acquired.source_revision !== artifact.sourceRevision ||
             acquired.artifact_sha256 !== artifact.artifactDigest
           )
@@ -209,14 +208,35 @@ export const makeControlCoordinator = (input: {
               failure("initialization", "control-acquire-unverified"),
             );
           const generation = acquired.generation;
-          let sequence = 0;
-          const guard = () => [ownerId, generation, sequence];
+          let sequence = acquired.effect_seq;
+          const contextParams = () => [
+            ...identityParams(identity),
+            artifact.sourceRevision,
+            artifact.artifactDigest,
+            executorRef,
+          ];
+          const contextClause =
+            "account_id=? AND database_id=? AND worker_name=? AND default_origin=? AND source_revision=? AND artifact_sha256=? AND executor_ref=? AND protocol=1";
+          const ownershipClause = `owner_id=? AND generation=? AND effect_seq=? AND ${contextClause}`;
+          const guard = () => [
+            ownerId,
+            generation,
+            sequence,
+            ...contextParams(),
+          ];
           const assertHeld = Effect.gen(function* () {
             const row = yield* readControl(db);
             if (
               Option.isNone(row) ||
               !ownerMatches(row.value, ownerId, generation) ||
-              row.value.effect_seq !== sequence
+              row.value.effect_seq !== sequence ||
+              row.value.account_id !== identity.accountId ||
+              row.value.database_id !== identity.databaseId ||
+              row.value.worker_name !== identity.workerName ||
+              row.value.default_origin !== identity.defaultOrigin ||
+              row.value.source_revision !== artifact.sourceRevision ||
+              row.value.artifact_sha256 !== artifact.artifactDigest ||
+              !Option.contains(row.value.executor_ref, executorRef)
             )
               return yield* Effect.fail(
                 failure("initialization", "control-ownership-unverified"),
@@ -241,7 +261,7 @@ export const makeControlCoordinator = (input: {
                   const rows = yield* db
                     .query(
                       `UPDATE ${CONTROL_TABLE} SET effect_seq=effect_seq+1,effect_kind=?,effect_state='intent',effect_ref=NULL,effect_receipt_json=NULL
-            WHERE slot=1 AND phase='held' AND owner_id=? AND generation=? AND effect_seq=? AND effect_state IN ('none','acked') AND effect_seq<9007199254740991 RETURNING *`,
+            WHERE slot=1 AND phase='held' AND ${ownershipClause} AND effect_state IN ('none','acked') AND effect_seq<9007199254740991 RETURNING *`,
                       [kind, ...guard()],
                     )
                     .pipe(
@@ -292,7 +312,7 @@ export const makeControlCoordinator = (input: {
                     );
                   const rows = yield* db.query(
                     `UPDATE ${CONTROL_TABLE} SET effect_state='acked',effect_ref=?,effect_receipt_json=?
-            WHERE slot=1 AND phase='held' AND owner_id=? AND generation=? AND effect_seq=? AND effect_kind=? AND effect_state='intent' RETURNING slot`,
+            WHERE slot=1 AND phase='held' AND ${ownershipClause} AND effect_kind=? AND effect_state='intent' RETURNING slot`,
                     [
                       proof.operationRef,
                       JSON.stringify(proof),
@@ -310,20 +330,35 @@ export const makeControlCoordinator = (input: {
                   // may already have advanced it. Never clear this ownership.
                   const rows = yield* db.query(
                     `UPDATE ${CONTROL_TABLE} SET phase='uncertain',effect_state=CASE WHEN effect_state='intent' THEN 'unknown' ELSE effect_state END
-              WHERE slot=1 AND owner_id=? AND generation=? AND phase IN ('held','uncertain') RETURNING slot`,
-                    [ownerId, generation],
+              WHERE slot=1 AND owner_id=? AND generation=? AND ${contextClause} AND phase IN ('held','uncertain') RETURNING slot`,
+                    [ownerId, generation, ...contextParams()],
                   );
                   yield* exactOne(rows, "control-quarantine-refused");
                   return;
                 }
+                const current = yield* readControl(db);
+                if (
+                  Option.isNone(current) ||
+                  !ownerMatches(current.value, ownerId, generation) ||
+                  current.value.effect_seq !== sequence
+                )
+                  return yield* Effect.fail(
+                    failure("initialization", "control-closure-stale"),
+                  );
                 const rows = yield* db.query(
                   `UPDATE ${CONTROL_TABLE} SET phase='idle',owner_id=NULL,executor_ref=NULL,effect_kind='none',effect_state='none',effect_ref=NULL,
-            last_release_receipt_json=? WHERE slot=1 AND phase='held' AND owner_id=? AND generation=? AND effect_seq=? AND effect_state IN ('none','acked') RETURNING slot`,
+            last_release_receipt_json=? WHERE slot=1 AND phase='held' AND ${ownershipClause} AND effect_state IN ('none','acked') RETURNING slot`,
                   [
                     JSON.stringify({
                       sourceRevision: artifact.sourceRevision,
                       artifactDigest: artifact.artifactDigest,
                       sequence,
+                      migrationManifest: artifact.migrations,
+                      manifestDigest: artifact.schemaDigest,
+                      qualifiedCompatibleSchemas: artifact.compatibleSchemas,
+                      terminalReceipt: Option.getOrNull(
+                        current.value.effect_receipt_json,
+                      ),
                     }),
                     ...guard(),
                   ],
@@ -433,7 +468,7 @@ export const reconcileControl = () =>
     const rows = yield* db.query(
       `UPDATE ${CONTROL_TABLE} SET phase='idle',owner_id=NULL,executor_ref=NULL,effect_kind='none',effect_state='none',effect_ref=NULL,reconciliation_sha256=?
     WHERE slot=1 AND owner_id=? AND executor_ref=? AND generation=? AND effect_seq=? AND phase=? AND effect_state=? AND effect_kind=?
-      AND source_revision=? AND artifact_sha256=? RETURNING slot`,
+      AND source_revision=? AND artifact_sha256=? AND effect_ref IS ? AND effect_receipt_json IS ? AND account_id=? AND database_id=? AND worker_name=? AND default_origin=? AND protocol=1 RETURNING slot`,
       [
         digest,
         executor.ownerId,
@@ -445,6 +480,9 @@ export const reconcileControl = () =>
         row.effect_kind,
         row.source_revision,
         row.artifact_sha256,
+        Option.getOrNull(row.effect_ref),
+        Option.getOrNull(row.effect_receipt_json),
+        ...identityParams(db.identity),
       ],
     );
     yield* exactOne(rows, "control-reconcile-stale");

@@ -242,6 +242,28 @@ describe("WO34 approved operational controls on actual native D1 (not provider p
     expect(results.filter(Either.isRight)).toHaveLength(1);
     expect(results.filter(Either.isLeft)).toHaveLength(1);
   });
+  it("rejects changed identity/source context without arming a protected effect", async () => {
+    await run(bootstrapControl());
+    const a = await run(coordinator());
+    const session = await Effect.runPromise(a.acquire(identity));
+    await env.ISOLATED_DB.prepare(
+      "UPDATE agentforum_release_control SET artifact_sha256=? WHERE slot=1",
+    )
+      .bind("f".repeat(64))
+      .run();
+    expect(
+      errorCode(await Effect.runPromise(Effect.either(session.assertHeld))),
+    ).toBe("control-ownership-unverified");
+    expect(
+      errorCode(
+        await Effect.runPromise(
+          Effect.either(session.arm("activate", artifact)),
+        ),
+      ),
+    ).toBe("control-intent-refused");
+    const row = await run(readControl(database()));
+    expect(Option.isSome(row) && row.value.effect_state).toBe("none");
+  });
   it("retains lost acquisition; never dispatches automatically or takes over", async () => {
     await run(bootstrapControl());
     const db = database();
@@ -285,7 +307,8 @@ describe("WO34 approved operational controls on actual native D1 (not provider p
     await Effect.runPromise(session.close("acknowledged"));
     const next = await run(coordinator(ownerB));
     const second = await Effect.runPromise(next.acquire(identity));
-    await Effect.runPromise(second.arm("activate", artifact));
+    const nextToken = await Effect.runPromise(second.arm("activate", artifact));
+    expect(nextToken.sequence).toBeGreaterThan(token.sequence);
     await Effect.runPromise(second.close("uncertain"));
     const row = await run(readControl(database()));
     expect(Option.isSome(row) && row.value.phase).toBe("uncertain");
@@ -293,6 +316,40 @@ describe("WO34 approved operational controls on actual native D1 (not provider p
     expect(
       errorCode(await Effect.runPromise(Effect.either(a.acquire(identity)))),
     ).toBe("control-acquire-refused");
+  });
+  it("retains unknown intent acknowledgement and never resets the sequence across owners", async () => {
+    await run(bootstrapControl());
+    const db = database();
+    const lost: typeof ControlDatabase.Service = {
+      ...db,
+      query: (sql, params) =>
+        db
+          .query(sql, params)
+          .pipe(
+            Effect.flatMap((rows) =>
+              sql.includes("SET effect_seq=effect_seq+1")
+                ? Effect.fail(failure("initialization", "lost-intent"))
+                : Effect.succeed(rows),
+            ),
+          ),
+    };
+    const coordinatorA = await run(
+      coordinator().pipe(Effect.provideService(ControlDatabase, lost)),
+    );
+    const session = await Effect.runPromise(coordinatorA.acquire(identity));
+    expect(
+      errorCode(
+        await Effect.runPromise(
+          Effect.either(session.arm("activate", artifact)),
+        ),
+      ),
+    ).toBe("control-intent-unknown-retained");
+    await Effect.runPromise(session.close("uncertain"));
+    const unknown = await run(readControl(db));
+    expect(Option.isSome(unknown) && unknown.value.effect_state).toBe(
+      "unknown",
+    );
+    expect(Option.isSome(unknown) && unknown.value.effect_seq).toBe(1);
   });
   it("stale closure cannot clear a newer owner, and foreign receipts cannot acknowledge an intent", async () => {
     await run(bootstrapControl());

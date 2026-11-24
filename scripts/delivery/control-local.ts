@@ -1,5 +1,11 @@
 // Dedicated disposable LOCAL adapter. No remote option or credential accessor.
-import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
+import {
+  lstat,
+  mkdtemp,
+  readFile,
+  realpath,
+  writeFile,
+} from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { Effect, Schema } from "effect";
 import { failure } from "./model.js";
@@ -34,10 +40,9 @@ export const localControls = async (input: {
   );
   if ((await Effect.runPromise(hashControl(v1))) !== CONTROL_V1_SHA256)
     throw failure("initialization", "control-v1-bytes-mismatch");
-  const directory = join(state, "control-v1");
-  await mkdir(directory);
+  const directory = await mkdtemp(join(state, "control-v1-"));
   await writeFile(join(directory, CONTROL_FILE), v1, { flag: "wx" });
-  const bootstrapConfig = join(state, "control-bootstrap.json");
+  const bootstrapConfig = `${directory}.json`;
   // Purpose-specific, never passed to Worker activation. Complete current target
   // is retained; ONLY DB native directory/history fields change.
   await writeFile(
@@ -63,21 +68,24 @@ export const localControls = async (input: {
       identity: input.prepared.artifact.identity,
       query: (sql, params) =>
         Effect.gen(function* () {
-          let index = 0;
-          const command = sql.replace(/\?/g, () => {
-            const value = params[index++];
-            if (value === undefined)
-              throw failure("configuration", "local-control-parameter-missing");
-            return value === null
-              ? "NULL"
-              : typeof value === "number"
-                ? String(value)
-                : `'${value.replace(/'/g, "''")}'`;
+          const command = yield* Effect.try({
+            try: () => {
+              let index = 0;
+              const text = sql.replace(/\?/g, () => {
+                const value = params[index++];
+                if (value === undefined) throw new Error("missing parameter");
+                return value === null
+                  ? "NULL"
+                  : typeof value === "number"
+                    ? String(value)
+                    : `'${value.replace(/'/g, "''")}'`;
+              });
+              if (index !== params.length) throw new Error("parameter count");
+              return text;
+            },
+            catch: () =>
+              failure("configuration", "local-control-parameters-invalid"),
           });
-          if (index !== params.length)
-            return yield* Effect.fail(
-              failure("configuration", "local-control-parameter-count"),
-            );
           const text = yield* Effect.tryPromise({
             try: () =>
               input.run([

@@ -1,3 +1,9 @@
+> Approval update: the owner explicitly approved the frozen10b7437 D1 control,
+> operational history/bootstrap and fail-closed lifecycle mechanism. This packet
+> is retained as its historical exact design reference. Section6 WO35 metadata
+> remains NOT APPROVED / NOT APPLIED. Current implementation/evidence/limits are
+> described in [release-lifecycle.md](release-lifecycle.md).
+
 # WO-34 exact control and composition proposal — NOT APPROVED / NOT APPLIED
 
 Parent review packet, based on verified main
