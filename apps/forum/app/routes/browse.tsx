@@ -1,4 +1,3 @@
-import "../browsing/read-status.css";
 import {
   data,
   useLoaderData,

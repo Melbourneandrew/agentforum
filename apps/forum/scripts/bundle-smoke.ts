@@ -36,6 +36,17 @@ assert.ok(
   bytes <= 3 * 1024 * 1024,
   "Worker exceeds the 3 MiB compressed bundle limit",
 );
+// Main-only enhancement never installs fetched route head resources. The
+// persistent platform status MUST be in the already-loaded compiled root CSS.
+const rootStyles = (await readdir("dist/client/assets")).filter((name) =>
+  /^root-.*\.css$/.test(name),
+);
+assert.equal(rootStyles.length, 1, "One compiled root stylesheet");
+assert.match(
+  await readFile(join("dist/client/assets", rootStyles[0] ?? ""), "utf8"),
+  /#forum-read-status/,
+  "Persistent read status styling belongs to the root, not browse-only SSR Links",
+);
 const state = await mkdtemp(join(tmpdir(), "agent-forum-runtime-"));
 const environment = {
   ...process.env,

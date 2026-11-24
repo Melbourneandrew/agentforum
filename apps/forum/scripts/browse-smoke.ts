@@ -79,6 +79,35 @@ export async function productionBrowseSmoke(
     const first = await page.goto(origin, { waitUntil: "networkidle" });
     assert.equal(first?.status(), 200);
     assert.ok(first);
+    const styleHrefs = await page
+      .locator('link[rel="stylesheet"]')
+      .evaluateAll((nodes) =>
+        nodes.map((node) => node.getAttribute("href")).sort(),
+      );
+    const assertRootStyle = async () => {
+      assert.deepEqual(
+        await page
+          .locator('link[rel="stylesheet"]')
+          .evaluateAll((nodes) =>
+            nodes.map((node) => node.getAttribute("href")).sort(),
+          ),
+        styleHrefs,
+        "Main swaps do not install arbitrary fetched-head CSS",
+      );
+      assert.deepEqual(
+        await page.locator("#forum-read-status").evaluate((node) => {
+          const style = getComputedStyle(node);
+          return {
+            position: style.position,
+            display: style.display,
+            reserved: Number.parseFloat(style.minHeight) > 0,
+          };
+        }),
+        { position: "sticky", display: "block", reserved: true },
+        "Compiled root status CSS remains available through main replacement",
+      );
+    };
+    await assertRootStyle();
     const policy = first.headers()["content-security-policy"] ?? "";
     assert.ok(policy.includes(`script-src '${readClient.integrity}'`));
     assert.equal(await page.locator("script").count(), 1);
@@ -170,12 +199,14 @@ export async function productionBrowseSmoke(
       ),
       11,
     );
+    await assertRootStyle();
     await capture(page, "actual-production-ready-desktop");
     await page.getByRole("link", { name: "Next", exact: true }).click();
     await page.waitForFunction(
       () =>
         document.querySelector("main")?.getAttribute("aria-busy") === "false",
     );
+    await assertRootStyle();
     assert.equal(await page.locator("tbody tr").count(), 4);
     assert.ok(new URL(page.url()).searchParams.has("pageCursor"));
     await page.getByRole("link", { name: "Previous", exact: true }).click();
@@ -320,6 +351,7 @@ export async function productionBrowseSmoke(
             .count(),
           0,
         );
+        await assertRootStyle();
         await capture(page, "actual-production-503-mobile-320");
       } finally {
         await restore();
@@ -327,6 +359,7 @@ export async function productionBrowseSmoke(
       await page.getByRole("link", { name: "Try again", exact: true }).click();
       await page.locator("tbody tr").first().waitFor();
       assert.equal(await page.locator("tbody tr").count(), 10);
+      await assertRootStyle();
       await capture(page, "actual-production-recovered-mobile-320");
     }
     assert.deepEqual(errors, []);
@@ -351,7 +384,7 @@ export async function productionBrowseSmoke(
     );
     assert.match(await bad.text(), /Invalid Posts query/);
     console.log(
-      "Production browse PASS: actual HTTPS Worker/private native D1, hash-only external script, no mount read/API/Agent execution, real debounce/held actual response loading, native cursor Next/Previous/reset, focus/caret, exact Tags, real400/empty distinction, real stale-response/IME/Back/503 recovery, mobile reflow and complete no-JS Enter/status.",
+      "Production browse PASS: actual HTTPS Worker/private native D1, compiled root-owned status CSS persists through main/filter/page/error/retry swaps without fetched-head resources, hash-only external script, no mount read/API/Agent execution, real debounce/held actual response loading, native cursor Next/Previous/reset, focus/caret, exact Tags, real400/empty distinction, real stale-response/IME/Back/503 recovery, mobile reflow and complete no-JS Enter/status.",
     );
   } finally {
     release?.();

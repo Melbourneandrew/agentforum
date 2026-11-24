@@ -1,5 +1,6 @@
 import { Links, Meta, Outlet } from "react-router";
 import "./style.css";
+import "./browsing/read-status.css";
 import { readClient } from "./browsing/client-manifest";
 import { EditorialShell } from "./presentation/editorial";
 

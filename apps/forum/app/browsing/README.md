@@ -10,8 +10,8 @@ wait belongs to the browser. Eligible enhanced search/navigation/pagination/retr
 MUST show visible in-document loading during actual pending reads, with real
 search debounce and stale-response protection. No fake states/artificial mount
 refetch/premature streamed200 or safety change. This closes interpretation, NOT
-acceptance. Pending runtime ADR-002/roadmap edits document the explicit owner
-decision; they do not imply unrelated pending suggestions are accepted.
+acceptance. Applied runtime ADR-002 and the roadmap record the explicit owner
+decision; unrelated pending suggestions are not accepted by implication.
 
 Earlier cold-gap receipts are historical and superseded by this owner decision.
 No new root approval or cold decision is required. Existing e834695 is retained
@@ -61,9 +61,17 @@ shared integration.
   16MiB actual streaming UTF8 bounds; complete200/400/404/500/503, fatal malformed
   UTF8/oversize/abort and robust cancel/release-lock. Inert template validation
   rejects active resources/events/styles/unsafe forms before main insertion.
-  Only title/description mirrored; richer31 head metadata remains coordinated.
-- Owned route read-status.css reserves a sticky platform line; actual production
-  assertion keeps Search stationary during pending read. No shared CSS changes.
+  Only title/description mirrored today. WO31 must hand off its pure canonical/
+  representation metadata helper for the existing parser/commit seam; update or
+  remove owned fields on validated successful swaps, never retain a prior URL
+  canonical or copy arbitrary head/link/style/script resources. WO31 owns URL/
+  representation policy; this lane does not invent it or build a head framework.
+- Existing read-status.css is imported by ROOT, not the browse route, so its
+  platform-owned reserved/sticky line survives direct route entry and main swaps.
+  Actual compiled-root CSS and persistent computed styles are checked through
+  browse/filter/paging/failure/retry swaps; no arbitrary fetched-head CSS. No CSS
+  content/shared font/style-token change. Actual Post route CSS availability must
+  additionally be proven at27/28 composition, not inferred from browse-only proof.
   Pre-debounce copy says displayed results have not updated, not fake loading.
 
 ## Verification boundaries
