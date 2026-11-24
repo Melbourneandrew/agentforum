@@ -3,16 +3,22 @@
 ## Authority and scope
 
 The parent explicitly approved the bounded root/status/index/hash-only CSP
-activation in execution-index thread83948d8f. Latest parent instruction explicitly
-keeps cold/direct initial in-document loading as a separate honest ACCEPTANCE GAP,
-not approved or waived. Earlier receipts describing that gap as settled are
-superseded for current acceptance reporting; requirements/ADRs are not edited.
-Direct/reload retains complete SSR/no-JS/allReady/final HTTP status; actual eligible
-enhanced navigation/filter/paging/retry reads show genuine in-document pending
-state, with no fake mount reread or browser-chrome substitute. Base e834695 is
-already retained without another refresh. No provider, PR merge/Complete,
-production seed/import/backfill/compatibility shim or release-scope expansion.
-Retained27 f7cc814 and28 b9aaa30 preserve their original parent histories.
+activation in execution-index thread83948d8f. LATEST EXPLICIT OWNER DISPOSITION
+supersedes prior cold-loading holds: direct URLs/reloads retain full SSR,
+complete no-JS body/allReady and accurate final HTTP status; the initial document
+wait belongs to the browser. Eligible enhanced search/navigation/pagination/retry
+MUST show visible in-document loading during actual pending reads, with real
+search debounce and stale-response protection. No fake states/artificial mount
+refetch/premature streamed200 or safety change. This closes interpretation, NOT
+acceptance. Pending runtime ADR-002/roadmap edits document the explicit owner
+decision; they do not imply unrelated pending suggestions are accepted.
+
+Earlier cold-gap receipts are historical and superseded by this owner decision.
+No new root approval or cold decision is required. Existing e834695 is retained
+without another refresh. No provider, PR merge/Complete, production seed/import/
+backfill/compatibility shim or release-scope expansion. Retained27 f7cc814 and28
+b9aaa30 preserve original parent histories and stay untouched until coordinated
+shared integration.
 
 ## Native state and presentation
 
@@ -90,7 +96,7 @@ fabricated business data/status, fault routes, production tests or proof of the
 future full Post-body integration. Real native Posts also contain hostile raw
 hook/script/mutation text which listing presentation escapes. The actual
 sanitizer, API and server entry are unchanged. App AGENTS documents the precise
-explicit renderer capability and separate cold-loading acceptance gap.
+explicit renderer capability and the owner-disposed direct-versus-enhanced loading boundary; integrated acceptance remains separately verified.
 
 `read-client-browser.ts` is an isolated presentation/transport module fixture,
 NOT real D1 acceptance. Native tests and complete inherited Docs/discovery

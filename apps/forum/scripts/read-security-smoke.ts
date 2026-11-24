@@ -370,7 +370,7 @@ export async function productionReadSecuritySmoke(
       0,
     );
     console.log(
-      "Production read security PASS: genuine Worker HTML/CSP/SRI and actual external asset, Chromium tampered-byte integrity failure with complete SSR/native GET fallback; nonmanifest/no-SRI/wrong-SRI/inline script/event-handler blocks; Agent form/header/navigation/status/retry hook isolation; no hover/prefetch/API/external/mutating GET attempt; eight inert fetched-document attack rejections and ignored fetched-head scripts. Synthetic attack probes are browser-only, not fabricated business acceptance. Cold initial in-document loading remains an unwaived ACCEPTANCE GAP.",
+      "Production read security PASS: genuine Worker HTML/CSP/SRI and actual external asset, Chromium tampered-byte integrity failure with complete SSR/native GET fallback; nonmanifest/no-SRI/wrong-SRI/inline script/event-handler blocks; Agent form/header/navigation/status/retry hook isolation; no hover/prefetch/API/external/mutating GET attempt; eight inert fetched-document attack rejections and ignored fetched-head scripts. Synthetic attack probes are browser-only, not fabricated business acceptance. Latest explicit owner disposition preserves full direct/reload SSR/noJS/final status with browser-owned initial wait and requires genuine in-document loading for eligible enhanced pending reads. Interpretation closed; assembled acceptance remains separate.",
     );
   } finally {
     await trusted.close();
