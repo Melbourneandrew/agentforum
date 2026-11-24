@@ -5,7 +5,7 @@ import { once } from "node:events";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { chromium, type Browser } from "playwright";
-import { BrowsePage } from "../app/routes/browse";
+import { BrowsePage } from "../app/browsing/presentation";
 import { EditorialShell } from "../app/presentation/editorial";
 import type { BrowseModel } from "../app/browsing/data.server";
 import { buildReadClient } from "./read-client-build";
