@@ -3,6 +3,8 @@
 // scope; WO34 retains adapter implementation. Denial occurs before adapter
 // construction or subprocesses.
 import { Effect, Either } from "effect";
+import { resolve } from "node:path";
+import { ownerEntryAuthorization, deniedOwnerAccess } from "./owner-handoff.js";
 import { failure, recovery } from "./model.js";
 import {
   deniedEntry,
@@ -10,10 +12,17 @@ import {
   EntryAuthorization,
   EntryAdapters,
 } from "./release-entry-command.js";
+const owner = ownerEntryAuthorization(
+  resolve(import.meta.dirname, "../.."),
+  deniedOwnerAccess,
+);
 const result = await Effect.runPromise(
   Effect.either(
     entryCommand(process.argv.slice(2)).pipe(
-      Effect.provideService(EntryAuthorization, deniedEntry),
+      Effect.provideService(EntryAuthorization, {
+        admit: (input) =>
+          input.mode === "cli" ? owner.admit(input) : deniedEntry.admit(input),
+      }),
       Effect.provideService(EntryAdapters, {
         prepare: () =>
           Effect.fail(

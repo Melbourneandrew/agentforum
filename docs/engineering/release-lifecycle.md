@@ -82,6 +82,19 @@ installed-state/activation adapter integration; the parent exclusively owns
 their remote execution and WO37 qualification. No provider transport has been
 enabled by local implementation.
 
+`owner-handoff.ts` now implements the retained-owner CLI bridge using the
+existing secure outside-checkout WO33 journal reader and authenticated Provider
+read interface. The supported execution service must establish source/account
+and required grants BEFORE journal lock/read or credential/provider construction;
+its default remains denied. Successful D1/Worker metadata reads do NOT imply
+write grants. The bridge revalidates exact D1 UUID/name, account-hosted origin and
+existing Worker's sole DB binding, or accepts an absent Worker for a fresh
+installation. It never creates resources, rewrites the retained journal, migrates,
+activates or proves provider terminality. The root CLI selection consumes this
+bridge with denied access until genuine execution composition is configured;
+native admission remains independently denied. Unit transports and a real secure
+local journal test establish implementation, not live provider authorization.
+
 For an admitted supported adapter, the dispatcher validates identity, consumes a
 clean complete prebuilt artifact, validates the coordinator nonce/context and
 verifies the complete artifact BEFORE any control query/bootstrap mutation,
