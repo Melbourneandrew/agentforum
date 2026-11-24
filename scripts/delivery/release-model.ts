@@ -1,5 +1,6 @@
 import { Context, Effect, Schema } from "effect";
 import { Identity } from "./model.js";
+import type { EffectToken, TerminalReceipt } from "./release-control.js";
 import type { DeliveryError } from "./model.js";
 
 export const Revision = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{40}$/));
@@ -51,10 +52,18 @@ export type ReleaseRequest = typeof ReleaseRequest.Type;
 export interface ReleaseSession {
   readonly assertHeld: Effect.Effect<void, DeliveryError>;
   // An uncertain mutation MUST retain exclusive ownership, not delete a lock.
-  // No distributed implementation is selected/installed pending parent approval.
+  // The installation-scoped D1 coordinator durably acknowledges every intent/receipt.
+  readonly arm: (
+    kind: EffectToken["kind"],
+    artifact: Artifact,
+  ) => Effect.Effect<EffectToken, DeliveryError>;
+  readonly terminal: (
+    token: EffectToken,
+    receipt: TerminalReceipt,
+  ) => Effect.Effect<void, DeliveryError>;
   readonly close: (
     outcome: "acknowledged" | "uncertain",
-  ) => Effect.Effect<void>;
+  ) => Effect.Effect<void, DeliveryError>;
 }
 export class ReleaseCoordinator extends Context.Tag(
   "delivery/ReleaseCoordinator",
@@ -78,10 +87,15 @@ export class ReleasePorts extends Context.Tag("delivery/ReleasePorts")<
     ) => Effect.Effect<Installed, DeliveryError>;
     readonly migrate: (
       artifact: Artifact,
-    ) => Effect.Effect<void, DeliveryError>;
+      token: EffectToken,
+    ) => Effect.Effect<TerminalReceipt, DeliveryError>;
     readonly activate: (
       artifact: Artifact,
-    ) => Effect.Effect<Activation, DeliveryError>;
+      token: EffectToken,
+    ) => Effect.Effect<
+      { readonly activation: Activation; readonly receipt: TerminalReceipt },
+      DeliveryError
+    >;
     readonly readiness: (
       artifact: Artifact,
       activation: Activation,

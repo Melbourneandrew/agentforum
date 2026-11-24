@@ -341,6 +341,19 @@ const artifact = Schema.decodeUnknownSync(Artifact)({
   migrations: [],
   compatibleSchemas: [],
 });
+const fixtureToken = {
+  ownerId: "33333333-3333-3333-3333-333333333333",
+  generation: 1,
+  sequence: 1,
+};
+const fixtureReceipt = (token: import("./release-control.js").EffectToken) => ({
+  ...token,
+  identity,
+  sourceRevision: artifact.sourceRevision,
+  artifactDigest: artifact.artifactDigest,
+  operationRef: "local-fixture-only",
+  outcome: "succeeded" as const,
+});
 const request = {
   identity,
   sourceRevision: artifact.sourceRevision,
@@ -366,14 +379,18 @@ const harness = (overrides: Partial<typeof ReleasePorts.Service> = {}) => {
           schemaDigest: artifact.schemaDigest,
         };
       }),
-    migrate: () =>
+    migrate: (_, token) =>
       Effect.sync(() => {
         events.push("migrate");
+        return fixtureReceipt(token);
       }),
-    activate: () =>
+    activate: (_, token) =>
       Effect.sync(() => {
         events.push("activate");
-        return { ...artifact, version: "fixture-version" };
+        return {
+          activation: { ...artifact, version: "fixture-version" },
+          receipt: fixtureReceipt(token),
+        };
       }),
     readiness: () =>
       Effect.fail(failure("readiness", "fixture-is-not-installation-proof")),
@@ -383,6 +400,8 @@ const harness = (overrides: Partial<typeof ReleasePorts.Service> = {}) => {
     acquire: () =>
       Effect.succeed({
         assertHeld: Effect.void,
+        arm: (kind) => Effect.succeed({ ...fixtureToken, kind }),
+        terminal: () => Effect.void,
         close: (result) =>
           Effect.sync(() => {
             events.push(result);
@@ -402,7 +421,7 @@ describe("WO-34 fail-closed orchestration contracts (not provider proof)", () =>
   it("does nothing without approved cross-entry serialization", async () => {
     const h = harness();
     expect(code(await h.run(request, unconfiguredCoordinator))).toBe(
-      "cross-entry-serialization-unapproved",
+      "release-control-adapter-unconfigured",
     );
     expect(h.events).toEqual([]);
   });
@@ -417,7 +436,7 @@ describe("WO-34 fail-closed orchestration contracts (not provider proof)", () =>
       "installed",
       "verify",
       "activate",
-      "uncertain",
+      "acknowledged",
     ]);
   });
   it("never activates after migration failure and retains uncertain ownership", async () => {
@@ -462,6 +481,8 @@ describe("WO-34 fail-closed orchestration contracts (not provider proof)", () =>
     const coordinator: typeof ReleaseCoordinator.Service = {
       acquire: () =>
         Effect.succeed({
+          arm: (kind) => Effect.succeed({ ...fixtureToken, kind }),
+          terminal: () => Effect.void,
           assertHeld: Effect.suspend(() =>
             held
               ? Effect.void
@@ -478,7 +499,7 @@ describe("WO-34 fail-closed orchestration contracts (not provider proof)", () =>
     );
     expect(verificationCount).toBe(2);
     expect(h.events).not.toContain("activate");
-    expect(h.events.at(-1)).toBe("uncertain");
+    expect(h.events.at(-1)).toBe("acknowledged");
   });
   it("retains ownership when interrupted during a migration", async () => {
     const events = await Effect.runPromise(
@@ -507,15 +528,46 @@ describe("WO-34 fail-closed orchestration contracts (not provider proof)", () =>
   });
   it("rejects an activation receipt for another artifact", async () => {
     const h = harness({
-      activate: () =>
+      activate: (_, token) =>
         Effect.succeed({
-          sourceRevision: artifact.sourceRevision,
-          artifactDigest: "e".repeat(64),
-          version: "other",
+          activation: {
+            sourceRevision: artifact.sourceRevision,
+            artifactDigest: "e".repeat(64),
+            version: "other",
+          },
+          receipt: fixtureReceipt(token),
         }),
     });
     expect(code(await h.run())).toBe("activated-artifact-mismatch");
     expect(h.events.at(-1)).toBe("uncertain");
+  });
+  it("surfaces typed closure failure instead of reporting ready", async () => {
+    const h = harness({
+      readiness: () =>
+        Effect.succeed({
+          sourceRevision: artifact.sourceRevision,
+          artifactDigest: artifact.artifactDigest,
+          defaultOrigin: identity.defaultOrigin,
+          checks: {
+            website: true,
+            docs: true,
+            discovery: true,
+            contract: true,
+            apiReads: true,
+          },
+        }),
+    });
+    const guard: typeof ReleaseCoordinator.Service = {
+      acquire: () =>
+        Effect.succeed({
+          assertHeld: Effect.void,
+          arm: (kind) => Effect.succeed({ ...fixtureToken, kind }),
+          terminal: () => Effect.void,
+          close: () =>
+            Effect.fail(failure("initialization", "fixture-closure-unknown")),
+        }),
+    };
+    expect(code(await h.run(request, guard))).toBe("fixture-closure-unknown");
   });
   it("rejects scaffold readiness through injected HTTP without ambient fetch", async () => {
     const seen: string[] = [];

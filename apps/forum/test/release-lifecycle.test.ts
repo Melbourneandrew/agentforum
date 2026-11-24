@@ -145,14 +145,34 @@ const harness = async (
         },
         catch: () => failure("initialization", "native-history-unreadable"),
       }),
-    migrate: () => native(() => apply(db, plan)),
-    activate: () =>
+    migrate: (_, token) =>
+      native(() => apply(db, plan)).pipe(
+        Effect.as({
+          ...token,
+          identity,
+          sourceRevision: artifact.sourceRevision,
+          artifactDigest: artifact.artifactDigest,
+          operationRef: "native-local-migrations",
+          outcome: "succeeded" as const,
+        }),
+      ),
+    activate: (_, token) =>
       Effect.sync(() => {
         events.push("activation-boundary-only");
         return {
-          sourceRevision: artifact.sourceRevision,
-          artifactDigest: artifact.artifactDigest,
-          version: "native-fixture-no-provider-version",
+          receipt: {
+            ...token,
+            identity,
+            sourceRevision: artifact.sourceRevision,
+            artifactDigest: artifact.artifactDigest,
+            operationRef: "native-local-activation-fixture",
+            outcome: "succeeded" as const,
+          },
+          activation: {
+            sourceRevision: artifact.sourceRevision,
+            artifactDigest: artifact.artifactDigest,
+            version: "native-fixture-no-provider-version",
+          },
         };
       }),
     readiness: (value, activation) =>
@@ -172,6 +192,14 @@ const harness = async (
     acquire: () =>
       Effect.succeed({
         assertHeld: Effect.void,
+        arm: (kind) =>
+          Effect.succeed({
+            kind,
+            ownerId: "33333333-3333-3333-3333-333333333333",
+            generation: 1,
+            sequence: 1,
+          }),
+        terminal: () => Effect.void,
         close: (outcome) =>
           Effect.sync(() => {
             events.push(outcome);
@@ -210,7 +238,7 @@ describe("WO-34 actual native D1 storage qualification", () => {
     expect(
       (await call(env.DB, "register", { name: "EmptyReleaseAgent" })).status,
     ).toBe(201);
-    expect(h.events).toEqual(["activation-boundary-only", "uncertain"]);
+    expect(h.events).toEqual(["activation-boundary-only", "acknowledged"]);
   });
   it("retains prior-version Agents/keys/Posts/checkpoints after committed migrations, failure, retry and compatible application reuse", async () => {
     const db = env.ISOLATED_DB,
@@ -289,7 +317,7 @@ describe("WO-34 actual native D1 storage qualification", () => {
     const retry = await harness(db, fixedPlan);
     const retryResult = await retry.run();
     expect(Either.isLeft(retryResult)).toBe(true);
-    expect(retry.events).toEqual(["activation-boundary-only", "uncertain"]);
+    expect(retry.events).toEqual(["activation-boundary-only", "acknowledged"]);
     await apply(db, fixedPlan); // Native history makes the committed prefix a no-op.
     const accepted = await call(
       db,
@@ -321,7 +349,10 @@ describe("WO-34 actual native D1 storage qualification", () => {
     const recovery = await harness(db, fixedPlan, true);
     const recovered = await recovery.run("recover");
     expect(Either.isLeft(recovered)).toBe(true);
-    expect(recovery.events).toEqual(["activation-boundary-only", "uncertain"]);
+    expect(recovery.events).toEqual([
+      "activation-boundary-only",
+      "acknowledged",
+    ]);
     expect(
       (
         await call(
