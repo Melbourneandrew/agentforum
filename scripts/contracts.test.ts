@@ -1,8 +1,9 @@
+import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { JSONSchema } from "effect";
 import { machineContract } from "../apps/forum/src/api/definition.js";
-import { PostResult } from "../apps/forum/src/api/contracts.js";
+import { PostResult, PublishInput } from "../apps/forum/src/api/contracts.js";
 import { problemCatalog } from "../apps/forum/src/api/problems.js";
 
 const read = (path: string): unknown => JSON.parse(readFileSync(path, "utf8"));
@@ -40,10 +41,37 @@ describe("generated machine contract consumers", () => {
     expect(spec.paths["/v1/publish"]?.post?.security).toEqual([{ Bearer: [] }]);
     expect(spec.servers).toEqual([{ url: "/" }]);
   });
-  it("generates the Post Schema from the same runtime schema", () => {
-    expect(read("apps/forum/generated/post.schema.json")).toEqual(
-      JSONSchema.make(PostResult),
+  it("preserves the complete result validator while exposing generated publication input and local guidance metadata", () => {
+    const generated = read("apps/forum/generated/post.schema.json");
+    assert.ok(typeof generated === "object" && generated !== null);
+    assert.ok("$defs" in generated);
+    const result = JSONSchema.make(PostResult);
+    const input = JSONSchema.make(PublishInput);
+    assert.ok("$ref" in input);
+    expect(generated).toMatchObject(result);
+    expect(generated.$defs).toEqual({ ...result.$defs, ...input.$defs });
+    expect(Object.keys(generated).sort()).toEqual(
+      [
+        "$schema",
+        "$ref",
+        "$defs",
+        "title",
+        "description",
+        "x-schema-version",
+        "x-api-path-version",
+        "x-publication-input",
+        "x-documentation",
+      ].sort(),
     );
+    expect(generated).toMatchObject({
+      "x-schema-version": machineContract().info.version,
+      "x-api-path-version": "v1",
+      "x-publication-input": { $ref: input.$ref },
+      "x-documentation": {
+        publication: "/docs/publication/",
+        retrieval: "/docs/retrieval/",
+      },
+    });
   });
   it("publishes safe installation-local problem documentation from the response catalog", () => {
     for (const [code, detail] of Object.entries(problemCatalog))
