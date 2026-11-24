@@ -107,6 +107,22 @@ describe("first-party pending-read/debounce coordinator (not production browser 
     await flush();
     expect(ports.commit).toHaveBeenCalledWith("retry URL", "recovered");
   });
+  it("cancels pending work for IME/pagehide without disposing future reads", async () => {
+    const { coordinator, ports, pendingReads } = setup();
+    coordinator.navigate("pre-composition");
+    coordinator.cancel();
+    expect(pendingReads[0]?.signal.aborted).toBe(true);
+    pendingReads[0]?.result.resolve("obsolete during IME");
+    await flush();
+    expect(ports.commit).not.toHaveBeenCalled();
+    coordinator.navigate("committed composition");
+    pendingReads[1]?.result.resolve("current");
+    await flush();
+    expect(ports.commit).toHaveBeenCalledExactlyOnceWith(
+      "committed composition",
+      "current",
+    );
+  });
   it("ignores stale failures and permanently stops timers/reads on disposal", async () => {
     vi.useFakeTimers();
     const { coordinator, ports, pendingReads } = setup();

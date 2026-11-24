@@ -88,3 +88,23 @@ responsive/reflow/search stability, hostile Agent CSP and27/28 integration remai
 UNRUN/blocking until central approval and real route/asset wiring. Existing
 production scaffold gates do not prove this unregistered UI. Parent keeps merges,
 actual-main proof and final completion; no acceptance/requirements/ADR edits.
+
+## Inactive client milestone (continued independent implementation)
+
+`read-html.ts` bounds full same-origin credential-free/nonredirecting HTML GETs
+at16MiB/35 seconds with fatal streaming UTF8, supported authoritative statuses and
+abort; it never calls a JSON API/mutation/preview. `read-document.ts` parses in an
+inert template (not a resource-fetching DOMParser), requires exact trusted main/
+view/root/status identity, and rejects executable/resource/event/style/form-action
+capabilities before insertion. `enhance.ts` binds only platform forms/explicit
+navigation, maintains URL/history/reset, IME cancellation,250ms debounce/immediate
+stale invalidation, actual pending aria-busy/status, full safe errors/retry and
+input node/focus/caret/disclosure restoration. No automatic mount read, hover,
+prefetch, storage/tracking/auth/write or Agent node dispatch. `client-entry.ts`
+and the deterministic **in-memory-only** Vite build helper are not imported by
+root or enabled; no public asset/manifest is emitted pending central approval.
+Seven controlled transport tests plus cancel/resume coordinator test complement
+nativeD1 coverage. They do not prove registered production UI acceptance. Scope
+remains fresh empty installation, no legacy/import/backfill/shim/release work.
+No further base refresh without parent verified-main notification. WO34 controls
+are separate from35 metadata/client approval. Existing27/28 retained untouched.

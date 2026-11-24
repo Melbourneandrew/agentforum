@@ -71,6 +71,9 @@ export const makeReadCoordinator = <Input, Result>(
       ports.intent(input);
       void start(input, version);
     },
+    cancel() {
+      if (active) invalidate();
+    },
     dispose() {
       active = false;
       invalidate();
