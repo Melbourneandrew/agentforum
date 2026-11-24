@@ -1,6 +1,7 @@
 // Production root entry. No automatic credential lookup, remote transport or
 // unsupported Builds attestation. Provider adapters are parent qualification
-// scope; denial is real and occurs before adapter construction or subprocesses.
+// scope; WO34 retains adapter implementation. Denial occurs before adapter
+// construction or subprocesses.
 import { Effect, Either } from "effect";
 import { failure, recovery } from "./model.js";
 import {

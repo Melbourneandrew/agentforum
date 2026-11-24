@@ -4,7 +4,7 @@
 > remains NOT APPROVED / NOT APPLIED. Current implementation/evidence/limits are
 > described in [release-lifecycle.md](release-lifecycle.md).
 
-# WO-34 exact control and composition proposal — NOT APPROVED / NOT APPLIED
+# WO-34 frozen control design and separately unapproved composition proposal
 
 Parent review packet, based on verified main
 `3e6953f502a9d90c60cf6270fe37081d05f31b28` (Docs32 + WO35 + WO33).

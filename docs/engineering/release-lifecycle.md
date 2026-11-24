@@ -70,16 +70,17 @@ terminality may block indefinitely; eventual recovery is not promised.
 
 Approved root aliases now point to the entry dispatcher:
 
-- `pnpm deploy` / `pnpm deploy:native`: native resolved-config entry.
+- `pnpm run deploy` / `pnpm deploy:native`: native resolved-config entry.
 - `pnpm deploy:cli`: retained resolved WO33-journal entry.
 - `pnpm release:qualify:local`: disposable local qualifier.
 
 Native and CLI handoffs remain distinct. The production executable currently
 **denies unsupported authorization before file reads, credential access, provider
 construction, HTTP or Wrangler**. It does not infer Builds authorization from an
-account variable, token, CI flag or build UUID. Provider handoff/account/grants and
-remote installed-state/activation adapters are parent-owned WO37 qualification;
-no provider transport has been enabled by local implementation.
+account variable, token, CI flag or build UUID. WO34 still owns the unfinished provider handoff/account/grants and remote
+installed-state/activation adapter integration; the parent exclusively owns
+their remote execution and WO37 qualification. No provider transport has been
+enabled by local implementation.
 
 For an admitted supported adapter, the dispatcher validates identity, consumes a
 clean complete prebuilt artifact, bootstraps v1, acquires the durable coordinator,
@@ -142,6 +143,7 @@ These tests prove local behavior, NOT Cloudflare lost-response terminality.
   interfaces and UI/discovery, never an in-flight branch or fake ready receipt.
 - Genuine native authorization/account/origin/credential handoff and remote
   installed-schema/history/activation/compatibility receipts remain unproved.
+  These remain WO34 implementation work, with parent-only remote qualification.
   Root denial is not a completed independent installer.
 - WO35 metadata remains NONE. Its smallest separate seam is a validated paired
   environment/revision value composed after diagnostic sanitization at the Worker
