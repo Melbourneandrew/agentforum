@@ -187,4 +187,9 @@ describe("real native physical replay, injected remote state", () => {
       );
     },
   );
+  it("SQLite bookkeeping exclusion is an exact literal prefix, not LIKE wildcard", () => {
+    expect(BUSINESS_MASTER).toContain("name NOT GLOB 'sqlite_*'");
+    expect(BUSINESS_MASTER).not.toContain("name NOT LIKE");
+    expect(BUSINESS_MASTER).not.toContain("_cf_%");
+  });
 });

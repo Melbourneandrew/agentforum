@@ -26,7 +26,7 @@ const Master = Schema.Array(
   }),
 );
 // Exact known provider/runtime bookkeeping tables, never a broad _cf_* filter.
-export const BUSINESS_MASTER = `SELECT name,type,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND tbl_name NOT IN ('${CONTROL_TABLE}','${CONTROL_HISTORY}','d1_migrations','_cf_KV','_cf_METADATA') ORDER BY name`;
+export const BUSINESS_MASTER = `SELECT name,type,tbl_name,sql FROM sqlite_master WHERE name NOT GLOB 'sqlite_*' AND tbl_name NOT IN ('${CONTROL_TABLE}','${CONTROL_HISTORY}','d1_migrations','_cf_KV','_cf_METADATA') ORDER BY name`;
 // Conservative token equality: ignore layout outside quoted values, not spaces
 // inside literals or identifier/token boundaries. This accepts native formatting
 // around punctuation without equating changed constraint literals or names.

@@ -142,7 +142,7 @@ it("native local D1 physical/history qualifies; same names with physical tamperi
       "DB",
       "--local",
       "--command",
-      "CREATE TABLE foreign_drift(id TEXT);",
+      "CREATE TABLE sqliteX_foreign_drift(id TEXT);",
     ]);
     const result = await Effect.runPromise(
       Effect.either(inspectInstalled(artifact, states, database)),
