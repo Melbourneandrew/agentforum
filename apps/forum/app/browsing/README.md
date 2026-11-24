@@ -86,3 +86,10 @@ head metadata. Authors/About remain disabled until real route composition.
 Parent serializes integration and verified-main notifications; no duplicate route
 work/history rewrite or unauthorized new base refresh. This PR is not a release,
 provider, merge or full26/27/28 acceptance claim.
+
+Inherited docs-smoke replaces only the obsolete root D1-scaffold landing text
+assertion with exact actual Posts main/heading/Search/fresh-empty state after
+Public site navigation. All Docs noJS/mobile/font/CSP/keyboard/raw/disclosure/
+no-external/no-business and30 discovery checks remain unchanged. The30579ba full
+sequence found this stale consumer after passing all other gates; failed log is
+retained and final proof is rerun, never relabeled successful.
