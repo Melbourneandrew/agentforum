@@ -89,6 +89,9 @@ export const release = (input: unknown) =>
           }
           yield* session.assertHeld;
           yield* ports.verify(artifact);
+          // Verification may yield: refuse dispatch if ownership is no longer
+          // acknowledged. This check is not fencing for a remote Worker upload.
+          yield* session.assertHeld;
           mutationBegan = true;
           const activation = yield* ports.activate(artifact).pipe(
             Effect.flatMap(Schema.decodeUnknown(Activation)),

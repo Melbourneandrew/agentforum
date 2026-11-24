@@ -449,6 +449,37 @@ describe("WO-34 fail-closed orchestration contracts (not provider proof)", () =>
       expect(h.events.at(-1)).toBe("acknowledged");
     }
   });
+  it("does not activate after ownership is lost during final artifact verification", async () => {
+    let held = true;
+    let verificationCount = 0;
+    const h = harness({
+      verify: () =>
+        Effect.sync(() => {
+          verificationCount += 1;
+          if (verificationCount === 2) held = false;
+        }),
+    });
+    const coordinator: typeof ReleaseCoordinator.Service = {
+      acquire: () =>
+        Effect.succeed({
+          assertHeld: Effect.suspend(() =>
+            held
+              ? Effect.void
+              : Effect.fail(failure("deployment", "fixture-ownership-lost")),
+          ),
+          close: (result) =>
+            Effect.sync(() => {
+              h.events.push(result);
+            }),
+        }),
+    };
+    expect(code(await h.run(request, coordinator))).toBe(
+      "fixture-ownership-lost",
+    );
+    expect(verificationCount).toBe(2);
+    expect(h.events).not.toContain("activate");
+    expect(h.events.at(-1)).toBe("uncertain");
+  });
   it("retains ownership when interrupted during a migration", async () => {
     const events = await Effect.runPromise(
       Effect.gen(function* () {
