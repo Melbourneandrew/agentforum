@@ -132,12 +132,17 @@ export const entryCommand = (args: readonly string[]) =>
       );
     // All storage mutations start only after admission and complete build/verify.
     return yield* Effect.gen(function* () {
-      yield* bootstrapControl();
+      // Pure coordinator validation must also finish before the frozen bootstrap
+      // exception. Construction performs no control queries or acquisition.
       const coordinator = yield* makeControlCoordinator({
         artifact,
         ownerId: prepared.ownerId,
         executorRef: admitted.executorRef,
       });
+      yield* prepared.ports.verify(artifact);
+      yield* bootstrapControl();
+      // release rechecks the artifact under ownership and again before activation;
+      // preflight is not a filesystem seal or external-upload fence.
       return yield* release({
         identity: artifact.identity,
         sourceRevision: artifact.sourceRevision,

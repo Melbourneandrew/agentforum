@@ -83,8 +83,9 @@ their remote execution and WO37 qualification. No provider transport has been
 enabled by local implementation.
 
 For an admitted supported adapter, the dispatcher validates identity, consumes a
-clean complete prebuilt artifact, bootstraps v1, acquires the durable coordinator,
-reverifies target/bindings, applies native business migrations, verifies installed
+clean complete prebuilt artifact, validates the coordinator nonce/context and
+verifies the complete artifact BEFORE any control query/bootstrap mutation,
+bootstraps v1, acquires durable ownership, reverifies target/bindings, applies native business migrations, verifies installed
 history, rechecks artifact AND ownership, activates, validates terminal evidence,
 then performs read-only readiness. Recovery skips SQL reversal and accepts only
 an explicitly qualified app compatible with installed schema/data.
