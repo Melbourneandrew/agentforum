@@ -13,7 +13,7 @@ jobs:
   tooling:
     name: Bootstrap tooling
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       WRANGLER_SEND_METRICS: "false"
       CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: "false"
