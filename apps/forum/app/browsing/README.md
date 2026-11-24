@@ -1,7 +1,11 @@
 # WO-26 independent browsing milestone — central integration pending
 
 Branch `8090/wo-26-search-browsing-4087db` starts from parent-designated verified
-main `3e6953f502a9d90c60cf6270fe37081d05f31b28` (Bootstrap45098907913 success).
+main `3e6953f502a9d90c60cf6270fe37081d05f31b28` (Bootstrap45098907913 success),
+then refreshes once onto verified parent WO-30/PR39 main
+`e83469589745034f93834e1c5f72a600b36fa4b3` (actual-main45313676555 success).
+Parent discovery metadata routes, enriched Post Schema/docs links, generators,
+static assets and whole35 wrapper/exact-off capture remain unchanged.
 WO-38/48 prerequisites are genuinely present. Existing WO-27/28 branches are
 not rewritten/duplicated; parent test-only WO-27 d0eba90 is preserved remotely.
 No provider operations, credentials, deployment, merge or Complete are authorized.
