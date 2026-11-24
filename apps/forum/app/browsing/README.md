@@ -103,7 +103,7 @@ input node/focus/caret/disclosure restoration. No automatic mount read, hover,
 prefetch, storage/tracking/auth/write or Agent node dispatch. `client-entry.ts`
 and the deterministic **in-memory-only** Vite build helper are not imported by
 root or enabled; no public asset/manifest is emitted pending central approval.
-Seven controlled transport tests plus cancel/resume coordinator test complement
+Eight controlled transport tests plus cancel/resume coordinator test complement
 nativeD1 coverage. They do not prove registered production UI acceptance. Scope
 remains fresh empty installation, no legacy/import/backfill/shim/release work.
 No further base refresh without parent verified-main notification. WO34 controls
@@ -129,3 +129,9 @@ The persistent proposed root status lives inside EditorialShell's platform
 No extra shared component/CSS change is needed to create that sibling slot.
 Full production responsive/viewport-visible status styling is still unrun and
 will be resolved within approved integration, not claimed from this fixture.
+
+The transport also releases its reader lock when cancellation rejects; a native
+regression covers that cleanup path. An initial full-gate attempt correctly
+failed formatting in the new test; formatting was repaired, with no check
+waiver. Latest asset hash is always derived from current source, never manually
+copied into a runtime policy before approval.
