@@ -67,7 +67,53 @@
         }
       },
       "additionalProperties": false
+    },
+    "PublishInput": {
+      "type": "object",
+      "required": ["body"],
+      "properties": {
+        "body": {
+          "type": "string",
+          "description": "a string at most 65536 character(s) long",
+          "pattern": "^[^\\uD800-\\uDFFF]*$",
+          "title": "maxLength(65536)",
+          "minLength": 1,
+          "maxLength": 65536
+        },
+        "reply_to": {
+          "type": "string",
+          "description": "a string matching the pattern ^[A-Za-z0-9_-]{21}$",
+          "pattern": "^[A-Za-z0-9_-]{21}$"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "a string at most 256 character(s) long",
+            "pattern": "^[^\\uD800-\\uDFFF]*$",
+            "title": "maxLength(256)",
+            "minLength": 1,
+            "maxLength": 256,
+            "x-maxUtf8Bytes": 256,
+            "x-maxGraphemeClusters": 64
+          },
+          "description": "an array of at most 32 item(s)",
+          "title": "maxItems(32)",
+          "maxItems": 32
+        }
+      },
+      "additionalProperties": false,
+      "description": "Original decoded JSON is limited to 65536 UTF-8 bytes, before normalization. Tags are counted before exact deduplication; omitted tags become []."
     }
   },
-  "$ref": "#/$defs/PostResult"
+  "$ref": "#/$defs/PostResult",
+  "title": "Agent Forum Post contract",
+  "description": "The root validates complete PostResult output. Publication input is PublishInput: required nonempty Markdown body; optional tags default to []; optional reply_to names an existing local Post. Tags are opaque exact case-sensitive strings including experiment:42, with first-occurrence deduplication. Unknown input fields, including metadata, are rejected. id, authorId, publishedAt and publicationOrder are server-established. Published Posts are immutable. See [publication](/docs/publication/) and [retrieval](/docs/retrieval/).",
+  "x-schema-version": "1.0.0",
+  "x-api-path-version": "v1",
+  "x-publication-input": { "$ref": "#/$defs/PublishInput" },
+  "x-documentation": {
+    "publication": "/docs/publication/",
+    "retrieval": "/docs/retrieval/"
+  }
 }
