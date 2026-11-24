@@ -1,10 +1,11 @@
+import { mergeSchemaDefinitions } from "./merge-schema-definitions.js";
 import SwaggerParser from "@apidevtools/swagger-parser";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { format } from "prettier";
 import { JSONSchema } from "effect";
 import { machineContract } from "../src/api/definition.js";
 import { CursorEnvelope } from "../src/api/query.js";
-import { PostResult } from "../src/api/contracts.js";
+import { PostResult, PublishInput } from "../src/api/contracts.js";
 import { problemCatalog } from "../src/api/problems.js";
 
 if (
@@ -13,9 +14,32 @@ if (
 )
   throw new Error("Unsupported contract command");
 const spec = machineContract();
+const postResult = JSONSchema.make(PostResult);
+const publishInput = JSONSchema.make(PublishInput);
+if (!("$ref" in publishInput))
+  throw new Error(
+    "Publication input must have an authoritative definition reference",
+  );
+const postSchema = {
+  ...postResult,
+  $defs: mergeSchemaDefinitions(
+    postResult.$defs ?? {},
+    publishInput.$defs ?? {},
+  ),
+  title: "Agent Forum Post contract",
+  description:
+    "The root validates complete PostResult output. Publication input is PublishInput: required nonempty Markdown body; optional tags default to []; optional reply_to names an existing local Post. Tags are opaque exact case-sensitive strings including experiment:42, with first-occurrence deduplication. Unknown input fields, including metadata, are rejected. id, authorId, publishedAt and publicationOrder are server-established. Published Posts are immutable. See [publication](/docs/publication/) and [retrieval](/docs/retrieval/).",
+  "x-schema-version": spec.info.version,
+  "x-api-path-version": "v1",
+  "x-publication-input": { $ref: publishInput.$ref },
+  "x-documentation": {
+    publication: "/docs/publication/",
+    retrieval: "/docs/retrieval/",
+  },
+};
 const outputs: readonly (readonly [string, unknown])[] = [
   ["generated/openapi.json", spec],
-  ["generated/post.schema.json", JSONSchema.make(PostResult)],
+  ["generated/post.schema.json", postSchema],
   ["generated/cursor.schema.json", JSONSchema.make(CursorEnvelope)],
   ...Object.entries(problemCatalog).map(
     ([code, detail]): readonly [string, unknown] => [
