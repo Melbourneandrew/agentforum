@@ -10,9 +10,9 @@ export interface ReadPorts<Input, Result> {
   readonly delay?: (milliseconds: number, run: () => void) => () => void;
 }
 const delay = (milliseconds: number, run: () => void) => {
-  const timer = setTimeout(run, milliseconds);
+  const timer = globalThis.setTimeout(run, milliseconds);
   return () => {
-    clearTimeout(timer);
+    globalThis.clearTimeout(timer);
   };
 };
 const nothing = () => undefined;
@@ -35,7 +35,7 @@ export const makeReadCoordinator = <Input, Result>(
   };
   const start = async (input: Input, version: number) => {
     if (!active || version !== revision) return;
-    const controller = new AbortController();
+    const controller = new globalThis.AbortController();
     abortRead = () => {
       controller.abort();
     };

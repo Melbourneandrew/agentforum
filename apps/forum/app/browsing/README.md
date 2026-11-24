@@ -135,3 +135,43 @@ regression covers that cleanup path. An initial full-gate attempt correctly
 failed formatting in the new test; formatting was repaired, with no check
 waiver. Latest asset hash is always derived from current source, never manually
 copied into a runtime policy before approval.
+
+## Approved activation milestone (supersedes inactive/approval-hold prose above)
+
+Parent explicitly approved the refined external hash/SRI asset/root status before
+children inside EditorialShell/200-only admitted dynamic HTML CSP/index. Accepted
+runtime ADR-002 now settles direct/reload completeSSR/final status/browser initial
+wait versus genuine enhanced-transition loading. No cold/central approval hold
+remains; no requirements changed and no new base refresh was performed.
+
+Index now registers browse, Posts navigation is real, Authors/About remain disabled
+until actual retained27/28 composition. Root emits exactly one generated hash/SRI
+external deferred asset and persistent status sibling outside main/Agent body.
+Errors/nonHTML/API/metadata/static Docs stay restrictive; allReady/status/body/
+sanitizer/whole35 capture/30 metadata/Wrangler unchanged. Generated JS uses
+qualified globalThis browser hosts and deterministic Prettier formatting so ALL
+existing lint/format checks cover it without generated-file ignores, exceptions,
+new dependencies or root task/config changes. Automatic source/asset/manifest
+parity test prevents stale capabilities. Source edits regenerate both byte hash
+and immutable manifest; never reuse the earlier inactive snapshot hashes.
+
+Owned read-status.css imported ONLY by owned browse route reserves a sticky
+platform line; Search stays fixed while the actual read is pending, including
+viewport-visible navigation status. No shared stylesheet/CSP style change.
+Inherited bundle-smoke adapts ONLY obsolete scaffold assertions to actual empty
+Posts, one exact script/form/hash policy and Operating guide; all existing native
+API/FTS/Tag/NUL/checkpoint/agent-loop/restart/noJS checks retained. New browse-smoke
+runs on that same actual HTTPS compiled Worker/private migrated D1: native API
+seed, real FTS read/cursor pagination/filter reset/Tags/focus/caret/400/empty/native
+Enter. Real Worker HTML transfer is held for pending-read assertion; never fake
+records/status/body. Observer context makes no business API or external request,
+credentials omitted on enhanced read and Agent script text inert. Node harness
+uses explicit APIResponse typing (TS inference cycle fixed), validated provider
+origin in native capability tests, and attribute-order-independent fixed GET-form
+assertions; no weakened expectations. Actual production suite passed.
+
+Registered production26 complete delayed/out-of-order/IME/keyboard/mobile/failure
+retry matrix, richer31 head metadata and retained27/28 common asset/route loading
+composition remain explicit unfinished acceptance. No merge/Complete/provider/
+legacy import/backfill/shim/new release scope. Current draft receipt/gates are
+updated per frozen activation head; older inactive467 proof is historical only.

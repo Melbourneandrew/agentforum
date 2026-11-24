@@ -12,7 +12,10 @@ export function parseReadDocument(
   html: string,
   target: URL,
 ): ReadDocument {
-  const destination = selectReadTarget(target.href, new URL(document.URL));
+  const destination = selectReadTarget(
+    target.href,
+    new globalThis.URL(document.URL),
+  );
   if (destination.kind !== "read") throw failed();
   const template = document.createElement("template");
   template.innerHTML = html;
@@ -21,7 +24,7 @@ export function parseReadDocument(
   const status = content.querySelector("#forum-read-status");
   const title = content.querySelector("title");
   if (
-    !(main instanceof HTMLElement) ||
+    !(main instanceof globalThis.HTMLElement) ||
     main.dataset.forumView !== destination.view ||
     content.querySelectorAll("main").length !== 1 ||
     content.querySelectorAll('[id="forum-content"]').length !== 1 ||
@@ -61,7 +64,7 @@ export function parseReadDocument(
   for (const link of main.querySelectorAll("a[href]")) {
     const value = link.getAttribute("href");
     if (value === null) throw failed();
-    const url = new URL(value, target);
+    const url = new globalThis.URL(value, target);
     if (
       !["http:", "https:"].includes(url.protocol) ||
       url.username ||

@@ -1,3 +1,5 @@
+import { readClient } from "../app/browsing/client-manifest";
+import { productionBrowseSmoke } from "./browse-smoke";
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
@@ -173,12 +175,21 @@ try {
   await waitReady(server);
   const response = await boundedFetch(origin);
   const html = await response.text();
-  assert.match(html, /One installation/);
-  assert.match(html, /data-database="available"/);
-  assert.doesNotMatch(html, /<script\b|<form\b|<iframe\b|<[a-z][^>]*\son\w+=/i);
+  assert.match(html, /Public forum, for Agents/);
+  assert.match(html, /No Posts have been published/);
+  assert.equal((html.match(/<script\b/g) ?? []).length, 1);
+  assert.ok(html.includes(`src="${readClient.path}"`));
+  assert.ok(html.includes(`integrity="${readClient.integrity}"`));
+  const form = /<form\b[^>]*>/.exec(html)?.[0];
+  assert.ok(form);
+  assert.match(form, /method="get"/);
+  assert.match(form, /action="\/"/);
+  assert.doesNotMatch(html, /<iframe\b|<[a-z][^>]*\son\w+=/i);
   assert.match(
     response.headers.get("Content-Security-Policy") ?? "",
-    /script-src 'none'/,
+    new RegExp(
+      `script-src '${readClient.integrity.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}'`,
+    ),
   );
   const css = /href="([^"]+\.css)"/.exec(html)?.[1];
   assert.ok(css, "SSR must link a real local stylesheet");
@@ -490,15 +501,16 @@ try {
     await page.goto(origin);
     assert.match(
       await page.locator("main").innerText(),
-      /Local D1 binding available/,
+      /Public forum, for Agents/,
     );
-    await page.getByRole("link", { name: "Runtime documentation" }).click();
+    await page.getByRole("link", { name: "Operating guide" }).click();
     assert.match(page.url(), /\/docs\//);
     assert.match(
       await page.locator("main").innerText(),
       /not a complete installation/,
     );
     await context.close();
+    await productionBrowseSmoke(browser, origin);
   } finally {
     await browser.close();
   }

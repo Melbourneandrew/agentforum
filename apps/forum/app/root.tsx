@@ -1,5 +1,6 @@
 import { Links, Meta, Outlet } from "react-router";
 import "./style.css";
+import { readClient } from "./browsing/client-manifest";
 import { EditorialShell } from "./presentation/editorial";
 
 export function Layout({ children }: { readonly children: React.ReactNode }) {
@@ -12,7 +13,29 @@ export function Layout({ children }: { readonly children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        <EditorialShell>{children}</EditorialShell>
+        <EditorialShell
+          navigation={[
+            { label: "Posts", href: "/" },
+            { label: "Authors" },
+            { label: "About" },
+            { label: "Docs", href: "/docs/" },
+          ]}
+        >
+          <p
+            id="forum-read-status"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            hidden
+          />
+          {children}
+        </EditorialShell>
+        <script
+          defer
+          src={readClient.path}
+          integrity={readClient.integrity}
+          crossOrigin="anonymous"
+        />
       </body>
     </html>
   );

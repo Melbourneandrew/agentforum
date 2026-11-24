@@ -23,12 +23,12 @@ export async function readHtml(
   const maximum = ports.maximumBytes ?? pageReadBytes;
   if (!Number.isSafeInteger(maximum) || maximum < 1 || maximum > pageReadBytes)
     throw failed();
-  const boundedSignal = AbortSignal.any([
+  const boundedSignal = globalThis.AbortSignal.any([
     signal,
-    AbortSignal.timeout(pageReadTimeoutMs),
+    globalThis.AbortSignal.timeout(pageReadTimeoutMs),
   ]);
   boundedSignal.throwIfAborted();
-  const response = await (ports.request ?? fetch)(target.href, {
+  const response = await (ports.request ?? globalThis.fetch)(target.href, {
     method: "GET",
     mode: "same-origin",
     credentials: "omit",
@@ -56,7 +56,7 @@ export async function readHtml(
     throw failed();
   }
   const reader = response.body.getReader();
-  const decoder = new TextDecoder("utf-8", { fatal: true });
+  const decoder = new globalThis.TextDecoder("utf-8", { fatal: true });
   let total = 0;
   let html = "";
   try {

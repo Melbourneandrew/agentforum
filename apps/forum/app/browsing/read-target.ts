@@ -9,7 +9,7 @@ export type ReadTarget =
 export const selectReadTarget = (href: string, current: URL): ReadTarget => {
   let url: URL;
   try {
-    url = new URL(href, current);
+    url = new globalThis.URL(href, current);
   } catch {
     return { kind: "native" };
   }
@@ -48,7 +48,7 @@ export const selectReadTarget = (href: string, current: URL): ReadTarget => {
 
 /** A changed filter/query/order starts a new selection, never a reused cursor. */
 export const changedBrowseHref = (values: URLSearchParams): string => {
-  const params = new URLSearchParams(values);
+  const params = new globalThis.URLSearchParams(values);
   params.delete("pageCursor");
   params.delete("previous");
   for (const key of ["q", "author", "parent"])

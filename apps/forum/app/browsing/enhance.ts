@@ -34,7 +34,7 @@ export function installReadEnhancement(browser: Window) {
     status.textContent = busy ? "Loading public page…" : "";
   };
   const form = (node: EventTarget | null) =>
-    node instanceof Element
+    node instanceof globalThis.Element
       ? node.closest<HTMLFormElement>('form[data-forum-search="true"]')
       : null;
   const platformForm = (value: HTMLFormElement | null) =>
@@ -46,7 +46,7 @@ export function installReadEnhancement(browser: Window) {
     read: async (input, signal) => {
       const result = await readHtml(
         input.url,
-        new URL(browser.location.href),
+        new globalThis.URL(browser.location.href),
         signal,
       );
       return parseReadDocument(document, result.html, input.url);
@@ -84,7 +84,8 @@ export function installReadEnhancement(browser: Window) {
         'form[data-forum-search="true"]',
       );
       const focused = document.activeElement;
-      const focusedInput = focused instanceof HTMLInputElement ? focused : null;
+      const focusedInput =
+        focused instanceof globalThis.HTMLInputElement ? focused : null;
       const selection =
         focusedInput?.selectionStart === null || focusedInput === null
           ? null
@@ -114,7 +115,7 @@ export function installReadEnhancement(browser: Window) {
       old.replaceWith(result.main);
       if (
         preserve &&
-        focused instanceof HTMLElement &&
+        focused instanceof globalThis.HTMLElement &&
         currentForm.contains(focused)
       ) {
         focused.focus({ preventScroll: true });
@@ -164,12 +165,15 @@ export function installReadEnhancement(browser: Window) {
     },
   });
   const change = (value: HTMLFormElement, immediate = false, force = false) => {
-    const params = new URLSearchParams();
-    for (const [key, item] of new FormData(value)) {
+    const params = new globalThis.URLSearchParams();
+    for (const [key, item] of new globalThis.FormData(value)) {
       if (typeof item !== "string") return;
       params.append(key, item);
     }
-    const url = new URL(changedBrowseHref(params), browser.location.href);
+    const url = new globalThis.URL(
+      changedBrowseHref(params),
+      browser.location.href,
+    );
     if (url.href === lastIntent && !force) return;
     const intent: Intent = { url, kind: "filter" };
     if (immediate) coordinator.navigate(intent);
@@ -177,16 +181,19 @@ export function installReadEnhancement(browser: Window) {
   };
   const input = (event: Event) => {
     // Text change on blur is not a new intent (including during history restore).
-    if (event.type === "change" && !(event.target instanceof HTMLSelectElement))
+    if (
+      event.type === "change" &&
+      !(event.target instanceof globalThis.HTMLSelectElement)
+    )
       return;
     const value = form(event.target);
     if (
       !composing &&
-      !(event instanceof InputEvent && event.isComposing) &&
+      !(event instanceof globalThis.InputEvent && event.isComposing) &&
       platformForm(value) &&
       value !== null
     )
-      change(value, event.target instanceof HTMLSelectElement);
+      change(value, event.target instanceof globalThis.HTMLSelectElement);
   };
   const submit = (event: SubmitEvent) => {
     const value = form(event.target);
@@ -218,7 +225,7 @@ export function installReadEnhancement(browser: Window) {
     )
       return;
     const link =
-      event.target instanceof Element
+      event.target instanceof globalThis.Element
         ? event.target.closest<HTMLAnchorElement>("a[href]")
         : null;
     if (
@@ -238,14 +245,17 @@ export function installReadEnhancement(browser: Window) {
       link.closest(".agent-body,.post-body,[data-agent-content]") !== null
     )
       return;
-    const target = selectReadTarget(link.href, new URL(browser.location.href));
+    const target = selectReadTarget(
+      link.href,
+      new globalThis.URL(browser.location.href),
+    );
     if (target.kind !== "read") return;
     event.preventDefault();
     composing = false;
     coordinator.navigate({ url: target.url, kind: "navigation" });
   };
   const history = () => {
-    const url = new URL(browser.location.href);
+    const url = new globalThis.URL(browser.location.href);
     if (selectReadTarget(url.href, url).kind === "read") {
       composing = false;
       coordinator.navigate({ url, kind: "history" });

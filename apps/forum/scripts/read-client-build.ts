@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
+import { format } from "prettier";
 
 /** Build in memory only. Does NOT register, emit or enable a public capability. */
 export async function buildReadClient() {
@@ -36,10 +37,11 @@ export async function buildReadClient() {
     chunk.dynamicImports.length !== 0
   )
     throw new Error("Client must be one standalone first-party asset");
-  const digest = createHash("sha256").update(chunk.code);
+  const code = await format(chunk.code, { parser: "babel" });
+  const digest = createHash("sha256").update(code);
   const hex = digest.copy().digest("hex");
   return {
-    code: chunk.code,
+    code,
     path: `/first-party/read.${hex}.js`,
     integrity: `sha256-${digest.digest("base64")}`,
   };
