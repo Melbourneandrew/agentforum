@@ -204,6 +204,7 @@ describe("independent native D1 Posts listing and URL state", () => {
     for (const path of [
       "/?q=x&q=y",
       "/?unknown=1",
+      "/?q=%E0%A4",
       "/?readCursor=anything",
       "/?limit=100",
       "/?pageCursor=bad",

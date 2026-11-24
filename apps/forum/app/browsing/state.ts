@@ -37,6 +37,10 @@ export const selectionWire = (selection: PostSelection) => ({
 /** Every cursor, including predecessor hints, is validated before the read port. */
 export const decodeBrowseState = (url: URL) =>
   Effect.gen(function* () {
+    yield* Effect.try({
+      try: () => decodeURIComponent(url.search),
+      catch: () => new InvalidBrowseState(),
+    });
     const params = url.searchParams;
     if (
       url.pathname !== "/" ||
