@@ -1,5 +1,6 @@
 // Physical-state proof, not historical SQL-byte attestation. Source inventory
-// digests label qualified states only AFTER exact native history + physical match.
+// digests remain source labels only. Installed receipts use a separately derived
+// physical-schema/native-history fingerprint; no SQL-byte history is claimed.
 import { createHash } from "node:crypto";
 import initSqlite from "@sqlite.org/sqlite-wasm";
 import { Effect, Schema } from "effect";
@@ -24,16 +25,21 @@ const Master = Schema.Array(
     sql: Schema.NullOr(Schema.String),
   }),
 );
-export const BUSINESS_MASTER = `SELECT name,type,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND tbl_name NOT IN ('${CONTROL_TABLE}','${CONTROL_HISTORY}','d1_migrations','_cf_KV') ORDER BY name`;
+// Exact known provider/runtime bookkeeping tables, never a broad _cf_* filter.
+export const BUSINESS_MASTER = `SELECT name,type,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND tbl_name NOT IN ('${CONTROL_TABLE}','${CONTROL_HISTORY}','d1_migrations','_cf_KV','_cf_METADATA') ORDER BY name`;
+// Conservative token equality: ignore layout outside quoted values, not spaces
+// inside literals or identifier/token boundaries. This accepts native formatting
+// around punctuation without equating changed constraint literals or names.
 const normalize = (sql: string) =>
-  sql
-    .replace(/\bIF NOT EXISTS\s+/g, "")
-    .trim()
-    .replace(/;$/, "")
-    .replace(
-      /('(?:[^']|'')*'|"(?:[^"]|"")*"|`(?:[^`]|``)*`|\[[^\]]*\])|(\s+)/g,
-      (match, quoted: string | undefined) => quoted ?? (match ? " " : ""),
-    );
+  JSON.stringify(
+    sql
+      .replace(/^CREATE TABLE IF NOT EXISTS\s+/, "CREATE TABLE ")
+      .trim()
+      .replace(/;$/, "")
+      .match(
+        /'(?:[^']|'')*'|"(?:[^"]|"")*"|`(?:[^`]|``)*`|\[[^\]]*\]|[A-Za-z_][A-Za-z_0-9$]*|[0-9]+(?:\.[0-9]+)?|<=|>=|!=|==|<>|[^\s]/g,
+      ),
+  );
 const canonical = (rows: typeof Master.Type) =>
   JSON.stringify(
     rows.map((row) => ({
@@ -69,7 +75,12 @@ export const physicalStates = (sources: readonly SqliteMigrationSource[]) =>
           history: history.map((entry) => entry.name),
           master,
           physicalDigest: createHash("sha256")
-            .update(canonical(master))
+            .update(
+              JSON.stringify({
+                master: canonical(master),
+                history: history.map((entry) => entry.name),
+              }),
+            )
             .digest("hex"),
         });
       };
@@ -174,11 +185,11 @@ export const inspectInstalled = (
       return yield* Effect.fail(
         failure("initialization", "business-foreign-keys-invalid"),
       );
-    const integrity = yield* database.query("PRAGMA integrity_check", []).pipe(
+    const integrity = yield* database.query("PRAGMA quick_check", []).pipe(
       Effect.flatMap(
         Schema.decodeUnknown(
           Schema.Array(
-            Schema.Struct({ integrity_check: Schema.Literal("ok") }),
+            Schema.Struct({ quick_check: Schema.Literal("ok") }),
           ).pipe(Schema.itemsCount(1)),
         ),
       ),
@@ -192,6 +203,6 @@ export const inspectInstalled = (
       );
     return {
       databaseId: artifact.identity.databaseId,
-      schemaDigest: state.inventory,
+      schemaDigest: state.physicalDigest,
     };
   });

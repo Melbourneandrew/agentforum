@@ -103,17 +103,22 @@ export const entryCommand = (args: readonly string[]) =>
           : parsed.values.identity) ?? "",
     };
     const authorization = yield* EntryAuthorization;
-    const admitted = yield* authorization.admit(input).pipe(
-      Effect.flatMap(Schema.decodeUnknown(Admission)),
-      Effect.mapError(() =>
-        failure(
-          "authorization",
-          mode === "native"
-            ? "native-authorization-handoff-unproved"
-            : "owner-execution-authorization-unconfigured",
+    const admitted = yield* authorization
+      .admit(input)
+      .pipe(
+        Effect.flatMap((value) =>
+          Schema.decodeUnknown(Admission)(value).pipe(
+            Effect.mapError(() =>
+              failure(
+                "authorization",
+                mode === "native"
+                  ? "native-authorization-handoff-unproved"
+                  : "owner-execution-authorization-unconfigured",
+              ),
+            ),
+          ),
         ),
-      ),
-    );
+      );
     if (!input.inputPath)
       return yield* Effect.fail(
         failure("configuration", "resolved-installation-input-required"),

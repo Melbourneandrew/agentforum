@@ -6,12 +6,13 @@ import {
   AccountId,
   Database,
   HostedOrigin,
+  Identity,
   failure,
   type DeliveryError,
 } from "./model.js";
 import { IdentityStore } from "./provision.js";
 import { Provider } from "./provider.js";
-import { ExecutorRef } from "./release-control.js";
+import { ExecutorRef, sameIdentity } from "./release-control.js";
 import { cliIdentity } from "./release-config.js";
 import type {
   EntryInput,
@@ -21,6 +22,7 @@ import type {
 const OwnerContext = Schema.Struct({
   accountId: AccountId,
   executorRef: ExecutorRef,
+  identity: Schema.optional(Identity),
 });
 export class OwnerReleaseAccess extends Context.Tag(
   "delivery/OwnerReleaseAccess",
@@ -68,6 +70,10 @@ export const verifyOwnerHandoff = (input: EntryInput) =>
     if (identity.accountId !== context.accountId)
       return yield* Effect.fail(
         failure("authorization", "owner-account-mismatch"),
+      );
+    if (context.identity && !sameIdentity(context.identity, identity))
+      return yield* Effect.fail(
+        failure("authorization", "parent-retained-identity-mismatch"),
       );
     // Construction/credential access is lazy and AFTER authority plus journal checks.
     const provider = yield* access.provider;

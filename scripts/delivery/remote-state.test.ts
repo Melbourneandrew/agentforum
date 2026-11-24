@@ -41,7 +41,7 @@ describe("real native physical replay, injected remote state", () => {
     const states = await Effect.runPromise(physicalStates(sources));
     expect(states).toHaveLength(4);
     expect(states[0]?.master).toEqual([]);
-    expect(states[1]?.physicalDigest).toBe(states[0]?.physicalDigest); // runtime SELECT1, but distinct history
+    expect(states[1]?.physicalDigest).not.toBe(states[0]?.physicalDigest); // empty business schema, but distinct native history
     expect(states[3]?.master.some((row) => row.name === "post_fts")).toBe(true);
     expect(states[3]?.physicalDigest).not.toBe(states[2]?.physicalDigest);
     for (const state of states) {
@@ -67,8 +67,8 @@ describe("real native physical replay, injected remote state", () => {
                       id: index + 1,
                       name,
                     }))
-                  : sql === "PRAGMA integrity_check"
-                    ? [{ integrity_check: "ok" }]
+                  : sql === "PRAGMA quick_check"
+                    ? [{ quick_check: "ok" }]
                     : [],
           ),
       };
@@ -76,7 +76,7 @@ describe("real native physical replay, injected remote state", () => {
         await Effect.runPromise(inspectInstalled(artifact, states, database)),
       ).toEqual({
         databaseId: identity.databaseId,
-        schemaDigest: state.inventory,
+        schemaDigest: state.physicalDigest,
       });
     }
   });
@@ -135,4 +135,56 @@ describe("real native physical replay, injected remote state", () => {
       "business-schema-unreadable",
     );
   });
+  it.each([
+    [
+      "CREATE TABLE custom(v TEXT CHECK(v!='one  two'))",
+      "CREATE TABLE custom(v TEXT CHECK(v!='one two'))",
+    ],
+    [
+      "CREATE TABLE custom(v TEXT CHECK(v!='IF NOT EXISTS x'))",
+      "CREATE TABLE custom(v TEXT CHECK(v!='x'))",
+    ],
+    ["CREATE TABLE custom(a b)", "CREATE TABLE custom(ab)"],
+  ])(
+    "layout normalization cannot hide changed literals/token boundaries",
+    async (expected, actual) => {
+      const states = [
+        {
+          inventory: "d".repeat(64),
+          history: [],
+          physicalDigest: "c".repeat(64),
+          master: [
+            {
+              name: "custom",
+              type: "table",
+              tbl_name: "custom",
+              sql: expected,
+            },
+          ],
+        },
+      ];
+      const database: typeof ControlDatabase.Service = {
+        identity,
+        query: (sql) =>
+          Effect.succeed(
+            sql === BUSINESS_MASTER
+              ? [
+                  {
+                    name: "custom",
+                    type: "table",
+                    tbl_name: "custom",
+                    sql: actual,
+                  },
+                ]
+              : [],
+          ),
+      };
+      const result = await Effect.runPromise(
+        Effect.either(inspectInstalled(artifact, states, database)),
+      );
+      expect(Either.isLeft(result) && result.left.code).toBe(
+        "physical-state-unqualified",
+      );
+    },
+  );
 });
