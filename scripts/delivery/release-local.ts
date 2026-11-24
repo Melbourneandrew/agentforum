@@ -2,6 +2,7 @@
 // Every Wrangler mutation is explicitly --local; credentials and inherited HOME
 // are excluded. The production/default flow remains blocked pending approval.
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -11,13 +12,22 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { Effect, Either, Schema } from "effect";
-import { Revision } from "./release-model.js";
+import { localControls } from "./control-local.js";
+import {
+  entryCommand,
+  EntryAdapters,
+  EntryAuthorization,
+} from "./release-entry-command.js";
+import { readControl, type TerminalReceipt } from "./release-control.js";
+import { Option } from "effect";
+import { Revision, type ReleasePorts } from "./release-model.js";
 import { Identity } from "./model.js";
 import {
   cliIdentity,
   decodeConfig,
   nativeIdentity,
   prepareTarget,
+  schemaDigest,
 } from "./release-config.js";
 import { inspectReadiness, ReadinessHttp } from "./release-readiness.js";
 import { failure } from "./model.js";
@@ -129,12 +139,14 @@ const qualify = async () => {
   };
   const wrangler = resolve("apps/forum/node_modules/wrangler/bin/wrangler.js");
   const run = async (args: string[]) => {
-    await execute(process.execPath, [wrangler, ...args], {
-      cwd: root,
-      env: environment,
-      timeout: 30000,
-      maxBuffer: 4 * 1024 * 1024,
-    });
+    return (
+      await execute(process.execPath, [wrangler, ...args], {
+        cwd: root,
+        env: environment,
+        timeout: 30000,
+        maxBuffer: 4 * 1024 * 1024,
+      })
+    ).stdout;
   };
   try {
     step = "source-revision";
@@ -228,10 +240,13 @@ const qualify = async () => {
       "--persist-to",
       join(state, "d1"),
     ];
-    step = "local-migrations";
-    await run(["d1", "migrations", "apply", "DB", "--local", ...config]);
-    step = "local-migrations";
-    await run(["d1", "migrations", "apply", "DB", "--local", ...config]);
+    const controls = await localControls({ prepared, root, state, run });
+    const journalPath = join(state, "retained-cli-identity.json");
+    await writeFile(
+      journalPath,
+      JSON.stringify({ state: "resolved", identity }),
+      { flag: "wx" },
+    );
     step = "disposable-local-tls";
     const certificate = join(state, "certificate.pem"),
       key = join(state, "key.pem");
@@ -385,8 +400,185 @@ const qualify = async () => {
         },
       );
     };
-    step = "local-built-worker";
-    await start();
+    const terminal = (
+      token: import("./release-control.js").EffectToken,
+      operationRef: string,
+    ): TerminalReceipt => ({
+      ...token,
+      identity,
+      sourceRevision,
+      artifactDigest: prepared.artifact.artifactDigest,
+      operationRef,
+      outcome: "succeeded",
+    });
+    const localReadiness = (
+      artifact: import("./release-model.js").Artifact,
+      activation: import("./release-model.js").Activation,
+    ) =>
+      inspectReadiness(artifact, activation).pipe(
+        Effect.provideService(ReadinessHttp, {
+          request: (request) =>
+            Effect.tryPromise({
+              try: () =>
+                localFetch(
+                  new Request(
+                    new URL(
+                      new URL(request.url).pathname +
+                        new URL(request.url).search,
+                      base,
+                    ),
+                    request,
+                  ),
+                  { signal: AbortSignal.timeout(5000) },
+                ),
+              catch: () => failure("readiness", "local-surface-unavailable"),
+            }),
+        }),
+      );
+    const ports: typeof ReleasePorts.Service = {
+      build: () => Effect.succeed(prepared.artifact),
+      verify: () =>
+        Effect.gen(function* () {
+          const current = yield* Effect.tryPromise({
+            try: () => readFile(builtConfig, "utf8"),
+            catch: () => failure("build", "local-built-config-unreadable"),
+          });
+          const raw = yield* decodeConfig(current);
+          const verified = yield* prepareTarget({
+            raw,
+            builtConfig,
+            output: join(state, "verify-only.json"),
+            identity,
+            sourceRevision,
+            authorizeTarget: true,
+          });
+          if (
+            verified.artifact.artifactDigest !==
+            prepared.artifact.artifactDigest
+          )
+            return yield* Effect.fail(
+              failure("build", "local-artifact-changed"),
+            );
+        }),
+      installed: () =>
+        Effect.gen(function* () {
+          const exists = yield* controls.database.query(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='d1_migrations'",
+            [],
+          );
+          const applied = exists.length
+            ? yield* controls.database.query(
+                "SELECT name FROM d1_migrations ORDER BY id",
+                [],
+              )
+            : [];
+          const names = yield* Schema.decodeUnknown(
+            Schema.Array(Schema.Struct({ name: Schema.String })),
+          )(applied).pipe(
+            Effect.mapError(() =>
+              failure("initialization", "local-history-invalid"),
+            ),
+          );
+          const prefix = prepared.artifact.migrations.slice(0, names.length);
+          if (names.some((row, index) => row.name !== prefix[index]?.name))
+            return yield* Effect.fail(
+              failure("initialization", "local-history-not-prefix"),
+            );
+          // Disposable-local qualification only, not historical provider SQL attestation.
+          return {
+            databaseId: identity.databaseId,
+            schemaDigest: schemaDigest(prefix),
+          };
+        }),
+      migrate: (_, token) =>
+        Effect.tryPromise({
+          try: async () => {
+            step = "local-business-migrations";
+            await run([
+              "d1",
+              "migrations",
+              "apply",
+              "DB",
+              "--local",
+              ...config,
+            ]);
+            return terminal(token, "local:native-business-migrations");
+          },
+          catch: () => failure("initialization", "local-migration-unknown"),
+        }),
+      activate: (_, token) =>
+        Effect.tryPromise({
+          try: async () => {
+            step = "local-built-worker";
+            await start();
+            return {
+              activation: {
+                sourceRevision,
+                artifactDigest: prepared.artifact.artifactDigest,
+                version: "local-built-worker-no-provider-version",
+              },
+              receipt: terminal(token, `local:worker:${String(child?.pid)}`),
+            };
+          },
+          catch: () => failure("deployment", "local-worker-activation-failed"),
+        }),
+      readiness: localReadiness,
+    };
+    const runEntry = async (mode: "native" | "cli") => {
+      step = `local-root-${mode}-entry`;
+      const result = await Effect.runPromise(
+        Effect.either(
+          entryCommand([
+            mode,
+            mode === "native" ? "--resolved-config" : "--identity",
+            mode === "native" ? prepared.artifact.configPath : journalPath,
+          ]).pipe(
+            Effect.provideService(EntryAuthorization, {
+              admit: (input) =>
+                Effect.gen(function* () {
+                  const text = yield* Effect.tryPromise({
+                    try: () => readFile(input.inputPath, "utf8"),
+                    catch: () =>
+                      failure("configuration", "local-entry-input-unreadable"),
+                  });
+                  const raw = yield* decodeConfig(text);
+                  const selected =
+                    input.mode === "native"
+                      ? yield* nativeIdentity(raw, {
+                          accountId: identity.accountId,
+                          defaultOrigin: identity.defaultOrigin,
+                        })
+                      : yield* cliIdentity(raw);
+                  return {
+                    identity: selected,
+                    executorRef: `local:root:${String(process.pid)}:${mode}`,
+                  };
+                }),
+            }),
+            Effect.provideService(EntryAdapters, {
+              prepare: () =>
+                Effect.succeed({
+                  artifact: prepared.artifact,
+                  ports,
+                  database: controls.database,
+                  bootstrap: controls.bootstrap,
+                  ownerId: randomUUID(),
+                }),
+            }),
+          ),
+        ),
+      );
+      assert.ok(
+        Either.isLeft(result) && result.left.stage === "readiness",
+        "Actual local entry must stop at incomplete product readiness",
+      );
+      const row = await Effect.runPromise(readControl(controls.database));
+      assert.ok(
+        Option.isSome(row) && row.value.phase === "idle",
+        "Known-terminal readiness failure should durably close, not strand ownership",
+      );
+    };
+    await runEntry("native");
     step = "local-agent-loop";
     step = "local-registration";
     const signup = await call("register", { name: "RootLocalReleaseAgent" });
@@ -414,10 +606,7 @@ const qualify = async () => {
     assert.ok(child);
     await stop(child);
     child = undefined;
-    step = "local-migrations";
-    await run(["d1", "migrations", "apply", "DB", "--local", ...config]);
-    step = "local-built-worker";
-    await start();
+    await runEntry("cli");
     const accepted = await call(
       "publish",
       { body: "after local application restart" },
@@ -523,7 +712,8 @@ const qualify = async () => {
         worker: "real-built-worker-restarted",
         keysAndCheckpoints: "retained",
         provider: "not-run",
-        serialization: "approval-blocked",
+        serialization: "actual-local-d1-native-cli-owned",
+        rootEntries: "actual-native-cli-dispatchers-local-transport",
         readiness: "failed-as-required-for-current-scaffold",
       }),
     );
