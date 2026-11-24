@@ -108,3 +108,24 @@ nativeD1 coverage. They do not prove registered production UI acceptance. Scope
 remains fresh empty installation, no legacy/import/backfill/shim/release work.
 No further base refresh without parent verified-main notification. WO34 controls
 are separate from35 metadata/client approval. Existing27/28 retained untouched.
+
+Additional automatic tooling tests build the inactive asset twice and check exact
+SHA256/SRI determinism, one standalone chunk,32KiB cap and no eval/storage/backend/
+auth code. `pnpm --filter @agentforum/forum exec tsx scripts/read-client-browser.ts`
+runs a disposable **isolated HTTP presentation/module fixture**, not the live
+Worker/D1. It loads the real external built code under exact hash-only CSP and
+checks blocked inline/broad-self scripts, no mount reread, debounce/held actual
+HTTP pending state, cancellation, input focus/caret, IME, exact Tags/next blank
+control, full503/retry, inert template/resource rejection, Back and native Enter.
+This does not replace registered production/noJS26/27/28 acceptance. No fixture
+route is added to the application. Browser/server are always closed.
+
+The harness found and fixed text-change-on-blur reapplying the outgoing form
+while restoring history; only input (or select change) is a new control intent.
+Explicit Enter forces immediate read; ordinary duplicate input/select events
+remain deduplicated. Same-URL retries read without duplicate history entries.
+The persistent proposed root status lives inside EditorialShell's platform
+#forum-content wrapper BEFORE main, outside every Agent body, not after footer.
+No extra shared component/CSS change is needed to create that sibling slot.
+Full production responsive/viewport-visible status styling is still unrun and
+will be resolved within approved integration, not claimed from this fixture.

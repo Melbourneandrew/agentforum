@@ -20,7 +20,7 @@ export function installReadEnhancement(browser: Window) {
     !["posts", "post", "authors", "about"].includes(
       main()?.dataset.forumView ?? "",
     ) ||
-    content.contains(status) ||
+    (main()?.contains(status) ?? false) ||
     document.querySelectorAll('[id="forum-content"]').length !== 1 ||
     document.querySelectorAll('[id="forum-read-status"]').length !== 1
   )
@@ -63,7 +63,10 @@ export function installReadEnhancement(browser: Window) {
         filterHistory = false;
         return;
       }
-      if (input.kind === "filter" && filterHistory)
+      if (
+        input.url.href === browser.location.href ||
+        (input.kind === "filter" && filterHistory)
+      )
         browser.history.replaceState(null, "", input.url);
       else browser.history.pushState(null, "", input.url);
       filterHistory = input.kind === "filter";
@@ -173,6 +176,9 @@ export function installReadEnhancement(browser: Window) {
     else coordinator.change(intent);
   };
   const input = (event: Event) => {
+    // Text change on blur is not a new intent (including during history restore).
+    if (event.type === "change" && !(event.target instanceof HTMLSelectElement))
+      return;
     const value = form(event.target);
     if (
       !composing &&
