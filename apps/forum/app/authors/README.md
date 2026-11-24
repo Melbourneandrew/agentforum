@@ -144,3 +144,23 @@ the Authors evidence directory. No separate theme or public docs prose overhaul.
 Parent owns protected contracts/config, independent review, merge, actual-main
 proof and final Complete. This delegated owner leaves PR open/In Review, does not
 merge/Complete, and awaits separate authorization before WO-26.
+
+## Verified WO-30 base refresh and accepted loading disposition
+
+Parent actual-main Bootstrap45313676555 SUCCESS for exact PR39 main
+e83469589745034f93834e1c5f72a600b36fa4b3 authorized one retained-branch refresh.
+After27's coherent verification sequence completed, this existing branch merged
+that exact base once, conflict-free, preserving9fd53da history and the previously
+approved Docs generator/navigation outputs.30 authoritative PostSchema/meta/guides
+and whole35 wrapper/capture remain unchanged. No common26 client/route scope is
+copied or stacked here; reusable UI remains generic origin, no maintained-domain
+hardcode/general-host mechanism/new WO/provider/production tests/merge/Complete.
+
+Accepted runtime ADR-002 supersedes the old cold-loading decision-hold prose:
+direct/reload preserves fullSSR/noJS/final status and initial wait belongs to the
+browser; eligible enhanced transitions require real in-document pending reads.
+Bounded external hash/SRI/root/CSP/current26 proof is recorded in parent thread
+83948d8f. No inline hydration, fake initial fetch or premature200 shell allowed.
+This base refresh does NOT install/prove28 common-asset/status/navigation hooks or
+cross-page loading. That remains serialized integration, not unresolved cold-load
+interpretation or a requirement waiver. Richer31 metadata stays separately owned.
