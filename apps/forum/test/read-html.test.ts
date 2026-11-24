@@ -90,6 +90,26 @@ describe("bounded HTML transport — controlled Response unit evidence, not enab
     ).rejects.toThrow();
     expect(cancel).toHaveBeenCalledTimes(1);
   });
+  it("releases its stream lock even if overflow cancellation itself rejects", async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(value) {
+        value.enqueue(new TextEncoder().encode("too large"));
+      },
+      cancel() {
+        throw new Error("Synthetic cleanup failure");
+      },
+    });
+    const response = new Response(stream, {
+      headers: { "Content-Type": "text/html" },
+    });
+    await expect(
+      readHtml(current, current, controller().signal, {
+        request: vi.fn<typeof fetch>().mockResolvedValue(response),
+        maximumBytes: 1,
+      }),
+    ).rejects.toThrow();
+    expect(response.body?.locked).toBe(false);
+  });
   it("rejects declared oversized bodies and malformed UTF8 rather than partial content", async () => {
     for (const response of [
       new Response("<main/>", {

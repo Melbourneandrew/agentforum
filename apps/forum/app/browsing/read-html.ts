@@ -73,7 +73,10 @@ export async function readHtml(
     if (total === 0) throw failed();
     return { html, status: response.status };
   } finally {
-    await reader.cancel();
-    reader.releaseLock();
+    try {
+      await reader.cancel();
+    } finally {
+      reader.releaseLock();
+    }
   }
 }
