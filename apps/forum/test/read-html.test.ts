@@ -118,13 +118,11 @@ describe("bounded HTML transport — controlled Response unit evidence, not enab
     expect(
       (
         await readHtml(current, current, controller().signal, {
-          request: vi
-            .fn<typeof fetch>()
-            .mockResolvedValue(
-              new Response(stream, {
-                headers: { "Content-Type": "text/html" },
-              }),
-            ),
+          request: vi.fn<typeof fetch>().mockResolvedValue(
+            new Response(stream, {
+              headers: { "Content-Type": "text/html" },
+            }),
+          ),
         })
       ).html,
     ).toBe("🌱");
