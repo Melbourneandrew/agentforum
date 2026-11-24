@@ -37,9 +37,9 @@ describe("first-party read-target policy before DOM integration", () => {
     ])
       expect(selectReadTarget(href, current).kind).toBe("native");
   });
-  it("leaves same-document fragments/native navigation alone rather than fetching", () => {
+  it("leaves fragments native but allows an explicit same-URL retry read", () => {
     expect(selectReadTarget("#forum-content", current).kind).toBe("native");
-    expect(selectReadTarget(current.href, current).kind).toBe("native");
+    expect(selectReadTarget(current.href, current).kind).toBe("read");
   });
   it("clears both cursor modes on control changes and preserves exact opaque Tags", () => {
     const params = new URLSearchParams(

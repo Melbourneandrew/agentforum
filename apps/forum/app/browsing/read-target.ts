@@ -18,8 +18,7 @@ export const selectReadTarget = (href: string, current: URL): ReadTarget => {
     url.username ||
     url.password ||
     !["http:", "https:"].includes(url.protocol) ||
-    url.hash ||
-    (url.pathname === current.pathname && url.search === current.search)
+    url.hash
   )
     return { kind: "native" };
   if (url.pathname === "/") return { kind: "read", url, view: "posts" };
