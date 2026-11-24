@@ -1,11 +1,17 @@
 // Actual compiled local Worker/private D1 only; called while bundle-smoke owns it.
 import assert from "node:assert/strict";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import { Schema } from "effect";
 import type { APIResponse, Browser } from "playwright";
 import { RegistrationResult, PostResult } from "../src/api/contracts.js";
 import { readClient } from "../app/browsing/client-manifest";
 
-export async function productionBrowseSmoke(browser: Browser, origin: string) {
+export async function productionBrowseSmoke(
+  browser: Browser,
+  origin: string,
+  fault?: () => Promise<() => Promise<void>>,
+) {
   assert.ok(
     ["127.0.0.1", "localhost", "[::1]"].includes(new URL(origin).hostname),
   );
@@ -15,6 +21,15 @@ export async function productionBrowseSmoke(browser: Browser, origin: string) {
     javaScriptEnabled: false,
     ignoreHTTPSErrors: true,
   });
+  const evidence = process.env.BROWSE_EVIDENCE;
+  const capture = async (page: import("playwright").Page, name: string) => {
+    if (evidence === undefined) return;
+    await mkdir(evidence, { recursive: true });
+    await page.screenshot({
+      path: path.join(evidence, name + ".png"),
+      fullPage: true,
+    });
+  };
   let release: (() => void) | undefined;
   try {
     const registered = await seed.request.post(origin + "/v1/register", {
@@ -136,6 +151,7 @@ export async function productionBrowseSmoke(browser: Browser, origin: string) {
       ).length,
       0,
     );
+    await capture(page, "actual-production-pending-desktop");
     gate.resolve(undefined);
     await page.waitForFunction(
       () =>
@@ -152,6 +168,7 @@ export async function productionBrowseSmoke(browser: Browser, origin: string) {
       ),
       11,
     );
+    await capture(page, "actual-production-ready-desktop");
     await page.getByRole("link", { name: "Next", exact: true }).click();
     await page.waitForFunction(
       () =>
@@ -207,6 +224,115 @@ export async function productionBrowseSmoke(browser: Browser, origin: string) {
     );
     assert.ok(requests.every((value) => value.url.origin === origin));
     assert.deepEqual(errors, []);
+    // Real native responses can arrive out of order; obsolete reads cannot repaint.
+    const obsolete = 'wo26orchard "green pear"';
+    const oldGate = Promise.withResolvers<undefined>();
+    release = () => {
+      oldGate.resolve(undefined);
+    };
+    await page.route("**/*", async (route) => {
+      if (new URL(route.request().url()).searchParams.get("q") !== obsolete) {
+        await route.fallback();
+        return;
+      }
+      const response = await route.fetch();
+      assert.equal(response.status(), 200);
+      await oldGate.promise;
+      await route.fulfill({ response }).catch(() => {
+        assert.ok(
+          route.request().failure()?.errorText.includes("ERR_ABORTED"),
+          "Only stale cancellation may stop transfer",
+        );
+      });
+    });
+    const oldRead = page.waitForRequest(
+      (request) => new URL(request.url()).searchParams.get("q") === obsolete,
+    );
+    await search.fill(obsolete);
+    await oldRead;
+    await search.fill("wo26absent");
+    await page
+      .getByText("No Posts match these filters and Text Query.", {
+        exact: true,
+      })
+      .waitFor();
+    oldGate.resolve(undefined);
+    await page.waitForTimeout(100);
+    assert.equal(await page.locator("tbody tr").count(), 0);
+    assert.equal(new URL(page.url()).searchParams.get("q"), "wo26absent");
+    const beforeIme = requests.filter(
+      (value) => value.url.pathname === "/",
+    ).length;
+    await search.dispatchEvent("compositionstart", { data: "wo26" });
+    await search.fill("wo26orchard");
+    await page.waitForTimeout(350);
+    assert.equal(
+      requests.filter((value) => value.url.pathname === "/").length,
+      beforeIme,
+    );
+    const committedIme = page.waitForRequest(
+      (request) =>
+        new URL(request.url()).searchParams.get("q") === "wo26orchard",
+    );
+    await search.dispatchEvent("compositionend", { data: "wo26orchard" });
+    await committedIme;
+    await page.locator("tbody tr").first().waitFor();
+    await page.goBack();
+    await page
+      .getByText("No Posts match these filters and Text Query.", {
+        exact: true,
+      })
+      .waitFor();
+    for (const width of [375, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      assert.ok(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+        "No document-wide mobile overflow",
+      );
+      await search.focus();
+      assert.equal(
+        await search.evaluate((node) => document.activeElement === node),
+        true,
+      );
+    }
+    assert.deepEqual(errors, []);
+    if (fault !== undefined) {
+      const restore = await fault();
+      try {
+        const unavailable = page.waitForResponse(
+          (response) =>
+            new URL(response.url()).searchParams.get("q") === "wo26orchard",
+        );
+        await search.fill("wo26orchard");
+        assert.equal((await unavailable).status(), 503);
+        await page
+          .getByRole("heading", { name: "Posts could not be loaded" })
+          .waitFor();
+        assert.equal(
+          await page
+            .getByText("No Posts match these filters and Text Query.", {
+              exact: true,
+            })
+            .count(),
+          0,
+        );
+        await capture(page, "actual-production-503-mobile-320");
+      } finally {
+        await restore();
+      }
+      await page.getByRole("link", { name: "Try again", exact: true }).click();
+      await page.locator("tbody tr").first().waitFor();
+      assert.equal(await page.locator("tbody tr").count(), 10);
+      await capture(page, "actual-production-recovered-mobile-320");
+    }
+    assert.deepEqual(errors, []);
+    assert.equal(
+      requests.filter((value) => value.url.pathname.startsWith("/v1")).length,
+      0,
+    );
+    assert.ok(requests.every((value) => value.url.origin === origin));
     const nojs = await native.newPage();
     await nojs.goto(origin);
     await nojs.getByRole("searchbox", { name: "Search" }).fill("wo26orchard");
@@ -215,6 +341,7 @@ export async function productionBrowseSmoke(browser: Browser, origin: string) {
       nojs.getByRole("searchbox", { name: "Search" }).press("Enter"),
     ]);
     assert.equal(await nojs.locator("tbody tr").count(), 10);
+    await capture(nojs, "actual-production-nojs-ready");
     const bad = await native.request.get(origin + "/?q=%22unterminated");
     assert.equal(bad.status(), 400);
     assert.ok(
@@ -222,7 +349,7 @@ export async function productionBrowseSmoke(browser: Browser, origin: string) {
     );
     assert.match(await bad.text(), /Invalid Posts query/);
     console.log(
-      "Production browse PASS: actual HTTPS Worker/private native D1, hash-only external script, no mount read/API/Agent execution, real debounce/held actual response loading, native cursor Next/Previous/reset, focus/caret, exact Tags, real400/empty distinction and complete no-JS Enter/status.",
+      "Production browse PASS: actual HTTPS Worker/private native D1, hash-only external script, no mount read/API/Agent execution, real debounce/held actual response loading, native cursor Next/Previous/reset, focus/caret, exact Tags, real400/empty distinction, real stale-response/IME/Back/503 recovery, mobile reflow and complete no-JS Enter/status.",
     );
   } finally {
     release?.();

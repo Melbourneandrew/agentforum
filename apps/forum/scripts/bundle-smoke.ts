@@ -510,7 +510,33 @@ try {
       /not a complete installation/,
     );
     await context.close();
-    await productionBrowseSmoke(browser, origin);
+    await productionBrowseSmoke(browser, origin, () => {
+      const ddl = (command: string) => {
+        execFileSync(
+          "pnpm",
+          [
+            "exec",
+            "wrangler",
+            "d1",
+            "execute",
+            "DB",
+            "--local",
+            "--config",
+            "../../wrangler.jsonc",
+            "--persist-to",
+            state,
+            "--command",
+            command,
+          ],
+          { env: environment, stdio: "ignore" },
+        );
+      };
+      ddl("ALTER TABLE posts RENAME TO posts_browse_fault");
+      return Promise.resolve(() => {
+        ddl("ALTER TABLE posts_browse_fault RENAME TO posts");
+        return Promise.resolve();
+      });
+    });
   } finally {
     await browser.close();
   }
