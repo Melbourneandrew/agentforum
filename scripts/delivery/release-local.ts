@@ -1,6 +1,6 @@
 // Executable ROOT-CWD local qualification, never a provider deploy entry.
 // Every Wrangler mutation is explicitly --local; credentials and inherited HOME
-// are excluded. The production/default flow remains blocked pending approval.
+// are excluded. The production/default flow remains blocked pending proven provider admission.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -29,7 +29,11 @@ import {
   prepareTarget,
   schemaDigest,
 } from "./release-config.js";
-import { inspectReadiness, ReadinessHttp } from "./release-readiness.js";
+import {
+  inspectDiscovery,
+  inspectReadiness,
+  ReadinessHttp,
+} from "./release-readiness.js";
 import { failure } from "./model.js";
 
 const controller = new AbortController();
@@ -655,6 +659,36 @@ const qualify = async () => {
         );
       }
     }
+    step = "actual-wo30-discovery";
+    // Direct metadata-only qualification on our trusted local TLS origin. This
+    // never substitutes for the full probe's separate incomplete-website gate.
+    await Effect.runPromise(
+      inspectDiscovery(base).pipe(
+        Effect.provideService(ReadinessHttp, {
+          request: (request) =>
+            Effect.tryPromise({
+              try: () =>
+                localFetch(request, { signal: AbortSignal.timeout(5000) }),
+              catch: () => failure("readiness", "local-discovery-unavailable"),
+            }),
+        }),
+      ),
+    );
+    for (const path of [
+      "/llms.txt",
+      "/skill.md",
+      "/skills/agentforum/SKILL.md",
+      "/docs/post.schema.json",
+    ]) {
+      const response = await localFetch(new URL(path, base), {
+        signal: AbortSignal.timeout(5000),
+      });
+      assert.equal(response.status, 200);
+      assert.equal(
+        await response.text(),
+        await readFile(resolve(`apps/forum/public${path}`), "utf8"),
+      );
+    }
     step = "current-scaffold-readiness-rejection";
     const notReady = await Effect.runPromise(
       Effect.either(
@@ -707,6 +741,8 @@ const qualify = async () => {
         builtConfig: "apps/forum/dist/server/wrangler.json",
         capturePolicy: "complete-built-object-preserved",
         docs32: "actual-static-contract-served",
+        discovery30:
+          "actual-relative-guides-skill-schema-and-four-pure-descriptions",
         nativeCliIdentity: "local-fixture-converged",
         migrations: "real-local-repeat-retained",
         worker: "real-built-worker-restarted",

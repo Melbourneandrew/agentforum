@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Deferred, Effect, Either, Fiber, Schema } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
+import { discoveryResponse } from "../../apps/forum/src/discovery/responses.js";
 import { Identity, failure } from "./model.js";
 import {
   cliIdentity,
@@ -21,7 +22,11 @@ import {
 } from "./release-config.js";
 import { Artifact, ReleaseCoordinator, ReleasePorts } from "./release-model.js";
 import { release, unconfiguredCoordinator } from "./release.js";
-import { inspectReadiness, ReadinessHttp } from "./release-readiness.js";
+import {
+  inspectDiscovery,
+  inspectReadiness,
+  ReadinessHttp,
+} from "./release-readiness.js";
 
 const identity = Schema.decodeUnknownSync(Identity)({
   version: 1,
@@ -611,8 +616,25 @@ describe("accepted Docs32 OpenAPI origin contract", () => {
               return new Response("<main>contract probe fixture</main>");
             if (path === "/llms.txt" || path === "/skill.md")
               return new Response(
-                `${identity.defaultOrigin}/docs/ ${identity.defaultOrigin}/v1`,
+                readFileSync("apps/forum/public/llms.txt", "utf8"),
               );
+            if (path === "/docs/post.schema.json")
+              return new Response(
+                readFileSync(`apps/forum/public${path}`, "utf8"),
+              );
+            if (path === "/skills/agentforum/SKILL.md")
+              return new Response(
+                readFileSync(`apps/forum/public${path}`, "utf8"),
+              );
+            if (
+              [
+                "/v1",
+                "/.well-known/api-catalog",
+                "/agents.txt",
+                "/agents.json",
+              ].includes(path)
+            )
+              return discoveryResponse(path, identity.defaultOrigin);
             if (path === "/docs/openapi.json")
               return new Response(JSON.stringify({ ...actual, servers }));
             if (path === "/v1/search")
@@ -662,5 +684,114 @@ describe("accepted Docs32 OpenAPI origin contract", () => {
     );
     expect(code(result)).toBe("unsupported-contract-path");
     expect(h.calls).toEqual([]);
+  });
+});
+
+// Genuine generated static representations and pure origin descriptions;
+// transport injection here is a unit regression, never provider evidence.
+describe("WO30 discovery readiness", () => {
+  const probe = (alter?: (path: string, response: Response) => Response) => {
+    const calls: string[] = [];
+    const program = inspectDiscovery(identity.defaultOrigin).pipe(
+      Effect.provideService(ReadinessHttp, {
+        request: (request) =>
+          Effect.sync(() => {
+            const path = new URL(request.url).pathname;
+            calls.push(`${request.method} ${path}`);
+            const response =
+              path === "/llms.txt" ||
+              path === "/skill.md" ||
+              path === "/skills/agentforum/SKILL.md" ||
+              path === "/docs/post.schema.json"
+                ? new Response(readFileSync(`apps/forum/public${path}`, "utf8"))
+                : discoveryResponse(path, identity.defaultOrigin);
+            return alter ? alter(path, response) : response;
+          }),
+      }),
+    );
+    return { program, calls };
+  };
+  it("accepts genuine relative guides/Skill and all four exact installation descriptions without business requests", async () => {
+    const h = probe();
+    await Effect.runPromise(h.program);
+    expect(h.calls).toEqual([
+      "GET /llms.txt",
+      "GET /skill.md",
+      "GET /skills/agentforum/SKILL.md",
+      "GET /docs/post.schema.json",
+      "GET /v1",
+      "GET /.well-known/api-catalog",
+      "GET /agents.txt",
+      "GET /agents.json",
+    ]);
+  });
+  it("rejects mismatched root guides", async () => {
+    const h = probe((path, response) =>
+      path === "/skill.md" ? new Response("foreign guide") : response,
+    );
+    expect(code(await outcome(h.program))).toBe(
+      "discovery-guide-or-skill-mismatch",
+    );
+  });
+  it("rejects missing portable Skill", async () => {
+    const h = probe((path, response) =>
+      path === "/skills/agentforum/SKILL.md"
+        ? new Response(null, { status: 404 })
+        : response,
+    );
+    expect(code(await outcome(h.program))).toBe("discovery-unavailable");
+  });
+  it("rejects foreign operating links even in matching guides and Skill", async () => {
+    const h = probe((path, response) =>
+      path === "/llms.txt" ||
+      path === "/skill.md" ||
+      path === "/skills/agentforum/SKILL.md"
+        ? new Response(
+            readFileSync(`apps/forum/public${path}`, "utf8").replaceAll(
+              "](/docs/)",
+              "](https://foreign.example/docs/)",
+            ),
+          )
+        : response,
+    );
+    expect(code(await outcome(h.program))).toBe(
+      "discovery-origin-or-inventory-failed",
+    );
+  });
+  it("rejects missing or malformed protected Post Schema", async () => {
+    for (const response of [
+      new Response(null, { status: 404 }),
+      new Response("{}"),
+    ]) {
+      const h = probe((path, original) =>
+        path === "/docs/post.schema.json" ? response : original,
+      );
+      expect(code(await outcome(h.program))).toBe(
+        response.status === 404
+          ? "discovery-unavailable"
+          : "discovery-post-schema-invalid",
+      );
+    }
+  });
+  it("rejects a foreign catalog description", async () => {
+    const h = probe((path, response) =>
+      path === "/.well-known/api-catalog"
+        ? discoveryResponse(path, "https://foreign.example")
+        : response,
+    );
+    expect(code(await outcome(h.program))).toBe(
+      "discovery-description-mismatch",
+    );
+  });
+  it("rejects wrong description media type or missing native catalog Link", async () => {
+    for (const header of ["Content-Type", "Link"]) {
+      const h = probe((path, response) => {
+        if (path === "/agents.json") response.headers.delete(header);
+        return response;
+      });
+      expect(code(await outcome(h.program))).toBe(
+        "discovery-description-mismatch",
+      );
+    }
   });
 });

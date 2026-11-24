@@ -119,7 +119,13 @@ removes executing local subprocesses and temporary state.
 
 The qualifier serves actual Docs32 `/docs/openapi.json` (same-origin `/`) and
 preserves complete capture-off fields. `/docs/llms.txt` is only a docs index, not
-WO30 root discovery. Current unfinished observation/discovery remains NOT READY.
+WO30 root discovery. After the single refresh from parent-verified main
+`e83469589745034f93834e1c5f72a600b36fa4b3` (actual-main Bootstrap45313676555),
+readiness consumes genuine installation-relative root guides, portable Skill,
+protected Post Schema and the exact four pure metadata representations. The
+metadata-only local probe verifies actual served bytes and source-derived
+origin descriptions without bypassing the separate incomplete-website gate.
+Current unfinished observation remains NOT READY.
 The approved Bootstrap step runs this actual qualifier after production smoke.
 Readiness on a real owner installation is nonmutating static/GET+POST search;
 registration/publication/continuity proofs are disposable qualification only.
@@ -138,9 +144,13 @@ These tests prove local behavior, NOT Cloudflare lost-response terminality.
 - Parent alone owns existing-connection provider inspection, qualification and
   activation after applicable WO36/37 gates. No child API/secret/DNS/deploy/resource
   access. The unrelated `board.agentforum.site` Vercel board remains untouched.
-- Wait for parent actual-main proof before refreshing this branch with critical
-  schema/generator39/30 integration; final combined gates use genuinely landed
-  interfaces and UI/discovery, never an in-flight branch or fake ready receipt.
+- The parent supplied actual-main proof for schema/generator39/30 at `e834695`;
+  this branch merged that exact verified revision once. Final combined gates use
+  genuinely landed interfaces and UI/discovery, never an in-flight branch or
+  fake ready receipt. The maintained first empty installation is
+  `https://agntforum.com` (no `e`); no old-zone publication, data migration or
+  redirect. This is an installation-specific destination, never a reusable
+  installer constant; independent workers.dev/trusted origins stay generic.
 - Genuine native authorization/account/origin/credential handoff and remote
   installed-schema/history/activation/compatibility receipts remain unproved.
   These remain WO34 implementation work, with parent-only remote qualification.

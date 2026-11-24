@@ -1,4 +1,8 @@
 import { Context, Effect, Schema } from "effect";
+import {
+  discoveryPaths,
+  discoveryResponse,
+} from "../../apps/forum/src/discovery/responses.js";
 import { failure } from "./model.js";
 import type { DeliveryError } from "./model.js";
 import type { Activation, Artifact } from "./release-model.js";
@@ -15,6 +19,106 @@ export class ReadinessHttp extends Context.Tag("delivery/ReadinessHttp")<
 // Accepted Docs32 static contract. The documentation index is NOT the root
 // System Discovery Guide; missing WO-30 assets must still fail readiness.
 export const DOCS_OPENAPI_PATH = "/docs/openapi.json";
+// Metadata-only probe of the accepted WO30 representations. Caller supplies the
+// already trusted installation origin; never derive it from request/CI input.
+// Passing this probe is NOT complete website/provider/release acceptance.
+export const inspectDiscovery = (origin: string) =>
+  Effect.gen(function* () {
+    const http = yield* ReadinessHttp;
+    const get = (path: string) =>
+      Effect.gen(function* () {
+        const response = yield* http.request(
+          new Request(`${origin}${path}`, { redirect: "manual" }),
+        );
+        if (response.status !== 200 || response.redirected)
+          return yield* Effect.fail(
+            failure("readiness", "discovery-unavailable"),
+          );
+        return response;
+      });
+    const text = (response: Response) =>
+      Effect.tryPromise({
+        try: () => response.text(),
+        catch: () => failure("readiness", "discovery-unreadable"),
+      });
+    const guide = yield* text(yield* get("/llms.txt"));
+    const skill = yield* text(yield* get("/skill.md"));
+    const packaged = yield* text(yield* get("/skills/agentforum/SKILL.md"));
+    if (
+      guide !== skill ||
+      !guide.startsWith("# Agent Forum System Discovery Guide\n") ||
+      !packaged.startsWith("---\nname: agentforum\ndescription:") ||
+      !packaged.endsWith(guide)
+    )
+      return yield* Effect.fail(
+        failure("readiness", "discovery-guide-or-skill-mismatch"),
+      );
+    const links = yield* Effect.try({
+      try: () =>
+        Array.from(guide.matchAll(/\]\(([^)]+)\)/g), (match) => {
+          const target = match[1];
+          if (!target) throw new Error("missing local link");
+          return new URL(target, origin);
+        }),
+      catch: () => failure("readiness", "discovery-link-invalid"),
+    });
+    if (
+      links.some((url) => url.origin !== origin) ||
+      [
+        "/",
+        "/v1",
+        "/docs/",
+        "/docs/openapi.json",
+        "/docs/post.schema.json",
+        "/skills/agentforum/SKILL.md",
+        ...discoveryPaths,
+      ].some((path) => !links.some((url) => url.pathname === path))
+    )
+      return yield* Effect.fail(
+        failure("readiness", "discovery-origin-or-inventory-failed"),
+      );
+    const schemaText = yield* text(yield* get("/docs/post.schema.json"));
+    yield* Schema.decodeUnknown(
+      Schema.parseJson(
+        Schema.Struct({
+          $schema: Schema.NonEmptyString,
+          $ref: Schema.Literal("#/$defs/PostResult"),
+          $defs: Schema.Struct({
+            PostResult: Schema.Record({
+              key: Schema.String,
+              value: Schema.Unknown,
+            }),
+            PublishInput: Schema.Record({
+              key: Schema.String,
+              value: Schema.Unknown,
+            }),
+          }),
+          "x-schema-version": Schema.NonEmptyString,
+          "x-api-path-version": Schema.Literal("v1"),
+        }),
+      ),
+    )(schemaText).pipe(
+      Effect.mapError(() =>
+        failure("readiness", "discovery-post-schema-invalid"),
+      ),
+    );
+    // Consume the shared pure source, not a second hand-maintained catalog or
+    // agents schema. Exactly four approved GET descriptions, no business writes.
+    for (const path of discoveryPaths) {
+      const response = yield* get(path);
+      const expected = discoveryResponse(path, origin);
+      if (
+        response.headers.get("Content-Type") !==
+          expected.headers.get("Content-Type") ||
+        response.headers.get("Link") !== expected.headers.get("Link") ||
+        (yield* text(response)) !== (yield* text(expected))
+      )
+        return yield* Effect.fail(
+          failure("readiness", "discovery-description-mismatch"),
+        );
+    }
+  });
+
 export const inspectReadiness = (
   artifact: Artifact,
   activation: Activation,
@@ -59,16 +163,7 @@ export const inspectReadiness = (
       return yield* Effect.fail(
         failure("readiness", "incomplete-observation-or-docs"),
       );
-    const guide = yield* get("/llms.txt");
-    const skill = yield* get("/skill.md");
-    if (
-      guide !== skill ||
-      !guide.includes(`${origin}/docs`) ||
-      !guide.includes(`${origin}/v1`)
-    )
-      return yield* Effect.fail(
-        failure("readiness", "discovery-origin-or-parity-failed"),
-      );
+    yield* inspectDiscovery(origin);
     const contractText = yield* get(contractPath);
     const contract = yield* Schema.decodeUnknown(
       Schema.parseJson(
