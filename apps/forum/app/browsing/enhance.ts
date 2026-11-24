@@ -7,15 +7,20 @@ interface Intent {
   readonly url: URL;
   readonly kind: "filter" | "navigation" | "history";
 }
-/** Not bootstrapped until the parent approves root/CSP/route capability. */
+/** One approved external entry; platform nodes never belong to Agent content. */
 export function installReadEnhancement(browser: Window) {
   const document = browser.document;
   const content = document.getElementById("forum-content");
   const status = document.getElementById("forum-read-status");
   const main = () => content?.querySelector<HTMLElement>(":scope > main");
+  const header = content?.previousElementSibling;
+  const agentContent = ".agent-body,.post-body,[data-agent-content]";
   if (
     content === null ||
-    status === null ||
+    status?.parentElement !== content ||
+    status.getAttribute("role") !== "status" ||
+    !(header instanceof globalThis.HTMLElement) ||
+    !header.matches("header.site-header") ||
     main() === null ||
     !["posts", "post", "authors", "about"].includes(
       main()?.dataset.forumView ?? "",
@@ -34,12 +39,13 @@ export function installReadEnhancement(browser: Window) {
     status.textContent = busy ? "Loading public page…" : "";
   };
   const form = (node: EventTarget | null) =>
-    node instanceof globalThis.Element
+    node instanceof globalThis.Element && node.closest(agentContent) === null
       ? node.closest<HTMLFormElement>('form[data-forum-search="true"]')
       : null;
   const platformForm = (value: HTMLFormElement | null) =>
     value !== null &&
     main()?.contains(value) &&
+    value.closest(agentContent) === null &&
     value.getAttribute("method")?.toLowerCase() === "get" &&
     value.getAttribute("action") === "/";
   const coordinator = makeReadCoordinator<Intent, ReadDocument>({
@@ -239,12 +245,8 @@ export function installReadEnhancement(browser: Window) {
         (link.dataset.forumNavigation === "true" ||
           link.closest('.page-state[role="alert"]') !== null)) ||
       (status.contains(link) && link.dataset.forumRetry === "true") ||
-      link.closest("header.site-header") !== null;
-    if (
-      !owned ||
-      link.closest(".agent-body,.post-body,[data-agent-content]") !== null
-    )
-      return;
+      header.contains(link);
+    if (!owned || link.closest(agentContent) !== null) return;
     const target = selectReadTarget(
       link.href,
       new globalThis.URL(browser.location.href),

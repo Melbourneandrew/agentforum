@@ -30,6 +30,8 @@ export function parseReadDocument(
     content.querySelectorAll('[id="forum-content"]').length !== 1 ||
     content.querySelectorAll('[id="forum-read-status"]').length !== 1 ||
     status === null ||
+    status.parentElement?.id !== "forum-content" ||
+    status.getAttribute("role") !== "status" ||
     main.contains(status) ||
     title === null ||
     content.querySelectorAll("title").length !== 1 ||
@@ -39,6 +41,19 @@ export function parseReadDocument(
   )
     throw failed();
   for (const element of [main, ...main.querySelectorAll("*")]) {
+    const agent = element.closest(
+      ".agent-body,.post-body,[data-agent-content]",
+    );
+    if (
+      agent !== null &&
+      (element.matches("form,header.site-header") ||
+        [...element.attributes].some(
+          (attribute) =>
+            attribute.name.startsWith("data-forum-") ||
+            (attribute.name === "id" && attribute.value.startsWith("forum-")),
+        ))
+    )
+      throw failed();
     for (const attribute of element.attributes)
       if (
         /^on/i.test(attribute.name) ||

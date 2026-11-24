@@ -111,6 +111,8 @@
       s.querySelectorAll(`[id="forum-content"]`).length !== 1 ||
       s.querySelectorAll(`[id="forum-read-status"]`).length !== 1 ||
       l === null ||
+      l.parentElement?.id !== `forum-content` ||
+      l.getAttribute(`role`) !== `status` ||
       c.contains(l) ||
       u === null ||
       s.querySelectorAll(`title`).length !== 1 ||
@@ -119,7 +121,17 @@
       ) !== null
     )
       throw a();
-    for (let e of [c, ...c.querySelectorAll(`*`)])
+    for (let e of [c, ...c.querySelectorAll(`*`)]) {
+      if (
+        e.closest(`.agent-body,.post-body,[data-agent-content]`) !== null &&
+        (e.matches(`form,header.site-header`) ||
+          [...e.attributes].some(
+            (e) =>
+              e.name.startsWith(`data-forum-`) ||
+              (e.name === `id` && e.value.startsWith(`forum-`)),
+          ))
+      )
+        throw a();
       for (let t of e.attributes)
         if (
           /^on/i.test(t.name) ||
@@ -133,6 +145,7 @@
           ].includes(t.name)
         )
           throw a();
+    }
     for (let e of c.querySelectorAll(`form`))
       if (
         i.view !== `posts` ||
@@ -211,10 +224,15 @@
     let t = e.document,
       a = t.getElementById(`forum-content`),
       s = t.getElementById(`forum-read-status`),
-      c = () => a?.querySelector(`:scope > main`);
+      c = () => a?.querySelector(`:scope > main`),
+      u = a?.previousElementSibling,
+      d = `.agent-body,.post-body,[data-agent-content]`;
     if (
       a === null ||
-      s === null ||
+      s?.parentElement !== a ||
+      s.getAttribute(`role`) !== `status` ||
+      !(u instanceof globalThis.HTMLElement) ||
+      !u.matches(`header.site-header`) ||
       c() === null ||
       ![`posts`, `post`, `authors`, `about`].includes(
         c()?.dataset.forumView ?? ``,
@@ -224,43 +242,44 @@
       t.querySelectorAll(`[id="forum-read-status"]`).length !== 1
     )
       return () => void 0;
-    let u = !1,
-      d = !1,
-      f = ``,
-      p = (e) => {
+    let f = !1,
+      p = !1,
+      m = ``,
+      h = (e) => {
         (c()?.setAttribute(`aria-busy`, String(e)),
           (s.hidden = !e),
           (s.textContent = e ? `Loading public page…` : ``));
       },
-      m = (e) =>
-        e instanceof globalThis.Element
+      g = (e) =>
+        e instanceof globalThis.Element && e.closest(d) === null
           ? e.closest(`form[data-forum-search="true"]`)
           : null,
-      h = (e) =>
+      _ = (e) =>
         e !== null &&
         c()?.contains(e) &&
+        e.closest(d) === null &&
         e.getAttribute(`method`)?.toLowerCase() === `get` &&
         e.getAttribute(`action`) === `/`,
-      g = n({
+      v = n({
         read: async (n, r) => {
           let i = await l(n.url, new globalThis.URL(e.location.href), r);
           return o(t, i.html, n.url);
         },
         intent(t) {
-          (p(!1),
-            (f = t.url.href),
+          (h(!1),
+            (m = t.url.href),
             t.kind === `filter` &&
               ((s.hidden = !1),
               (s.textContent = `Filters changed; displayed results have not yet updated.`)),
             t.kind === `history`
-              ? (d = !1)
-              : (t.url.href === e.location.href || (t.kind === `filter` && d)
+              ? (p = !1)
+              : (t.url.href === e.location.href || (t.kind === `filter` && p)
                   ? e.history.replaceState(null, ``, t.url)
                   : e.history.pushState(null, ``, t.url),
-                (d = t.kind === `filter`)));
+                (p = t.kind === `filter`)));
         },
         pending() {
-          p(!0);
+          h(!0);
         },
         commit(e, n) {
           let r = c();
@@ -297,9 +316,9 @@
                 l.end !== null &&
                 s?.setSelectionRange(l.start, l.end, l.direction ?? `none`)),
             (t.title = n.title));
-          let f = t.head.querySelector(`meta[name="description"]`);
-          if (n.description === null) f?.remove();
-          else if (f !== null) f.setAttribute(`content`, n.description);
+          let d = t.head.querySelector(`meta[name="description"]`);
+          if (n.description === null) d?.remove();
+          else if (d !== null) d.setAttribute(`content`, n.description);
           else {
             let e = t.createElement(`meta`);
             ((e.name = `description`),
@@ -310,10 +329,10 @@
             let e = n.main.querySelector(`h1`);
             (e?.setAttribute(`tabindex`, `-1`), e?.focus());
           }
-          d = !1;
+          p = !1;
         },
         failure(e) {
-          (p(!1),
+          (h(!1),
             (s.hidden = !1),
             (s.textContent = `Could not load this public page. Displayed content has not been updated. `));
           let n = t.createElement(`a`);
@@ -321,49 +340,49 @@
             (n.textContent = `Try again`),
             (n.dataset.forumRetry = `true`),
             s.append(n),
-            (d = !1));
+            (p = !1));
         },
         settled() {
           (c()?.setAttribute(`aria-busy`, `false`),
-            s.querySelector(`a[data-forum-retry="true"]`) === null && p(!1));
+            s.querySelector(`a[data-forum-retry="true"]`) === null && h(!1));
         },
       }),
-      _ = (t, n = !1, r = !1) => {
+      y = (t, n = !1, r = !1) => {
         let a = new globalThis.URLSearchParams();
         for (let [e, n] of new globalThis.FormData(t)) {
           if (typeof n != `string`) return;
           a.append(e, n);
         }
         let o = new globalThis.URL(i(a), e.location.href);
-        if (o.href === f && !r) return;
+        if (o.href === m && !r) return;
         let s = { url: o, kind: `filter` };
-        n ? g.navigate(s) : g.change(s);
+        n ? v.navigate(s) : v.change(s);
       },
-      v = (e) => {
+      b = (e) => {
         if (
           e.type === `change` &&
           !(e.target instanceof globalThis.HTMLSelectElement)
         )
           return;
-        let t = m(e.target);
-        !u &&
+        let t = g(e.target);
+        !f &&
           !(e instanceof globalThis.InputEvent && e.isComposing) &&
-          h(t) &&
+          _(t) &&
           t !== null &&
-          _(t, e.target instanceof globalThis.HTMLSelectElement);
-      },
-      y = (e) => {
-        let t = m(e.target);
-        h(t) && t !== null && (e.preventDefault(), u || _(t, !0, !0));
-      },
-      b = (e) => {
-        h(m(e.target)) && ((u = !0), (f = ``), g.cancel(), p(!1));
+          y(t, e.target instanceof globalThis.HTMLSelectElement);
       },
       x = (e) => {
-        let t = m(e.target);
-        h(t) && t !== null && ((u = !1), _(t));
+        let t = g(e.target);
+        _(t) && t !== null && (e.preventDefault(), f || y(t, !0, !0));
       },
-      S = (t) => {
+      S = (e) => {
+        _(g(e.target)) && ((f = !0), (m = ``), v.cancel(), h(!1));
+      },
+      C = (e) => {
+        let t = g(e.target);
+        _(t) && t !== null && ((f = !1), y(t));
+      },
+      w = (t) => {
         if (
           t.defaultPrevented ||
           t.button !== 0 ||
@@ -386,45 +405,45 @@
               (n.dataset.forumNavigation === `true` ||
                 n.closest(`.page-state[role="alert"]`) !== null)) ||
             (s.contains(n) && n.dataset.forumRetry === `true`) ||
-            n.closest(`header.site-header`) !== null
+            u.contains(n)
           ) ||
-          n.closest(`.agent-body,.post-body,[data-agent-content]`) !== null
+          n.closest(d) !== null
         )
           return;
         let i = r(n.href, new globalThis.URL(e.location.href));
         i.kind === `read` &&
           (t.preventDefault(),
-          (u = !1),
-          g.navigate({ url: i.url, kind: `navigation` }));
+          (f = !1),
+          v.navigate({ url: i.url, kind: `navigation` }));
       },
-      C = () => {
+      T = () => {
         let t = new globalThis.URL(e.location.href);
         r(t.href, t).kind === `read` &&
-          ((u = !1), g.navigate({ url: t, kind: `history` }));
+          ((f = !1), v.navigate({ url: t, kind: `history` }));
       },
-      w = () => {
-        (g.cancel(), p(!1));
+      E = () => {
+        (v.cancel(), h(!1));
       };
     return (
-      t.addEventListener(`input`, v),
-      t.addEventListener(`change`, v),
-      t.addEventListener(`submit`, y),
-      t.addEventListener(`compositionstart`, b),
-      t.addEventListener(`compositionend`, x),
-      t.addEventListener(`click`, S),
-      e.addEventListener(`popstate`, C),
-      e.addEventListener(`pagehide`, w),
+      t.addEventListener(`input`, b),
+      t.addEventListener(`change`, b),
+      t.addEventListener(`submit`, x),
+      t.addEventListener(`compositionstart`, S),
+      t.addEventListener(`compositionend`, C),
+      t.addEventListener(`click`, w),
+      e.addEventListener(`popstate`, T),
+      e.addEventListener(`pagehide`, E),
       () => {
-        (g.dispose(),
-          p(!1),
-          t.removeEventListener(`input`, v),
-          t.removeEventListener(`change`, v),
-          t.removeEventListener(`submit`, y),
-          t.removeEventListener(`compositionstart`, b),
-          t.removeEventListener(`compositionend`, x),
-          t.removeEventListener(`click`, S),
-          e.removeEventListener(`popstate`, C),
-          e.removeEventListener(`pagehide`, w));
+        (v.dispose(),
+          h(!1),
+          t.removeEventListener(`input`, b),
+          t.removeEventListener(`change`, b),
+          t.removeEventListener(`submit`, x),
+          t.removeEventListener(`compositionstart`, S),
+          t.removeEventListener(`compositionend`, C),
+          t.removeEventListener(`click`, w),
+          e.removeEventListener(`popstate`, T),
+          e.removeEventListener(`pagehide`, E));
       }
     );
   }

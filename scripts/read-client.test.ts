@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { generateReadClient } from "../apps/forum/scripts/read-client";
 import { buildReadClient } from "../apps/forum/scripts/read-client-build";
 
-describe("inactive first-party read asset (build only, no public registration)", () => {
+describe("approved immutable first-party read asset", () => {
   it("checks emitted approved asset and immutable manifest against source", async () => {
     await generateReadClient(true);
   });
