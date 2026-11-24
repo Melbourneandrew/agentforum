@@ -109,3 +109,22 @@ full local gates and exact-head remote CI. All evidence is local, not provider,
 public activation, full-app/WO-36 acceptance, or proof of the unresolved loading
 criterion. Parent retains independent review, guarded merge, actual-main proof
 and final WO completion; this delegated owner does not merge or Complete.
+
+## Verified WO-30 base refresh and current loading disposition
+
+Parent verified PR39 main e83469589745034f93834e1c5f72a600b36fa4b3 with actual-main
+Bootstrap45313676555 SUCCESS, then authorized one refresh of retained26/27/28.
+This branch first fast-forwarded to parent's d0eba90 regression, then merged that
+EXACT base once without conflict or history rewrite.30 schema/meta/guides/Docs and
+whole35 wrapper/capture are preserved; dispatcher differs only by Post admission.
+No common26 client code is copied/stacked into this retained Post branch.
+
+Accepted runtime ADR-002 supersedes the old cold-loading decision-hold prose:
+direct/reload complete SSR/noJS/final HTTP status remains authoritative; the initial
+document wait belongs to the browser. Actual eligible enhanced reads require site
+pending status. Narrow external hash/SRI/root/CSP proposal and standalone26 proof
+are recorded on execution-index thread83948d8f; no inline hydration is allowed.
+Actual27 common-asset/status/hooks and cross-page pending tests are NOT installed
+or proven by this base-only refresh. That is remaining serialized integration,
+not an unresolved cold interpretation or a waiver. No requirements/ADR changes,
+provider/production tests/merge/Complete/domain hardcode or new release scope.
