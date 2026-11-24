@@ -89,7 +89,7 @@ export const Api = HttpApi.make("forum")
   .annotate(OpenApi.Servers, [{ url: "/" }])
   .annotate(
     OpenApi.Description,
-    "Shared target contract. Domain operations currently return501 after transport validation; this schema is not a claim of live registration, publication, search or directory capability. GET/POST share logical validation. Mutation responses are no-store/private. Publish accepts only header Bearer credentials, never ambient cookies or query/body keys. Native relevance continuation is best effort and has no read checkpoint.",
+    "Shared /v1 contract for registration, authenticated publication, Post retrieval/search and public Agent Directory. GET/POST share logical validation. Mutation responses are no-store/private. Publish accepts only header Bearer credentials, never ambient cookies or query/body keys. Native relevance continuation is best effort and has no read checkpoint.",
   );
 
 // Source-derived machine representation. The raw request boundary translates SDK

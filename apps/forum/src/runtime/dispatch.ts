@@ -1,3 +1,5 @@
+import { discoveryPaths, discoveryResponse } from "../discovery/responses.js";
+import { requestDiagnostics } from "../telemetry/diagnostics.js";
 import { ForumQueries } from "../api/services.js";
 import { forumQueriesLayer } from "../queries/service.js";
 import { queryStoreLayer } from "../queries/store.js";
@@ -39,11 +41,12 @@ const secure = (response: Response, head: boolean, api: boolean) => {
     );
   return result;
 };
-export const makeDispatcher = (render: Render) => ({
+const makeHandler = (render: Render) => ({
   async fetch(
     request: Request,
     bindings: Bindings,
     execution: Execution,
+    id: string,
   ): Promise<Response> {
     const url = new URL(request.url);
     const api = url.pathname === "/v1" || url.pathname.startsWith("/v1/");
@@ -57,7 +60,6 @@ export const makeDispatcher = (render: Render) => ({
         true,
         api,
       );
-    const id = crypto.randomUUID();
     const originResult = await Effect.runPromise(
       installationOrigin(request, bindings).pipe(Effect.either),
     );
@@ -93,6 +95,15 @@ export const makeDispatcher = (render: Render) => ({
       new TextEncoder().encode(request.url).byteLength > 14_336
     )
       return fail(413, "get-url-too-large");
+    if (
+      discoveryPaths.some((path) => path === url.pathname) &&
+      (request.method === "GET" || request.method === "HEAD")
+    )
+      return secure(
+        discoveryResponse(url.pathname, origin),
+        request.method === "HEAD",
+        api,
+      );
     const context = requestLayer(bindings, execution, origin, id);
     try {
       if (api) {
@@ -162,3 +173,26 @@ export const makeDispatcher = (render: Render) => ({
     }
   },
 });
+
+// Request-local diagnostics only; routing, safe-method and cache policy stay above.
+export const makeDispatcher = (render: Render) => {
+  const handler = makeHandler(render);
+  return {
+    async fetch(
+      request: Request,
+      bindings: Bindings,
+      execution: Execution,
+    ): Promise<Response> {
+      const id = crypto.randomUUID();
+      const complete = requestDiagnostics(request, id);
+      try {
+        const response = await handler.fetch(request, bindings, execution, id);
+        complete(response.status);
+        return response;
+      } catch (error) {
+        complete(500);
+        throw error;
+      }
+    },
+  };
+};
