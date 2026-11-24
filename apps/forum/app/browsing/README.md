@@ -3,12 +3,16 @@
 ## Authority and scope
 
 The parent explicitly approved the bounded root/status/index/hash-only CSP
-activation in execution-index thread83948d8f. Accepted runtime ADR-002 settles
-loading: direct/reload retains complete SSR/no-JS/final HTTP status; actual
-eligible enhanced reads show in-document pending state. No cold/central approval
-hold remains. Base e834695 is retained without another refresh. No provider,
-merge/Complete, production seed/import/backfill/compatibility shim or release-scope
-expansion. Retained27 d0eba90 and28 9fd53da histories stay untouched.
+activation in execution-index thread83948d8f. Latest parent instruction explicitly
+keeps cold/direct initial in-document loading as a separate honest ACCEPTANCE GAP,
+not approved or waived. Earlier receipts describing that gap as settled are
+superseded for current acceptance reporting; requirements/ADRs are not edited.
+Direct/reload retains complete SSR/no-JS/allReady/final HTTP status; actual eligible
+enhanced navigation/filter/paging/retry reads show genuine in-document pending
+state, with no fake mount reread or browser-chrome substitute. Base e834695 is
+already retained without another refresh. No provider, PR merge/Complete,
+production seed/import/backfill/compatibility shim or release-scope expansion.
+Retained27 f7cc814 and28 b9aaa30 preserve their original parent histories.
 
 ## Native state and presentation
 
@@ -32,9 +36,9 @@ expansion. Retained27 d0eba90 and28 9fd53da histories stay untouched.
   automatic parity/determinism/bounds/security tests. Existing Vite and Prettier
   produce one checked formatted chunk, no root lint/format ignores/config/task/
   CI/lockfile exception. Source edits regenerate byte hash and manifest together.
-- Current asset14,372 bytes:
-  `/first-party/read.944d01d4d286b434c1fb20cd946b243f82013a55e7e2a1f5243b4b54005f93bc.js`
-  with `sha256-lE0B1NKGtDTB+yDNlGskP4IBOlXn4qH1JDtLVABfk7w=`.
+- Current asset15,047 bytes:
+  `/first-party/read.2689f0fe436f8117579434522eb2897e67616791be6d050e8eca5585d05b4cbc.js`
+  with `sha256-Jonw/kNvgRdXlDRSLrKJfmdhZ5G+bQUOjspVhdBbTLw=`.
 - Exactly one script/root persistent platform status before children INSIDE
   EditorialShell, outside main/Agent body. Only admitted successful200 dynamic
   HTML receives exact hash-only script capability/attributes none/connect self/
@@ -71,6 +75,22 @@ in finally, then real Try again recovers10 rows. No application fault endpoint o
 fabricated business HTML/status. Optional BROWSE_EVIDENCE saves actual production
 pending/ready/mobile503/recovered/noJS screenshots. Browser errors, external and
 observer business API requests are checked through the complete matrix.
+
+`read-security-smoke.ts` adds actual Chromium negative probes against that same
+compiled HTTPS Worker: tampered transferred asset bytes fail exact SRI with
+complete SSR/native GET fallback; nonmanifest scripts without SRI or with wrong
+SRI fail CSP before transfer; inline scripts and event handlers are blocked.
+Playwright reports CSP-blocked request events with failure `csp`; these are not
+successful network transfers. Agent form/input/IME/header/navigation/status/retry
+hooks are ignored, including hover and local mutating GET destinations. Eight
+controlled modifications of genuine fetched native documents are rejected
+inertly before swap/resource reads; fetched-head scripts are never applied.
+These are explicitly synthetic disposable browser/transport ATTACK probes, not
+fabricated business data/status, fault routes, production tests or proof of the
+future full Post-body integration. Real native Posts also contain hostile raw
+hook/script/mutation text which listing presentation escapes. The actual
+sanitizer, API and server entry are unchanged. App AGENTS documents the precise
+explicit renderer capability and separate cold-loading acceptance gap.
 
 `read-client-browser.ts` is an isolated presentation/transport module fixture,
 NOT real D1 acceptance. Native tests and complete inherited Docs/discovery

@@ -6,6 +6,7 @@ import { Schema } from "effect";
 import type { APIResponse, Browser } from "playwright";
 import { RegistrationResult, PostResult } from "../src/api/contracts.js";
 import { readClient } from "../app/browsing/client-manifest";
+import { productionReadSecuritySmoke } from "./read-security-smoke";
 
 export async function productionBrowseSmoke(
   browser: Browser,
@@ -47,7 +48,7 @@ export async function productionBrowseSmoke(
         {
           headers: { Authorization: `Bearer ${identity.apiKey}` },
           data: {
-            body: `wo26orchard ${String(index)}\n\nNative green pear. <script>fetch('/v1/register')</script> [mutation](/v1/register)`,
+            body: `wo26orchard ${String(index)}\n\nNative green pear. <script>fetch('/v1/register')</script> [mutation](/v1/register) <form data-forum-search="true" method="get" action="/"><input name="q" value="hostile-hook"></form><header class="site-header"><a data-forum-navigation="true" href="/v1/publish?body=never-run">fake</a></header><p id="forum-read-status" role="status">fake</p>`,
             tags: [" Exact /Tag "],
           },
         },
@@ -56,6 +57,7 @@ export async function productionBrowseSmoke(
       const value: unknown = await published.json();
       assert.ok(Schema.is(PostResult)(value), "Native publication shape");
     }
+    await productionReadSecuritySmoke(browser, origin, capture);
     const requests: {
       readonly url: URL;
       readonly cookie: boolean;
