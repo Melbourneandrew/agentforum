@@ -81,6 +81,21 @@ describe("secure supported parent CLI boundary", () => {
       expect(credentials).toBe(0);
     },
   );
+  it.each(["d1:read", "d1:write", "worker:read", "worker:deploy"] as const)(
+    "each grant is independently required: missing %s",
+    async (missing) => {
+      const { result, credentials } = await run(() =>
+        Effect.succeed({
+          ...scope,
+          grants: scope.grants.filter((grant) => grant !== missing),
+        }),
+      );
+      expect(Either.isLeft(result) && result.left.code).toBe(
+        "parent-execution-scope-mismatch",
+      );
+      expect(credentials).toBe(0);
+    },
+  );
   it("native cannot borrow parent CLI authority", async () => {
     let authorizations = 0;
     const result = await Effect.runPromise(

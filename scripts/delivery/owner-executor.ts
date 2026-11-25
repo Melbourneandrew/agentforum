@@ -28,6 +28,7 @@ import { ownerEntryAuthorization } from "./owner-handoff.js";
 import { cloudflare } from "./provider.js";
 import { remoteProvider } from "./remote-provider.js";
 import { decodeConfig, prepareTarget } from "./release-config.js";
+import { authorizeZoneTarget, ZoneGrant } from "./zone-authority.js";
 import { physicalStates } from "./remote-state.js";
 import { remotePorts } from "./remote-release.js";
 import {
@@ -43,6 +44,7 @@ const Scope = Schema.Struct({
   sourceRevision: Revision,
   executorRef: ExecutorRef,
   operation: Schema.Literal("update", "recover"),
+  zoneGrants: Schema.optional(Schema.Array(ZoneGrant)),
   grants: Schema.Array(
     Schema.Literal("d1:read", "d1:write", "worker:read", "worker:deploy"),
   ),
@@ -132,6 +134,32 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
         };
         let scope = Option.none<OwnerScope>();
         let token = Option.none<string>();
+        let built =
+          Option.none<
+            Effect.Effect.Success<ReturnType<typeof prepareTarget>>
+          >();
+        const prepare = (context: OwnerScope, output: string) => {
+          const builtConfig = join(
+            context.repository,
+            "apps/forum/dist/server/wrangler.json",
+          );
+          return io(() => readFile(builtConfig, "utf8")).pipe(
+            Effect.flatMap(decodeConfig),
+            Effect.tap((raw) =>
+              authorizeZoneTarget(raw, context.zoneGrants ?? []),
+            ),
+            Effect.flatMap((raw) =>
+              prepareTarget({
+                raw,
+                builtConfig,
+                output,
+                identity: context.identity,
+                sourceRevision: context.sourceRevision,
+                authorizeTarget: true,
+              }),
+            ),
+          );
+        };
         const source = (context: OwnerScope) =>
           Effect.gen(function* () {
             const root = yield* io(() => realpath(context.repository));
@@ -167,7 +195,24 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
               failure("authorization", "parent-scope-not-admitted"),
             );
           const context = scope.value;
-          return source(context).pipe(
+          return Effect.gen(function* () {
+            yield* source(context);
+            // Exactly one fresh complete build, before ANY credential access or
+            // provider construction. Journal/source identity is already checked.
+            yield* command(
+              "pnpm",
+              ["exec", "turbo", "run", "build", "--force"],
+              context.repository,
+              env,
+              "build",
+            );
+            yield* source(context);
+            const prepared = yield* prepare(
+              context,
+              join(state, "target.json"),
+            );
+            built = Option.some(prepared);
+          }).pipe(
             Effect.zipRight(parent.credential),
             Effect.flatMap((value) => {
               if (
@@ -194,7 +239,11 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
                   ),
                 );
               const context = yield* parent.authorize(input).pipe(
-                Effect.flatMap(Schema.decodeUnknown(Scope)),
+                Effect.flatMap((value) =>
+                  Schema.decodeUnknown(Scope)(value, {
+                    onExcessProperty: "error",
+                  }),
+                ),
                 Effect.mapError(() =>
                   failure(
                     "authorization",
@@ -244,6 +293,7 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
               if (
                 Option.isNone(scope) ||
                 Option.isNone(token) ||
+                Option.isNone(built) ||
                 input.mode !== "cli" ||
                 !sameIdentity(scope.value.identity, admission.identity)
               )
@@ -253,34 +303,11 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
               const context = scope.value,
                 credential = token.value;
               yield* source(context);
-              // Complete fresh build, never an upload of only business code/docs/metadata.
-              yield* command(
-                "pnpm",
-                ["exec", "turbo", "run", "build", "--force"],
-                context.repository,
-                env,
-                "build",
+              const prepared = built.value;
+              yield* authorizeZoneTarget(
+                prepared.target,
+                context.zoneGrants ?? [],
               );
-              yield* source(context);
-              const builtConfig = join(
-                context.repository,
-                "apps/forum/dist/server/wrangler.json",
-              );
-              const prepare = (output: string) =>
-                io(() => readFile(builtConfig, "utf8")).pipe(
-                  Effect.flatMap(decodeConfig),
-                  Effect.flatMap((raw) =>
-                    prepareTarget({
-                      raw,
-                      builtConfig,
-                      output,
-                      identity: admission.identity,
-                      sourceRevision: context.sourceRevision,
-                      authorizeTarget: true,
-                    }),
-                  ),
-                );
-              const prepared = yield* prepare(join(state, "target.json"));
               const binding = prepared.target.d1_databases[0];
               if (!binding)
                 return yield* Effect.fail(
@@ -315,7 +342,10 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
               };
               const verify = Effect.gen(function* () {
                 yield* source(context);
-                const current = yield* prepare(join(state, "verify-only.json"));
+                const current = yield* prepare(
+                  context,
+                  join(state, "verify-only.json"),
+                );
                 if (
                   current.artifact.artifactDigest !== artifact.artifactDigest ||
                   (yield* io(() => readFile(artifact.configPath, "utf8"))) !==

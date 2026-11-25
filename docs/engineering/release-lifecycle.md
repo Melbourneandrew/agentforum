@@ -256,3 +256,38 @@ is live permission, provider deployment, future-version recovery or installation
 readiness evidence. No child provider/resource/DNS/credential operation is run.
 The maintained target remains `https://agntforum.com`; independent targets stay
 identity-derived and WO35 metadata remains NONE.
+
+## Separate exact zone-attachment scope
+
+The parent owner scope optionally supplies `zoneGrants`, each containing the
+explicit `zone:attach` action, exact zone ID (`zoneId`) and exact DNS hostname.
+D1 read/write and Worker read/deploy remain independently required; none implies
+zone attachment. Grants must match the target's requested attachment set exactly:
+missing, wrong-zone, wrong-host, duplicate and unused extra grants deny. Generic
+workers.dev installs with no zone mutations require no zone grant and retain the
+same identity-derived default/trusted installation origin. No maintained hostname
+or old-zone/board permission is hardcoded.
+
+The single fresh complete build and pure route/custom-domain scope check now run
+AFTER trusted parent source/journal/identity admission but BEFORE the lazy
+credential effect or provider construction. The prepared artifact is reused, not
+built twice. Target preparation repeats the guard under ownership and immediately
+before native effects through existing artifact verification. This guard neither
+rewrites routes nor creates a new domain/release layer. Only exact-host routes
+with explicit `zone_id`, or explicit hostname+zone custom-domain declarations,
+can match a grant. Wildcard hosts, implicit zone lookup, ambiguous route strings,
+expanded/encoded host forms and overlapping duplicate declarations deny.
+
+This is authorization validation, not a provider attachment receipt. Parent
+account/zone/D1/Workers GET success, response edit indicators, a named GitHub
+Actions secret, an empty Builds list or a CLI loggedIn=false result prove neither
+mutation authority nor its denial. Parent owns MCP-first/native/managed-Builds
+preflight and all actual provider execution after gates. The existing GitHub
+secret is never read, exported, copied or rotated by this code; no second
+credential is requested. There is no new workflow, source connection, token,
+secret-consuming run or child provider call. WO35 metadata stays unapproved.
+
+Tests use pure scope checks and real disposable local checkout/journal boundaries
+with an injected local build. Successful unit admission deliberately stops at an
+injected failing credential Effect BEFORE any provider construction/mutation.
+These results do not establish live zone grants or installation readiness.
