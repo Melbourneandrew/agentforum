@@ -170,6 +170,59 @@ describe("zone guard is before real owner credential boundary", () => {
     );
     expect(credentials).toBe(1);
   });
+  it("approved canonical label without attachment needs NO zone grant", async () => {
+    const scope = fixture({});
+    const { result, credentials } = await invoke({
+      ...scope,
+      canonicalOrigin: "https://forum.example.com",
+      zoneGrants: [],
+    });
+    expect(Either.isLeft(result) && result.left.code).toBe(
+      "unit-stop-before-provider",
+    );
+    expect(credentials).toBe(1);
+  });
+  it.each([undefined, "https://approved.example.com"])(
+    "unapproved/conflicting raw canonical %j denies before credential",
+    async (canonicalOrigin) => {
+      const scope = fixture({
+        vars: { CANONICAL_ORIGIN: "https://hostile.example.com" },
+      });
+      const { result, credentials } = await invoke({
+        ...scope,
+        ...(canonicalOrigin === undefined ? {} : { canonicalOrigin }),
+      });
+      expect(Either.isLeft(result) && result.left.code).toBe(
+        "canonical-origin-conflict",
+      );
+      expect(credentials).toBe(0);
+    },
+  );
+  it("malformed parent canonical denies before build/journal/credentials", async () => {
+    const scope = fixture({});
+    const { result, credentials } = await invoke({
+      ...scope,
+      canonicalOrigin: "https://user:pass@forum.example.com/path",
+    });
+    expect(Either.isLeft(result) && result.left.code).toBe(
+      "owner-execution-authorization-unconfigured",
+    );
+    expect(credentials).toBe(0);
+  });
+  it("canonical label cannot authorize an actual attachment", async () => {
+    const scope = fixture({
+      routes: [{ pattern: `${hostname}/*`, zone_id: zoneId }],
+    });
+    const { result, credentials } = await invoke({
+      ...scope,
+      canonicalOrigin: `https://${hostname}`,
+      zoneGrants: [],
+    });
+    expect(Either.isLeft(result) && result.left.code).toBe(
+      "zone-attachment-authority-mismatch",
+    );
+    expect(credentials).toBe(0);
+  });
   it("unrequested zone grant on a generic target denies before credential", async () => {
     const scope = fixture({});
     const { result, credentials } = await invoke({
