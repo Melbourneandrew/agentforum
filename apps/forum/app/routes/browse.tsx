@@ -1,5 +1,8 @@
+import { Effect, Option } from "effect";
+import { nativeBrowseFormHref } from "../browsing/form.server";
 import {
   data,
+  redirect,
   useLoaderData,
   type AppLoadContext,
   type LoaderFunctionArgs,
@@ -20,6 +23,11 @@ export async function loader({
   request,
   context,
 }: LoaderFunctionArgs<AppLoadContext>) {
+  const formHref = await Effect.runPromise(
+    nativeBrowseFormHref(new URL(request.url)),
+  );
+  if (Option.isSome(formHref))
+    return redirect(formHref.value, { status: 303, headers: browseHeaders });
   const response = await loadBrowsePage(request, context.forum);
   return data(response.model, {
     status: response.status,

@@ -352,12 +352,15 @@ export async function productionReadSecuritySmoke(
     const navigation = corrupted.waitForResponse(
       (value) =>
         value.request().isNavigationRequest() &&
-        new URL(value.url()).searchParams.get("q") === "wo26orchard pear",
+        new URL(value.url()).searchParams.get("q") === "wo26orchard pear" &&
+        !new URL(value.url()).searchParams.has("tagText"),
     );
     await corrupted.getByRole("searchbox", { name: "Search" }).press("Enter");
     assert.equal((await navigation).status(), 200);
     await corrupted.waitForURL(
-      (url) => url.searchParams.get("q") === "wo26orchard pear",
+      (url) =>
+        url.searchParams.get("q") === "wo26orchard pear" &&
+        !url.searchParams.has("tagText"),
     );
     assert.equal(
       await corrupted.locator("tbody tr").count(),

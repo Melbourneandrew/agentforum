@@ -127,3 +127,39 @@ Public site navigation. All Docs noJS/mobile/font/CSP/keyboard/raw/disclosure/
 no-external/no-business and30 discovery checks remain unchanged. The30579ba full
 sequence found this stale consumer after passing all other gates; failed log is
 retained and final proof is rerun, never relabeled successful.
+
+## Lossless exact-Tag form boundary (P2 review remediation)
+
+The backend accepts CR, LF and NUL in opaque Tags. Raw HTML attributes cannot
+preserve NUL and single-line inputs strip CR/LF. Tag controls and visible listing
+Tags therefore use the small reversible notation `\\` (backslash), `\r`, `\n`
+and `\0`. Unknown escapes and percent-looking strings remain literal. Literal
+backslashes are always escaped when rendering; decoding is exactly once at the
+FORM boundary, never on public `tag=` URLs or backend strings.
+
+Controls use the distinct `tagText` field. Enhanced FormData translates it through
+`browseFormValues` before the existing changed-selection URL/reset adapter.
+Native GET submits to the SAME root route: `nativeBrowseFormHref` validates the
+original percent encoding/65,536-byte bound, only declared form keys, and the
+unchanged shared strict selection decoder before returning a private/no-store303
+to the existing RAW `tag=` URL. The final native document retains full SSR/noJS/
+allReady and accurate200/400/503 status; enhancement never fetches a form URL or
+follows a redirect. No extra endpoint, URL alias/legacy compatibility, second
+search engine, tag normalization/rejection, stored state or framework is added.
+
+Mixed raw/form tags, unknown keys, duplicate singleton controls, malformed/oversize
+URLs, more than32 nonempty Tags and cursor/history fields in the first-page form
+are not redirected or silently repaired: normal strict400 handling remains. Raw
+public URLs, API/schema/query fingerprints, pagination links and retry URLs still
+use the original exact tags. Native forms contain no cursor/history fields;
+enhanced changes delete both as before.
+
+`tag-control.test.ts` proves reversible controls/literals and unchanged raw URL
+semantics, boundaries and resets. `productionTagSmoke` executes against the actual
+compiled HTTPS Worker/private D1, not a synthetic response fixture: CR/LF/CRLF/NUL,
+mixed slashes/escapes and literal percent/Unicode-escape-looking tags; complete
+native Enter/canonical303, enhanced edits/unrelated order/query, actual matched
+Post identities against sanitized-tag decoys, Next/reset/Back/history and real503/
+retry. Observer contexts never issue business/external/mutating requests. Existing
+native CSP/SRI/Agent-hook negative checks remain required, including blocked-SRI
+JS-enabled NATIVE GET fallback through the final canonical document.

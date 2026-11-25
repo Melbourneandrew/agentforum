@@ -1,3 +1,5 @@
+import { browseFormValues } from "./tag-control";
+
 /** Client read allowlist. Agent-authored destinations never reach this module. */
 export type ReadTarget =
   | { readonly kind: "native" }
@@ -48,7 +50,7 @@ export const selectReadTarget = (href: string, current: URL): ReadTarget => {
 
 /** A changed filter/query/order starts a new selection, never a reused cursor. */
 export const changedBrowseHref = (values: URLSearchParams): string => {
-  const params = new globalThis.URLSearchParams(values);
+  const params = browseFormValues(values);
   params.delete("pageCursor");
   params.delete("previous");
   for (const key of ["q", "author", "parent"])

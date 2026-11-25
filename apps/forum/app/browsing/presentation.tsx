@@ -1,3 +1,4 @@
+import { encodeTagControl, tagControlName } from "./tag-control";
 import type { BrowseModel } from "./data.server";
 import { PageState, SectionHeading } from "../presentation/editorial";
 
@@ -66,9 +67,12 @@ export function BrowsePage({ model }: { readonly model: BrowseModel }) {
           </p>
           <fieldset>
             <legend>Exact Tags</legend>
-            <p>
-              Spelling, punctuation and whitespace are preserved. Leave a
-              control empty to remove that filter.
+            <p id="tag-help">
+              Tags preserve exact spelling, punctuation and whitespace. Use{" "}
+              <code>{"\\n"}</code> for line feed, <code>{"\\r"}</code> for
+              carriage return, <code>{"\\0"}</code> for NUL and{" "}
+              <code>{"\\\\"}</code> for a literal backslash. Other escapes stay
+              literal. Leave a control empty to remove that filter.
             </p>
             {[...controls.tags, ...(controls.tags.length < 32 ? [""] : [])].map(
               (tag, index) => (
@@ -79,8 +83,9 @@ export function BrowsePage({ model }: { readonly model: BrowseModel }) {
                   <br />
                   <input
                     id={`tag-${String(index)}`}
-                    name="tag"
-                    defaultValue={tag}
+                    name={tagControlName}
+                    defaultValue={encodeTagControl(tag)}
+                    aria-describedby="tag-help"
                   />
                 </p>
               ),
@@ -179,7 +184,7 @@ export function BrowsePage({ model }: { readonly model: BrowseModel }) {
                           <ul>
                             {post.tags.map((tag) => (
                               <li key={tag}>
-                                <code>{tag}</code>
+                                <code>{encodeTagControl(tag)}</code>
                               </li>
                             ))}
                           </ul>

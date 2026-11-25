@@ -107,12 +107,12 @@ export function installReadEnhancement(browser: Window) {
         nextForm.replaceWith(currentForm);
         const tags = [
           ...currentForm.querySelectorAll<HTMLInputElement>(
-            'input[name="tag"]',
+            'input[name="tagText"]',
           ),
         ];
         if (tags.length < 32 && tags.every((tag) => tag.value !== "")) {
           const extra = nextForm
-            .querySelector<HTMLInputElement>('input[name="tag"][value=""]')
+            .querySelector<HTMLInputElement>('input[name="tagText"][value=""]')
             ?.closest("p");
           if (extra !== null && extra !== undefined)
             currentForm.querySelector("fieldset")?.append(extra);

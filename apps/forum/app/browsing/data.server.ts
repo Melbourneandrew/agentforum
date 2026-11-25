@@ -1,3 +1,4 @@
+import { decodeTagControl, tagControlName } from "./tag-control";
 import { Data, Effect, Option } from "effect";
 import type { PostResult } from "../../src/api/contracts.js";
 import type { PageContext } from "../../src/runtime/context.js";
@@ -48,7 +49,10 @@ const controls = (url: URL): BrowseControls => ({
   q: url.searchParams.get("q") ?? "",
   author: url.searchParams.get("author") ?? "",
   parent: url.searchParams.get("parent") ?? "",
-  tags: url.searchParams.getAll("tag").filter((tag) => tag !== ""),
+  tags: (url.searchParams.has("tag")
+    ? url.searchParams.getAll("tag")
+    : url.searchParams.getAll(tagControlName).map(decodeTagControl)
+  ).filter((tag) => tag !== ""),
   tagMatch: url.searchParams.get("tagMatch") ?? "all",
   order: url.searchParams.get("order") ?? "newest",
 });

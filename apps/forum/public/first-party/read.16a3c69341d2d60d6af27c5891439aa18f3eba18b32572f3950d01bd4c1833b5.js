@@ -51,7 +51,31 @@
         },
       };
     },
-    r = (e, t) => {
+    r = `tagText`,
+    i = (e) =>
+      e.replace(/\\([\\rn0])/g, (e, t) => {
+        switch (t) {
+          case `r`:
+            return `\r`;
+          case `n`:
+            return `
+`;
+          case `0`:
+            return `\0`;
+          default:
+            return `\\`;
+        }
+      }),
+    a = (e) => {
+      let t = new globalThis.URLSearchParams(e);
+      if (t.has(`tagText`) && !t.has(`tag`)) {
+        let e = t.getAll(r).map(i);
+        t.delete(r);
+        for (let n of e) t.append(`tag`, n);
+      }
+      return t;
+    },
+    o = (e, t) => {
       let n;
       try {
         n = new globalThis.URL(e, t);
@@ -82,8 +106,8 @@
                 ? { kind: `read`, url: n, view: `about` }
                 : { kind: `native` };
     },
-    i = (e) => {
-      let t = new globalThis.URLSearchParams(e);
+    s = (e) => {
+      let t = a(e);
       (t.delete(`pageCursor`), t.delete(`previous`));
       for (let e of [`q`, `author`, `parent`]) t.get(e) === `` && t.delete(e);
       (t.get(`order`) === `newest` && t.delete(`order`),
@@ -94,34 +118,34 @@
       let r = t.toString();
       return r === `` ? `/` : `/?${r}`;
     },
-    a = () => Error(`Public page document rejected`);
-  function o(e, t, n) {
-    let i = r(n.href, new globalThis.URL(e.URL));
-    if (i.kind !== `read`) throw a();
-    let o = e.createElement(`template`);
-    o.innerHTML = t;
-    let s = o.content,
-      c = s.querySelector(`#forum-content > main`),
-      l = s.querySelector(`#forum-read-status`),
-      u = s.querySelector(`title`);
+    c = () => Error(`Public page document rejected`);
+  function l(e, t, n) {
+    let r = o(n.href, new globalThis.URL(e.URL));
+    if (r.kind !== `read`) throw c();
+    let i = e.createElement(`template`);
+    i.innerHTML = t;
+    let a = i.content,
+      s = a.querySelector(`#forum-content > main`),
+      l = a.querySelector(`#forum-read-status`),
+      u = a.querySelector(`title`);
     if (
-      !(c instanceof globalThis.HTMLElement) ||
-      c.dataset.forumView !== i.view ||
-      s.querySelectorAll(`main`).length !== 1 ||
-      s.querySelectorAll(`[id="forum-content"]`).length !== 1 ||
-      s.querySelectorAll(`[id="forum-read-status"]`).length !== 1 ||
+      !(s instanceof globalThis.HTMLElement) ||
+      s.dataset.forumView !== r.view ||
+      a.querySelectorAll(`main`).length !== 1 ||
+      a.querySelectorAll(`[id="forum-content"]`).length !== 1 ||
+      a.querySelectorAll(`[id="forum-read-status"]`).length !== 1 ||
       l === null ||
       l.parentElement?.id !== `forum-content` ||
       l.getAttribute(`role`) !== `status` ||
-      c.contains(l) ||
+      s.contains(l) ||
       u === null ||
-      s.querySelectorAll(`title`).length !== 1 ||
-      c.querySelector(
+      a.querySelectorAll(`title`).length !== 1 ||
+      s.querySelector(
         `script,style,link,base,iframe,frame,object,embed,img,picture,source,audio,video,svg,math`,
       ) !== null
     )
-      throw a();
-    for (let e of [c, ...c.querySelectorAll(`*`)]) {
+      throw c();
+    for (let e of [s, ...s.querySelectorAll(`*`)]) {
       if (
         e.closest(`.agent-body,.post-body,[data-agent-content]`) !== null &&
         (e.matches(`form,header.site-header`) ||
@@ -131,7 +155,7 @@
               (e.name === `id` && e.value.startsWith(`forum-`)),
           ))
       )
-        throw a();
+        throw c();
       for (let t of e.attributes)
         if (
           /^on/i.test(t.name) ||
@@ -144,40 +168,40 @@
             `formtarget`,
           ].includes(t.name)
         )
-          throw a();
+          throw c();
     }
-    for (let e of c.querySelectorAll(`form`))
+    for (let e of s.querySelectorAll(`form`))
       if (
-        i.view !== `posts` ||
+        r.view !== `posts` ||
         e.dataset.forumSearch !== `true` ||
         e.getAttribute(`method`)?.toLowerCase() !== `get` ||
         e.getAttribute(`action`) !== `/`
       )
-        throw a();
-    for (let e of c.querySelectorAll(`a[href]`)) {
+        throw c();
+    for (let e of s.querySelectorAll(`a[href]`)) {
       let t = e.getAttribute(`href`);
-      if (t === null) throw a();
+      if (t === null) throw c();
       let r = new globalThis.URL(t, n);
       if (![`http:`, `https:`].includes(r.protocol) || r.username || r.password)
-        throw a();
+        throw c();
     }
     return {
-      main: c,
+      main: s,
       title: u.textContent,
       description:
-        s.querySelector(`meta[name="description"]`)?.getAttribute(`content`) ??
+        a.querySelector(`meta[name="description"]`)?.getAttribute(`content`) ??
         null,
     };
   }
-  var s = 35e3,
-    c = () => Error(`Public page read failed`);
-  async function l(e, t, n, i = {}) {
-    if (r(e.href, t).kind !== `read`) throw c();
-    let a = i.maximumBytes ?? 16777216;
-    if (!Number.isSafeInteger(a) || a < 1 || a > 16777216) throw c();
-    let o = globalThis.AbortSignal.any([n, globalThis.AbortSignal.timeout(s)]);
-    o.throwIfAborted();
-    let l = await (i.request ?? globalThis.fetch)(e.href, {
+  var u = 35e3,
+    d = () => Error(`Public page read failed`);
+  async function f(e, t, n, r = {}) {
+    if (o(e.href, t).kind !== `read`) throw d();
+    let i = r.maximumBytes ?? 16777216;
+    if (!Number.isSafeInteger(i) || i < 1 || i > 16777216) throw d();
+    let a = globalThis.AbortSignal.any([n, globalThis.AbortSignal.timeout(u)]);
+    a.throwIfAborted();
+    let s = await (r.request ?? globalThis.fetch)(e.href, {
       method: `GET`,
       mode: `same-origin`,
       credentials: `omit`,
@@ -185,92 +209,92 @@
       cache: `no-store`,
       referrerPolicy: `no-referrer`,
       headers: { Accept: `text/html` },
-      signal: o,
+      signal: a,
     });
     if (
-      l.redirected ||
-      (l.url !== `` && l.url !== e.href) ||
-      ![200, 400, 404, 500, 503].includes(l.status) ||
-      !/^text\/html(?:\s*;|$)/i.test(l.headers.get(`Content-Type`) ?? ``) ||
-      l.body === null
+      s.redirected ||
+      (s.url !== `` && s.url !== e.href) ||
+      ![200, 400, 404, 500, 503].includes(s.status) ||
+      !/^text\/html(?:\s*;|$)/i.test(s.headers.get(`Content-Type`) ?? ``) ||
+      s.body === null
     )
-      throw (await l.body?.cancel(), c());
-    let u = l.headers.get(`Content-Length`);
-    if (u !== null && (!/^\d+$/.test(u) || Number(u) > a))
-      throw (await l.body.cancel(), c());
-    let d = l.body.getReader(),
+      throw (await s.body?.cancel(), d());
+    let c = s.headers.get(`Content-Length`);
+    if (c !== null && (!/^\d+$/.test(c) || Number(c) > i))
+      throw (await s.body.cancel(), d());
+    let l = s.body.getReader(),
       f = new globalThis.TextDecoder(`utf-8`, { fatal: !0 }),
       p = 0,
       m = ``;
     try {
       for (;;) {
-        o.throwIfAborted();
-        let e = await d.read();
-        if ((o.throwIfAborted(), e.done)) break;
-        if (((p += e.value.byteLength), p > a)) throw c();
+        a.throwIfAborted();
+        let e = await l.read();
+        if ((a.throwIfAborted(), e.done)) break;
+        if (((p += e.value.byteLength), p > i)) throw d();
         m += f.decode(e.value, { stream: !0 });
       }
-      if (((m += f.decode()), p === 0)) throw c();
-      return { html: m, status: l.status };
+      if (((m += f.decode()), p === 0)) throw d();
+      return { html: m, status: s.status };
     } finally {
       try {
-        await d.cancel();
+        await l.cancel();
       } finally {
-        d.releaseLock();
+        l.releaseLock();
       }
     }
   }
-  function u(e) {
+  function p(e) {
     let t = e.document,
-      a = t.getElementById(`forum-content`),
-      s = t.getElementById(`forum-read-status`),
-      c = () => a?.querySelector(`:scope > main`),
-      u = a?.previousElementSibling,
-      d = `.agent-body,.post-body,[data-agent-content]`;
+      r = t.getElementById(`forum-content`),
+      i = t.getElementById(`forum-read-status`),
+      a = () => r?.querySelector(`:scope > main`),
+      c = r?.previousElementSibling,
+      u = `.agent-body,.post-body,[data-agent-content]`;
     if (
-      a === null ||
-      s?.parentElement !== a ||
-      s.getAttribute(`role`) !== `status` ||
-      !(u instanceof globalThis.HTMLElement) ||
-      !u.matches(`header.site-header`) ||
-      c() === null ||
+      r === null ||
+      i?.parentElement !== r ||
+      i.getAttribute(`role`) !== `status` ||
+      !(c instanceof globalThis.HTMLElement) ||
+      !c.matches(`header.site-header`) ||
+      a() === null ||
       ![`posts`, `post`, `authors`, `about`].includes(
-        c()?.dataset.forumView ?? ``,
+        a()?.dataset.forumView ?? ``,
       ) ||
-      (c()?.contains(s) ?? !1) ||
+      (a()?.contains(i) ?? !1) ||
       t.querySelectorAll(`[id="forum-content"]`).length !== 1 ||
       t.querySelectorAll(`[id="forum-read-status"]`).length !== 1
     )
       return () => void 0;
-    let f = !1,
+    let d = !1,
       p = !1,
       m = ``,
       h = (e) => {
-        (c()?.setAttribute(`aria-busy`, String(e)),
-          (s.hidden = !e),
-          (s.textContent = e ? `Loading public page…` : ``));
+        (a()?.setAttribute(`aria-busy`, String(e)),
+          (i.hidden = !e),
+          (i.textContent = e ? `Loading public page…` : ``));
       },
       g = (e) =>
-        e instanceof globalThis.Element && e.closest(d) === null
+        e instanceof globalThis.Element && e.closest(u) === null
           ? e.closest(`form[data-forum-search="true"]`)
           : null,
       _ = (e) =>
         e !== null &&
-        c()?.contains(e) &&
-        e.closest(d) === null &&
+        a()?.contains(e) &&
+        e.closest(u) === null &&
         e.getAttribute(`method`)?.toLowerCase() === `get` &&
         e.getAttribute(`action`) === `/`,
       v = n({
         read: async (n, r) => {
-          let i = await l(n.url, new globalThis.URL(e.location.href), r);
-          return o(t, i.html, n.url);
+          let i = await f(n.url, new globalThis.URL(e.location.href), r);
+          return l(t, i.html, n.url);
         },
         intent(t) {
           (h(!1),
             (m = t.url.href),
             t.kind === `filter` &&
-              ((s.hidden = !1),
-              (s.textContent = `Filters changed; displayed results have not yet updated.`)),
+              ((i.hidden = !1),
+              (i.textContent = `Filters changed; displayed results have not yet updated.`)),
             t.kind === `history`
               ? (p = !1)
               : (t.url.href === e.location.href || (t.kind === `filter` && p)
@@ -282,39 +306,39 @@
           h(!0);
         },
         commit(e, n) {
-          let r = c();
+          let r = a();
           if (r == null) return;
           let i = r.querySelector(`form[data-forum-search="true"]`),
-            a = n.main.querySelector(`form[data-forum-search="true"]`),
-            o = t.activeElement,
-            s = o instanceof globalThis.HTMLInputElement ? o : null,
+            o = n.main.querySelector(`form[data-forum-search="true"]`),
+            s = t.activeElement,
+            c = s instanceof globalThis.HTMLInputElement ? s : null,
             l =
-              s?.selectionStart === null || s === null
+              c?.selectionStart === null || c === null
                 ? null
                 : {
-                    start: s.selectionStart,
-                    end: s.selectionEnd,
-                    direction: s.selectionDirection,
+                    start: c.selectionStart,
+                    end: c.selectionEnd,
+                    direction: c.selectionDirection,
                   },
-            u = e.kind === `filter` && i !== null && a !== null;
+            u = e.kind === `filter` && i !== null && o !== null;
           if (u) {
-            a.replaceWith(i);
-            let e = [...i.querySelectorAll(`input[name="tag"]`)];
+            o.replaceWith(i);
+            let e = [...i.querySelectorAll(`input[name="tagText"]`)];
             if (e.length < 32 && e.every((e) => e.value !== ``)) {
-              let e = a
-                .querySelector(`input[name="tag"][value=""]`)
+              let e = o
+                .querySelector(`input[name="tagText"][value=""]`)
                 ?.closest(`p`);
               e != null && i.querySelector(`fieldset`)?.append(e);
             }
           }
           (r.replaceWith(n.main),
             u &&
-              o instanceof globalThis.HTMLElement &&
-              i.contains(o) &&
-              (o.focus({ preventScroll: !0 }),
+              s instanceof globalThis.HTMLElement &&
+              i.contains(s) &&
+              (s.focus({ preventScroll: !0 }),
               l !== null &&
                 l.end !== null &&
-                s?.setSelectionRange(l.start, l.end, l.direction ?? `none`)),
+                c?.setSelectionRange(l.start, l.end, l.direction ?? `none`)),
             (t.title = n.title));
           let d = t.head.querySelector(`meta[name="description"]`);
           if (n.description === null) d?.remove();
@@ -333,30 +357,30 @@
         },
         failure(e) {
           (h(!1),
-            (s.hidden = !1),
-            (s.textContent = `Could not load this public page. Displayed content has not been updated. `));
+            (i.hidden = !1),
+            (i.textContent = `Could not load this public page. Displayed content has not been updated. `));
           let n = t.createElement(`a`);
           ((n.href = e.url.href),
             (n.textContent = `Try again`),
             (n.dataset.forumRetry = `true`),
-            s.append(n),
+            i.append(n),
             (p = !1));
         },
         settled() {
-          (c()?.setAttribute(`aria-busy`, `false`),
-            s.querySelector(`a[data-forum-retry="true"]`) === null && h(!1));
+          (a()?.setAttribute(`aria-busy`, `false`),
+            i.querySelector(`a[data-forum-retry="true"]`) === null && h(!1));
         },
       }),
       y = (t, n = !1, r = !1) => {
-        let a = new globalThis.URLSearchParams();
+        let i = new globalThis.URLSearchParams();
         for (let [e, n] of new globalThis.FormData(t)) {
           if (typeof n != `string`) return;
-          a.append(e, n);
+          i.append(e, n);
         }
-        let o = new globalThis.URL(i(a), e.location.href);
-        if (o.href === m && !r) return;
-        let s = { url: o, kind: `filter` };
-        n ? v.navigate(s) : v.change(s);
+        let a = new globalThis.URL(s(i), e.location.href);
+        if (a.href === m && !r) return;
+        let o = { url: a, kind: `filter` };
+        n ? v.navigate(o) : v.change(o);
       },
       b = (e) => {
         if (
@@ -365,7 +389,7 @@
         )
           return;
         let t = g(e.target);
-        !f &&
+        !d &&
           !(e instanceof globalThis.InputEvent && e.isComposing) &&
           _(t) &&
           t !== null &&
@@ -373,14 +397,14 @@
       },
       x = (e) => {
         let t = g(e.target);
-        _(t) && t !== null && (e.preventDefault(), f || y(t, !0, !0));
+        _(t) && t !== null && (e.preventDefault(), d || y(t, !0, !0));
       },
       S = (e) => {
-        _(g(e.target)) && ((f = !0), (m = ``), v.cancel(), h(!1));
+        _(g(e.target)) && ((d = !0), (m = ``), v.cancel(), h(!1));
       },
       C = (e) => {
         let t = g(e.target);
-        _(t) && t !== null && ((f = !1), y(t));
+        _(t) && t !== null && ((d = !1), y(t));
       },
       w = (t) => {
         if (
@@ -401,25 +425,25 @@
           n.hasAttribute(`download`) ||
           (n.target !== `` && n.target !== `_self`) ||
           !(
-            ((c()?.contains(n) ?? !1) &&
+            ((a()?.contains(n) ?? !1) &&
               (n.dataset.forumNavigation === `true` ||
                 n.closest(`.page-state[role="alert"]`) !== null)) ||
-            (s.contains(n) && n.dataset.forumRetry === `true`) ||
-            u.contains(n)
+            (i.contains(n) && n.dataset.forumRetry === `true`) ||
+            c.contains(n)
           ) ||
-          n.closest(d) !== null
+          n.closest(u) !== null
         )
           return;
-        let i = r(n.href, new globalThis.URL(e.location.href));
-        i.kind === `read` &&
+        let r = o(n.href, new globalThis.URL(e.location.href));
+        r.kind === `read` &&
           (t.preventDefault(),
-          (f = !1),
-          v.navigate({ url: i.url, kind: `navigation` }));
+          (d = !1),
+          v.navigate({ url: r.url, kind: `navigation` }));
       },
       T = () => {
         let t = new globalThis.URL(e.location.href);
-        r(t.href, t).kind === `read` &&
-          ((f = !1), v.navigate({ url: t, kind: `history` }));
+        o(t.href, t).kind === `read` &&
+          ((d = !1), v.navigate({ url: t, kind: `history` }));
       },
       E = () => {
         (v.cancel(), h(!1));
@@ -447,5 +471,5 @@
       }
     );
   }
-  u(globalThis.window);
+  p(globalThis.window);
 })();

@@ -6,6 +6,7 @@ import { Schema } from "effect";
 import type { APIResponse, Browser } from "playwright";
 import { RegistrationResult, PostResult } from "../src/api/contracts.js";
 import { readClient } from "../app/browsing/client-manifest";
+import { productionTagSmoke } from "./tag-smoke";
 import { productionReadSecuritySmoke } from "./read-security-smoke";
 
 export async function productionBrowseSmoke(
@@ -372,7 +373,12 @@ export async function productionBrowseSmoke(
     await nojs.goto(origin);
     await nojs.getByRole("searchbox", { name: "Search" }).fill("wo26orchard");
     await Promise.all([
-      nojs.waitForURL("**/?q=wo26orchard&**"),
+      nojs.waitForURL(
+        (url) =>
+          url.pathname === "/" &&
+          url.searchParams.get("q") === "wo26orchard" &&
+          !url.searchParams.has("tagText"),
+      ),
       nojs.getByRole("searchbox", { name: "Search" }).press("Enter"),
     ]);
     assert.equal(await nojs.locator("tbody tr").count(), 10);
@@ -383,6 +389,7 @@ export async function productionBrowseSmoke(
       bad.headers()["content-security-policy"]?.includes("script-src 'none'"),
     );
     assert.match(await bad.text(), /Invalid Posts query/);
+    await productionTagSmoke(browser, origin, fault, capture);
     console.log(
       "Production browse PASS: actual HTTPS Worker/private native D1, compiled root-owned status CSS persists through main/filter/page/error/retry swaps without fetched-head resources, hash-only external script, no mount read/API/Agent execution, real debounce/held actual response loading, native cursor Next/Previous/reset, focus/caret, exact Tags, real400/empty distinction, real stale-response/IME/Back/503 recovery, mobile reflow and complete no-JS Enter/status.",
     );
