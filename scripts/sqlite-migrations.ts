@@ -6,6 +6,12 @@ import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { promisify } from "node:util";
 import { parse as parseJsonc, type ParseError } from "jsonc-parser";
+import {
+  CONTROL_FILE,
+  CONTROL_HISTORY,
+  CONTROL_V1_SHA256,
+  NATIVE_HISTORY_SQL,
+} from "./delivery/release-control.js";
 import initSqlite, {
   type Database,
   type Sqlite3Static,
@@ -567,6 +573,7 @@ interface NativeOptions {
   readonly fresh: Set<string>;
   readonly expected?: readonly string[];
   readonly tracking?: boolean;
+  readonly trackingTable?: string;
 }
 
 // Both whole files and Wrangler's actual chunks pass through SQLite itself.
@@ -598,7 +605,7 @@ const nativeReplay = (
           if (options.approved) return c.SQLITE_OK;
           if (options.tracking)
             return (action === c.SQLITE_INSERT &&
-              first === "d1_migrations" &&
+              first === (options.trackingTable ?? "d1_migrations") &&
               database === "main") ||
               (action === c.SQLITE_FUNCTION &&
                 typeof second === "string" &&
@@ -798,4 +805,76 @@ export const checkSqliteMigrations = async (
   return checkSqliteMigrationSources(
     sqlPaths.map((path) => ({ path, bytes: requiredFile(current, path) })),
   );
+};
+
+// Deliberately only frozen protocol v1 is supported. A future operational upgrade
+// needs its own reviewed additive protocol/safety support; arbitrary SQL does not
+// acquire an exception merely by living in the operational directory.
+export const checkOperationalMigrations = async (
+  root: string,
+  base: string,
+): Promise<SqliteMigrationReport> => {
+  const directory = "scripts/delivery/control-migrations";
+  const path = `${directory}/${CONTROL_FILE}`;
+  for (const part of ["scripts", "scripts/delivery", directory])
+    if (!(await lstat(join(root, part))).isDirectory()) return fail("layout");
+  const names = await readdir(join(root, directory));
+  if (names.length !== 1 || names[0] !== CONTROL_FILE) return fail("layout");
+  const bytes = await regularFile(join(root, path));
+  if (digest(bytes) !== CONTROL_V1_SHA256) return fail("history");
+  if (!/^[a-f0-9]{40}$/.test(base)) return fail("history");
+  await git(root, ["merge-base", "--is-ancestor", base, "HEAD"]);
+  const tree = (
+    await git(root, ["ls-tree", "-rz", "--full-tree", base, "--", directory])
+  ).toString("utf8");
+  const entries = tree.split("\0").filter(Boolean);
+  if (entries.length) {
+    if (
+      entries.length !== 1 ||
+      !new RegExp(`^100644 blob [a-f0-9]{40}\\t${path}$`).test(entries[0] ?? "")
+    )
+      return fail("history");
+    if (digest(await git(root, ["show", `${base}:${path}`])) !== digest(bytes))
+      return fail("history");
+  }
+  const s = await sqlite();
+  const whole = new s.oo1.DB(":memory:");
+  const runner = new s.oo1.DB(":memory:");
+  try {
+    const source = decode(bytes);
+    const parsed = nativeReplay(s, whole, source, {
+      approved: false,
+      fresh: new Set(),
+    });
+    if (parsed.statements.length !== 1) return fail("policy");
+    runner.exec(NATIVE_HISTORY_SQL);
+    const tracking = `INSERT INTO "${CONTROL_HISTORY}" (name)\nvalues ('${CONTROL_FILE}');`;
+    const chunks = splitWithWrangler(`${source}\n${tracking}`);
+    if (chunks.length !== 2) return fail("parse");
+    const expected = [
+      ...parsed.statements,
+      normalized(`${parsed.trailing}\n${tracking}`),
+    ];
+    for (const [index, chunk] of chunks.entries()) {
+      const statement = expected[index];
+      if (!statement) return fail("parse");
+      nativeReplay(s, runner, chunk, {
+        approved: false,
+        fresh: new Set(),
+        expected: [statement],
+        tracking: index === 1,
+        trackingTable: CONTROL_HISTORY,
+      });
+    }
+    if (
+      whole.selectValue("PRAGMA integrity_check") !== "ok" ||
+      runner.selectValue("PRAGMA integrity_check") !== "ok" ||
+      runner.selectValue(`SELECT count(*) FROM ${CONTROL_HISTORY}`) !== 1
+    )
+      return fail("replay");
+    return { migrations: 1, statements: 1 };
+  } finally {
+    whole.close();
+    runner.close();
+  }
 };
