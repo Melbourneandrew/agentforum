@@ -293,7 +293,11 @@ export async function productionTagSmoke(
           await enhanced.getByLabel("Tag 1", { exact: true }).inputValue(),
           encodeTagControl(tag),
         );
-        assert.equal((await nojs.goto(href(tag)))?.status(), 503);
+        // The accepted finite public cache may serve a previously visited URL.
+        // Use a fresh, equivalent FTS selection to exercise the actual D1 fault.
+        const nativeFault = new URL(href(tag));
+        nativeFault.searchParams.set("q", 'wo26losslesstag "orchard"');
+        assert.equal((await nojs.goto(nativeFault.href))?.status(), 503);
         assert.equal(
           await nojs.getByLabel("Tag 1", { exact: true }).inputValue(),
           encodeTagControl(tag),
