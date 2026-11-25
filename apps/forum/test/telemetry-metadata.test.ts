@@ -237,9 +237,11 @@ describe("inactive bounded diagnostic metadata in workerd", () => {
     const writer = makeDiagnosticWriter(
       sanitizeDiagnosticMetadata({ environment: "preview", revision }),
     );
-    expect(() => writer(base)).not.toThrow();
-    expect(() =>
-      requestDiagnostics(new Request("https://example.com/"), id, writer)(200),
-    ).not.toThrow();
+    expect(() => {
+      writer(base);
+    }).not.toThrow();
+    expect(() => {
+      requestDiagnostics(new Request("https://example.com/"), id, writer)(200);
+    }).not.toThrow();
   });
 });
