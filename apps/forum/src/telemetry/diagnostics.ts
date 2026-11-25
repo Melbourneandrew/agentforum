@@ -46,16 +46,54 @@ const Diagnostic = Schema.Struct({
   "duration.ms": Duration,
 });
 export type SafeDiagnostic = typeof Diagnostic.Type;
-// Never pass caller objects through to a sink, even when structurally typed.
-export const writeDiagnostic = (input: SafeDiagnostic): void => {
-  const decoded = Schema.decodeUnknownOption(Diagnostic)(input);
-  if (Option.isNone(decoded)) return;
-  try {
-    console.info(JSON.stringify(decoded.value));
-  } catch {
-    // Diagnostics must never alter business outcomes, even if the sink fails.
-  }
+const Metadata = Schema.Struct({
+  environment: Schema.Literal("local", "preview", "staging", "production"),
+  revision: Schema.String.pipe(
+    Schema.minLength(40),
+    Schema.maxLength(40),
+    Schema.pattern(/^[a-f0-9]{40}$/),
+  ),
+});
+export type DiagnosticMetadata = typeof Metadata.Type;
+// Shape validation is NOT authority. Only a separately authorized composition
+// boundary may supply this pair; no request/config/ambient context is consulted.
+export const sanitizeDiagnosticMetadata = (
+  input: unknown,
+): Option.Option<DiagnosticMetadata> =>
+  Schema.decodeUnknownOption(Metadata)(input, {
+    onExcessProperty: "error",
+  }).pipe(
+    Option.map((pair) =>
+      Object.freeze({ environment: pair.environment, revision: pair.revision }),
+    ),
+  );
+export type DiagnosticWriter = (input: SafeDiagnostic) => void;
+export const makeDiagnosticWriter = (
+  metadata: Option.Option<DiagnosticMetadata> = Option.none(),
+): DiagnosticWriter => {
+  // Revalidate even structurally typed callers and snapshot before retaining.
+  const pair = Option.flatMap(metadata, sanitizeDiagnosticMetadata);
+  return (input) => {
+    // Never pass caller objects through to a sink. Sanitize BASE fields first;
+    // caller-supplied metadata keys cannot survive or override the captured pair.
+    const decoded = Schema.decodeUnknownOption(Diagnostic)(input);
+    if (Option.isNone(decoded)) return;
+    const record = Option.isSome(pair)
+      ? {
+          ...decoded.value,
+          "deployment.environment.name": pair.value.environment,
+          "service.version": pair.value.revision,
+        }
+      : decoded.value;
+    try {
+      console.info(JSON.stringify(record));
+    } catch {
+      // Diagnostics must never alter business outcomes, even if the sink fails.
+    }
+  };
 };
+// Existing runtime consumers stay inactive and byte-equivalent by default.
+export const writeDiagnostic: DiagnosticWriter = makeDiagnosticWriter();
 const routeOf = (path: string): typeof Route.Type => {
   const route = Schema.decodeUnknownOption(Route)(path);
   return Option.getOrElse(route, () => "unmatched" as const);
@@ -86,7 +124,11 @@ const errorOf = (status: number): SafeDiagnostic["error.type"] => {
   }
 };
 // One bounded record per request. No request/body/exception references escape this closure.
-export const requestDiagnostics = (request: Request, correlationId: string) => {
+export const requestDiagnostics = (
+  request: Request,
+  correlationId: string,
+  writer: DiagnosticWriter = writeDiagnostic,
+) => {
   const route = routeOf(new URL(request.url).pathname);
   const method = Option.getOrElse(
     Schema.decodeUnknownOption(Method)(request.method),
@@ -97,7 +139,7 @@ export const requestDiagnostics = (request: Request, correlationId: string) => {
   return (status: number): void => {
     if (completed) return;
     completed = true;
-    writeDiagnostic({
+    writer({
       "service.name": "agentforum",
       "event.name": "operation.completed",
       "api.version": "v1",
