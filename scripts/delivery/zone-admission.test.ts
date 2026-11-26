@@ -1,11 +1,11 @@
 // Real clean disposable checkout + secure journal, injected local build only.
 // Credential effect intentionally stops successful admission before any provider.
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Effect, Either, Schema } from "effect";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { Identity, failure } from "./model.js";
 import {
   ownerReleaseCommand,
@@ -25,7 +25,6 @@ const identity = Schema.decodeUnknownSync(Identity)({
 });
 const roots: string[] = [];
 afterEach(() => {
-  vi.unstubAllEnvs();
   for (const root of roots.splice(0))
     rmSync(root, { recursive: true, force: true });
 });
@@ -40,16 +39,10 @@ const fixture = (attachments: Record<string, unknown>) => {
     process.cwd(),
     root,
   ]);
-  const revision = execFileSync("git", ["rev-parse", "HEAD"], {
-    cwd: root,
-    encoding: "utf8",
-  }).trim();
   const journalPath = join(directory, "identity.json");
   writeFileSync(journalPath, JSON.stringify({ state: "resolved", identity }), {
     mode: 0o600,
   });
-  const bin = join(directory, "bin");
-  mkdirSync(bin);
   const config = {
     name: "agent-forum",
     main: "index.js",
@@ -75,12 +68,41 @@ const fixture = (attachments: Record<string, unknown>) => {
     ],
     ...attachments,
   };
+  // Inject a private local IPC build fixture, not PATH/CLI grant flags.
+  // Parent still owns the fork, validates readback/clean exit and checks exact
+  // clean source on both sides. This synthetic artifact is NOT readiness proof.
+  const entry = "apps/forum/scripts/owner-build.ts";
   writeFileSync(
-    join(bin, "pnpm"),
-    `#!/usr/bin/env node\nconst fs=require('node:fs');const p=require('node:path'); if(JSON.stringify(process.argv.slice(2))!==JSON.stringify(['exec','turbo','run','build','--force']))process.exit(91);const base=p.join(process.cwd(),'apps/forum/dist'); fs.mkdirSync(p.join(base,'server'),{recursive:true});fs.mkdirSync(p.join(base,'client'),{recursive:true});fs.writeFileSync(p.join(base,'server/index.js'),'export default {fetch(){return new Response("unit fixture")}}');fs.writeFileSync(p.join(base,'client/fixture.txt'),'not readiness evidence');fs.writeFileSync(p.join(base,'server/wrangler.json'),${JSON.stringify(JSON.stringify(config))});\n`,
-    { mode: 0o700 },
+    join(root, entry),
+    `import fs from "node:fs"; import p from "node:path";
+process.once("message", input => {
+  const base=p.join(process.cwd(),"dist");
+  fs.mkdirSync(p.join(base,"server"),{recursive:true}); fs.mkdirSync(p.join(base,"client"),{recursive:true});
+  fs.writeFileSync(p.join(base,"server/index.js"),'export default {fetch(){return new Response("unit fixture")}}');
+  fs.writeFileSync(p.join(base,"client/fixture.txt"),"not readiness evidence");
+  fs.writeFileSync(p.join(base,"server/wrangler.json"),${JSON.stringify(JSON.stringify(config))});
+  process.send({version:1,kind:"built",revision:input.revision,metadata:input.metadata}, () => process.exit(0));
+});`,
   );
-  vi.stubEnv("PATH", `${bin}:${process.env.PATH ?? ""}`);
+  execFileSync("git", ["add", entry], { cwd: root });
+  execFileSync(
+    "git",
+    [
+      "-c",
+      "user.name=LocalFixture",
+      "-c",
+      "user.email=fixture@invalid",
+      "commit",
+      "--quiet",
+      "-m",
+      "test: private local build fixture",
+    ],
+    { cwd: root },
+  );
+  const revision = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
   const scope: OwnerScope = {
     repository: root,
     journalPath,

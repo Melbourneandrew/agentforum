@@ -2,7 +2,7 @@ import { fork } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { Effect, Either, Fiber } from "effect";
+import { Effect, Either, Fiber, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 import {
   BuildProcess,
@@ -13,7 +13,8 @@ import {
   ownerBuild,
   safeBuildEnvironment,
 } from "../../apps/forum/scripts/owner-build.js";
-import { failure } from "./model.js";
+import { ParentExecution, ownerReleaseCommand } from "./owner-executor.js";
+import { Identity, failure } from "./model.js";
 const input = {
   version: 1,
   repository: process.cwd(),
@@ -42,6 +43,55 @@ const invalidInputs: readonly unknown[] = [
   { ...input, metadata: undefined },
 ];
 describe("private build DTO is data, not authority", () => {
+  it("rejects excess trusted Scope input before source/build/credential", async () => {
+    let credentials = 0;
+    const identity = Schema.decodeUnknownSync(Identity)({
+      version: 1,
+      accountId: "a".repeat(32),
+      workerName: "scope-forum",
+      databaseName: "scope-database",
+      databaseId: "11111111-1111-1111-1111-111111111111",
+      defaultOrigin: "https://scope-forum.owner.workers.dev",
+    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        ownerReleaseCommand([
+          "cli",
+          "--identity",
+          "/not-opened/identity.json",
+        ]).pipe(
+          Effect.provideService(ParentExecution, {
+            authorize: () =>
+              Effect.succeed({
+                repository: process.cwd(),
+                journalPath: "/not-opened/identity.json",
+                identity,
+                sourceRevision: input.revision,
+                diagnosticEnvironment: "staging" as const,
+                executorRef: "trusted-parent:scope-unit",
+                operation: "update" as const,
+                grants: [
+                  "d1:read",
+                  "d1:write",
+                  "worker:read",
+                  "worker:deploy",
+                ] as const,
+                metadataAuthority: "not-a-grant",
+              }),
+            credential: Effect.sync(() => {
+              credentials++;
+              return "NEVER-USED-SYNTHETIC";
+            }),
+          }),
+        ),
+      ),
+    );
+    expect(Either.isLeft(result) && result.left.code).toBe(
+      "owner-execution-authorization-unconfigured",
+    );
+    expect(credentials).toBe(0);
+  });
+
   it.each(invalidInputs.map((value, index) => ({ value, index })))(
     "rejects input $index before process/build/credential continuation",
     async ({ value }) => {
