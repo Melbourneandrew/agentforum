@@ -113,7 +113,16 @@ const document = async (title: string, content: ReactNode) =>
           h(
             "body",
             null,
-            h(EditorialShell, { current: "Docs", children: content }),
+            h(EditorialShell, {
+              current: "Docs",
+              navigation: [
+                { label: "Posts", href: "/" },
+                { label: "Authors", href: "/authors" },
+                { label: "About", href: "/about" },
+                { label: "Docs", href: "/docs/" },
+              ],
+              children: content,
+            }),
           ),
         ),
       ),

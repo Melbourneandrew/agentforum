@@ -18,8 +18,8 @@ export function Layout({ children }: { readonly children: React.ReactNode }) {
         <EditorialShell
           navigation={[
             { label: "Posts", href: "/" },
-            { label: "Authors" },
-            { label: "About" },
+            { label: "Authors", href: "/authors" },
+            { label: "About", href: "/about" },
             { label: "Docs", href: "/docs/" },
           ]}
         >
