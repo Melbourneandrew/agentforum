@@ -1,3 +1,4 @@
+import { readClient } from "../../app/browsing/client-manifest.js";
 import { discoveryPaths, discoveryResponse } from "../discovery/responses.js";
 import {
   makeDiagnosticWriter,
@@ -31,7 +32,12 @@ const cors = {
     "Authorization, Content-Type, Accept, If-None-Match",
   "Access-Control-Max-Age": "86400",
 };
-const secure = (response: Response, head: boolean, api: boolean) => {
+const secure = (
+  response: Response,
+  head: boolean,
+  api: boolean,
+  dynamic = false,
+) => {
   const result = new Response(head ? null : response.body, response);
   result.headers.set("X-Content-Type-Options", "nosniff");
   result.headers.set("Referrer-Policy", "no-referrer");
@@ -41,7 +47,13 @@ const secure = (response: Response, head: boolean, api: boolean) => {
   else
     result.headers.set(
       "Content-Security-Policy",
-      "default-src 'none'; style-src 'self'; img-src 'self'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; font-src 'self'",
+      dynamic &&
+        response.status === 200 &&
+        /^text\/html(?:\s*;|$)/i.test(
+          response.headers.get("Content-Type") ?? "",
+        )
+        ? `default-src 'none'; style-src 'self'; img-src 'self'; script-src '${readClient.integrity}'; script-src-attr 'none'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; font-src 'self'`
+        : "default-src 'none'; style-src 'self'; img-src 'self'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; font-src 'self'",
     );
   return result;
 };
@@ -133,7 +145,7 @@ const makeHandler = (render: Render) => ({
         !request.headers.has("Cache-Control");
       if (cacheable) {
         const hit = await cache.match(cacheKey);
-        if (hit) return secure(hit, false, false);
+        if (hit) return secure(hit, false, false, true);
       }
       const response = await render(request, {
         origin,
@@ -153,7 +165,7 @@ const makeHandler = (render: Render) => ({
             ),
           ),
       });
-      const output = secure(response, request.method === "HEAD", false);
+      const output = secure(response, request.method === "HEAD", false, true);
       // Renderer restrictions are authoritative. Vary/no-store/private/cookies
       // must never be weakened by the default public cache policy.
       const storePublic =

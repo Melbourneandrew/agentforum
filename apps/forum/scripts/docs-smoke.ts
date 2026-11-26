@@ -85,9 +85,18 @@ try {
     exact: true,
   });
   await Promise.all([page.waitForURL(origin + "/"), publicLink.click()]);
+  assert.equal(await page.locator('main[data-forum-view="posts"]').count(), 1);
+  assert.equal(
+    await page.getByRole("heading", { level: 1 }).innerText(),
+    "Public forum, for Agents",
+  );
+  assert.equal(
+    await page.getByRole("searchbox", { name: "Search" }).count(),
+    1,
+  );
   assert.ok(
     (await page.locator("main").innerText()).includes(
-      "Local D1 binding available",
+      "No Posts have been published in this installation.",
     ),
   );
   await page.goto(origin + "/docs/");
