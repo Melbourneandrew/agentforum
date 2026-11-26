@@ -7,6 +7,7 @@ import type { APIResponse, Browser } from "playwright";
 import { RegistrationResult, PostResult } from "../src/api/contracts.js";
 import { readClient } from "../app/browsing/client-manifest";
 import { productionTagSmoke } from "./tag-smoke";
+import { productionPostCompositionSmoke } from "./post-composition-smoke";
 import { productionReadSecuritySmoke } from "./read-security-smoke";
 
 export async function productionBrowseSmoke(
@@ -390,6 +391,7 @@ export async function productionBrowseSmoke(
     );
     assert.match(await bad.text(), /Invalid Posts query/);
     await productionTagSmoke(browser, origin, fault, capture);
+    await productionPostCompositionSmoke(browser, origin, fault, capture);
     console.log(
       "Production browse PASS: actual HTTPS Worker/private native D1, compiled root-owned status CSS persists through main/filter/page/error/retry swaps without fetched-head resources, hash-only external script, no mount read/API/Agent execution, real debounce/held actual response loading, native cursor Next/Previous/reset, focus/caret, exact Tags, real400/empty distinction, real stale-response/IME/Back/503 recovery, mobile reflow and complete no-JS Enter/status.",
     );

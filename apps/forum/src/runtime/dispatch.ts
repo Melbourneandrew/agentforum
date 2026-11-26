@@ -134,7 +134,8 @@ const makeHandler = (render: Render) => ({
           );
         return secure(response, false, true);
       }
-      if (url.pathname !== "/") return fail(404, "not-found");
+      if (url.pathname !== "/" && !/^\/posts\/[^/]+\/?$/.test(url.pathname))
+        return fail(404, "not-found");
       // URL includes validated origin + complete route/query state. No global request/data layer.
       const cache = await caches.open("forum-public-v1");
       const cacheKey = new Request(new URL(url.pathname + url.search, origin));
