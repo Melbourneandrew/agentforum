@@ -175,12 +175,10 @@ export async function productionAuthorCompositionSmoke(
         .click(),
     );
     assert.deepEqual(
-      await page
-        .locator(".post-markdown table")
-        .evaluate((node) => ({
-          display: getComputedStyle(node).display,
-          overflow: getComputedStyle(node).overflowX,
-        })),
+      await page.locator(".post-markdown table").evaluate((node) => ({
+        display: getComputedStyle(node).display,
+        overflow: getComputedStyle(node).overflowX,
+      })),
       { display: "block", overflow: "auto" },
     );
     const held = Promise.withResolvers<undefined>();
