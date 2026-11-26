@@ -1,3 +1,5 @@
+import { readClient } from "../app/browsing/client-manifest";
+import { productionBrowseSmoke } from "./browse-smoke";
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
@@ -33,6 +35,17 @@ const bytes = (
 assert.ok(
   bytes <= 3 * 1024 * 1024,
   "Worker exceeds the 3 MiB compressed bundle limit",
+);
+// Main-only enhancement never installs fetched route head resources. The
+// persistent platform status MUST be in the already-loaded compiled root CSS.
+const rootStyles = (await readdir("dist/client/assets")).filter((name) =>
+  /^root-.*\.css$/.test(name),
+);
+assert.equal(rootStyles.length, 1, "One compiled root stylesheet");
+assert.match(
+  await readFile(join("dist/client/assets", rootStyles[0] ?? ""), "utf8"),
+  /#forum-read-status/,
+  "Persistent read status styling belongs to the root, not browse-only SSR Links",
 );
 const state = await mkdtemp(join(tmpdir(), "agent-forum-runtime-"));
 const environment = {
@@ -173,12 +186,21 @@ try {
   await waitReady(server);
   const response = await boundedFetch(origin);
   const html = await response.text();
-  assert.match(html, /One installation/);
-  assert.match(html, /data-database="available"/);
-  assert.doesNotMatch(html, /<script\b|<form\b|<iframe\b|<[a-z][^>]*\son\w+=/i);
+  assert.match(html, /Public forum, for Agents/);
+  assert.match(html, /No Posts have been published/);
+  assert.equal((html.match(/<script\b/g) ?? []).length, 1);
+  assert.ok(html.includes(`src="${readClient.path}"`));
+  assert.ok(html.includes(`integrity="${readClient.integrity}"`));
+  const form = /<form\b[^>]*>/.exec(html)?.[0];
+  assert.ok(form);
+  assert.match(form, /method="get"/);
+  assert.match(form, /action="\/"/);
+  assert.doesNotMatch(html, /<iframe\b|<[a-z][^>]*\son\w+=/i);
   assert.match(
     response.headers.get("Content-Security-Policy") ?? "",
-    /script-src 'none'/,
+    new RegExp(
+      `script-src '${readClient.integrity.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}'`,
+    ),
   );
   const css = /href="([^"]+\.css)"/.exec(html)?.[1];
   assert.ok(css, "SSR must link a real local stylesheet");
@@ -490,15 +512,42 @@ try {
     await page.goto(origin);
     assert.match(
       await page.locator("main").innerText(),
-      /Local D1 binding available/,
+      /Public forum, for Agents/,
     );
-    await page.getByRole("link", { name: "Runtime documentation" }).click();
+    await page.getByRole("link", { name: "Operating guide" }).click();
     assert.match(page.url(), /\/docs\//);
     assert.match(
       await page.locator("main").innerText(),
       /not a complete installation/,
     );
     await context.close();
+    await productionBrowseSmoke(browser, origin, () => {
+      const ddl = (command: string) => {
+        execFileSync(
+          "pnpm",
+          [
+            "exec",
+            "wrangler",
+            "d1",
+            "execute",
+            "DB",
+            "--local",
+            "--config",
+            "../../wrangler.jsonc",
+            "--persist-to",
+            state,
+            "--command",
+            command,
+          ],
+          { env: environment, stdio: "ignore" },
+        );
+      };
+      ddl("ALTER TABLE posts RENAME TO posts_browse_fault");
+      return Promise.resolve(() => {
+        ddl("ALTER TABLE posts_browse_fault RENAME TO posts");
+        return Promise.resolve();
+      });
+    });
   } finally {
     await browser.close();
   }
