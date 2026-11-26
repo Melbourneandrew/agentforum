@@ -6,7 +6,7 @@ import {
 import { failure } from "./model.js";
 import type { DeliveryError } from "./model.js";
 import type { Activation, Artifact } from "./release-model.js";
-import { Readiness } from "./release-model.js";
+import { CanonicalOrigin, Readiness } from "./release-model.js";
 
 export class ReadinessHttp extends Context.Tag("delivery/ReadinessHttp")<
   ReadinessHttp,
@@ -22,7 +22,10 @@ export const DOCS_OPENAPI_PATH = "/docs/openapi.json";
 // Metadata-only probe of the accepted WO30 representations. Caller supplies the
 // already trusted installation origin; never derive it from request/CI input.
 // Passing this probe is NOT complete website/provider/release acceptance.
-export const inspectDiscovery = (origin: string) =>
+export const inspectDiscovery = (
+  origin: string,
+  canonicalOrigin: string = origin,
+) =>
   Effect.gen(function* () {
     const http = yield* ReadinessHttp;
     const get = (path: string) =>
@@ -58,12 +61,12 @@ export const inspectDiscovery = (origin: string) =>
         Array.from(guide.matchAll(/\]\(([^)]+)\)/g), (match) => {
           const target = match[1];
           if (!target) throw new Error("missing local link");
-          return new URL(target, origin);
+          return new URL(target, canonicalOrigin);
         }),
       catch: () => failure("readiness", "discovery-link-invalid"),
     });
     if (
-      links.some((url) => url.origin !== origin) ||
+      links.some((url) => url.origin !== canonicalOrigin) ||
       [
         "/",
         "/v1",
@@ -106,7 +109,7 @@ export const inspectDiscovery = (origin: string) =>
     // agents schema. Exactly four approved GET descriptions, no business writes.
     for (const path of discoveryPaths) {
       const response = yield* get(path);
-      const expected = discoveryResponse(path, origin);
+      const expected = discoveryResponse(path, canonicalOrigin);
       if (
         response.headers.get("Content-Type") !==
           expected.headers.get("Content-Type") ||
@@ -136,98 +139,122 @@ export const inspectReadiness = (
       return yield* Effect.fail(
         failure("readiness", "activation-receipt-mismatch"),
       );
+    const canonicalOrigin = yield* Schema.decodeUnknown(CanonicalOrigin)(
+      artifact.canonicalOrigin ?? artifact.identity.defaultOrigin,
+    ).pipe(
+      Effect.mapError(() =>
+        failure("configuration", "canonical-origin-invalid"),
+      ),
+    );
     const http = yield* ReadinessHttp;
-    const origin = artifact.identity.defaultOrigin;
-    const get = (path: string) =>
-      Effect.gen(function* () {
-        const response = yield* http.request(
-          new Request(`${origin}${path}`, { redirect: "manual" }),
+    // Default address remains enabled and must be usable even with a canonical
+    // label. Only an explicitly approved distinct canonical adds another probe;
+    // incomplete attachment is handled by retaining the default label first.
+    for (const origin of new Set([
+      artifact.identity.defaultOrigin,
+      canonicalOrigin,
+    ])) {
+      const get = (path: string) =>
+        Effect.gen(function* () {
+          const response = yield* http.request(
+            new Request(`${origin}${path}`, { redirect: "manual" }),
+          );
+          if (response.status !== 200 || response.redirected)
+            return yield* Effect.fail(
+              failure("readiness", "required-surface-unavailable"),
+            );
+          return yield* Effect.tryPromise({
+            try: () => response.text(),
+            catch: () => failure("readiness", "required-surface-unreadable"),
+          });
+        });
+      const web = yield* get("/");
+      const docs = yield* get("/docs/");
+      if (
+        !web.includes("<main") ||
+        web.includes("Local D1 binding available") ||
+        !docs.includes("<main") ||
+        docs.includes("not a complete installation")
+      )
+        return yield* Effect.fail(
+          failure("readiness", "incomplete-observation-or-docs"),
         );
+      yield* inspectDiscovery(origin, canonicalOrigin);
+      const contractText = yield* get(contractPath);
+      const contract = yield* Schema.decodeUnknown(
+        Schema.parseJson(
+          Schema.Struct({
+            servers: Schema.Array(Schema.Struct({ url: Schema.String })),
+            paths: Schema.Record({
+              key: Schema.String,
+              value: Schema.Record({
+                key: Schema.String,
+                value: Schema.Unknown,
+              }),
+            }),
+          }),
+        ),
+      )(contractText).pipe(
+        Effect.mapError(() => failure("readiness", "contract-unavailable")),
+      );
+      if (
+        !contract.servers.length ||
+        contract.servers.some(
+          (server) => server.url !== "/" && server.url !== canonicalOrigin,
+        )
+      )
+        return yield* Effect.fail(
+          failure("readiness", "contract-origin-mismatch"),
+        );
+      for (const operation of ["register", "publish", "search"]) {
+        const path = contract.paths[`/v1/${operation}`];
+        if (
+          !path ||
+          !Object.hasOwn(path, "get") ||
+          !Object.hasOwn(path, "post")
+        )
+          return yield* Effect.fail(
+            failure("readiness", "contract-operation-incomplete"),
+          );
+      }
+      // Only unauthenticated, non-mutating search probes on an owner installation.
+      // Register/publish/retention qualification needs a separately scoped disposable
+      // installation; never seed or mutate a live owner's data during readiness.
+      for (const method of ["GET", "POST"]) {
+        const body = JSON.stringify({ limit: 1 });
+        const request = new Request(
+          `${origin}/v1/search${method === "GET" ? `?payload=${encodeURIComponent(body)}` : ""}`,
+          {
+            method,
+            headers: { "Content-Type": "application/json" },
+            redirect: "manual",
+            ...(method === "POST" ? { body } : {}),
+          },
+        );
+        const response = yield* http.request(request);
         if (response.status !== 200 || response.redirected)
           return yield* Effect.fail(
-            failure("readiness", "required-surface-unavailable"),
+            failure("readiness", "api-read-unavailable"),
           );
-        return yield* Effect.tryPromise({
-          try: () => response.text(),
-          catch: () => failure("readiness", "required-surface-unreadable"),
+        const raw: unknown = yield* Effect.tryPromise({
+          try: () => response.json(),
+          catch: () => failure("readiness", "api-read-invalid"),
         });
-      });
-    const web = yield* get("/");
-    const docs = yield* get("/docs/");
-    if (
-      !web.includes("<main") ||
-      web.includes("Local D1 binding available") ||
-      !docs.includes("<main") ||
-      docs.includes("not a complete installation")
-    )
-      return yield* Effect.fail(
-        failure("readiness", "incomplete-observation-or-docs"),
-      );
-    yield* inspectDiscovery(origin);
-    const contractText = yield* get(contractPath);
-    const contract = yield* Schema.decodeUnknown(
-      Schema.parseJson(
-        Schema.Struct({
-          servers: Schema.Array(Schema.Struct({ url: Schema.String })),
-          paths: Schema.Record({
-            key: Schema.String,
-            value: Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+        yield* Schema.decodeUnknown(
+          Schema.Struct({
+            posts: Schema.Array(Schema.Unknown),
+            readCursor: Schema.String,
           }),
-        }),
-      ),
-    )(contractText).pipe(
-      Effect.mapError(() => failure("readiness", "contract-unavailable")),
-    );
-    if (
-      !contract.servers.length ||
-      contract.servers.some(
-        (server) => server.url !== "/" && server.url !== origin,
-      )
-    )
-      return yield* Effect.fail(
-        failure("readiness", "contract-origin-mismatch"),
-      );
-    for (const operation of ["register", "publish", "search"]) {
-      const path = contract.paths[`/v1/${operation}`];
-      if (!path || !Object.hasOwn(path, "get") || !Object.hasOwn(path, "post"))
-        return yield* Effect.fail(
-          failure("readiness", "contract-operation-incomplete"),
+        )(raw).pipe(
+          Effect.mapError(() => failure("readiness", "api-read-invalid")),
         );
-    }
-    // Only unauthenticated, non-mutating search probes on an owner installation.
-    // Register/publish/retention qualification needs a separately scoped disposable
-    // installation; never seed or mutate a live owner's data during readiness.
-    for (const method of ["GET", "POST"]) {
-      const body = JSON.stringify({ limit: 1 });
-      const request = new Request(
-        `${origin}/v1/search${method === "GET" ? `?payload=${encodeURIComponent(body)}` : ""}`,
-        {
-          method,
-          headers: { "Content-Type": "application/json" },
-          redirect: "manual",
-          ...(method === "POST" ? { body } : {}),
-        },
-      );
-      const response = yield* http.request(request);
-      if (response.status !== 200 || response.redirected)
-        return yield* Effect.fail(failure("readiness", "api-read-unavailable"));
-      const raw: unknown = yield* Effect.tryPromise({
-        try: () => response.json(),
-        catch: () => failure("readiness", "api-read-invalid"),
-      });
-      yield* Schema.decodeUnknown(
-        Schema.Struct({
-          posts: Schema.Array(Schema.Unknown),
-          readCursor: Schema.String,
-        }),
-      )(raw).pipe(
-        Effect.mapError(() => failure("readiness", "api-read-invalid")),
-      );
+      }
     }
     return yield* Schema.decodeUnknown(Readiness)({
       sourceRevision: artifact.sourceRevision,
       artifactDigest: artifact.artifactDigest,
-      defaultOrigin: origin,
+      defaultOrigin: artifact.identity.defaultOrigin,
+      canonicalOrigin,
       checks: {
         website: true,
         docs: true,
