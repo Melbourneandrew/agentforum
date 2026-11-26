@@ -316,12 +316,10 @@ export async function productionAuthorCompositionSmoke(
     assert.equal(await nojs.locator("main section.listing-row").count(), 8);
     await capture(nojs, "authors-composition-nojs-about");
     const missing = await nojs.goto(origin + "/authors/NoSuchComposedIdentity");
-    assert.equal(missing?.status(), 404);
-    assert.ok(
-      missing
-        ?.headers()
-        ["content-security-policy"]?.includes("script-src 'none'"),
-    );
+    assert.ok(missing);
+    assert.equal(missing.status(), 404);
+    const missingPolicy = missing.headers()["content-security-policy"];
+    assert.ok(missingPolicy?.includes("script-src 'none'"));
     const invalid = await native.request.get(origin + "/about?unowned=1");
     assert.equal(invalid.status(), 400);
     const policy = invalid.headers()["content-security-policy"];

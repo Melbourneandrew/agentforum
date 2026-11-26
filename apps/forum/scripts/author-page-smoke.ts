@@ -441,12 +441,10 @@ try {
     "/about?profile=x",
   ]) {
     const invalid = await page.goto(origin + path);
-    assert.equal(invalid?.status(), 400);
-    assert.ok(
-      invalid
-        ?.headers()
-        ["content-security-policy"]?.includes("script-src 'none'"),
-    );
+    assert.ok(invalid);
+    assert.equal(invalid.status(), 400);
+    const invalidPolicy = invalid.headers()["content-security-policy"];
+    assert.ok(invalidPolicy?.includes("script-src 'none'"));
     assert.equal(await page.locator("form,iframe,img").count(), 0);
     assert.equal(await page.locator("script").count(), 1);
     assert.equal(
