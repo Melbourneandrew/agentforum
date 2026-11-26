@@ -4,7 +4,7 @@ import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { Effect, Schema } from "effect";
 import { parse, type ParseError } from "jsonc-parser";
 import { Identity, Journal, failure } from "./model.js";
-import { Artifact, Revision } from "./release-model.js";
+import { Artifact, CanonicalOrigin, Revision } from "./release-model.js";
 
 const Dictionary = Schema.Record({ key: Schema.String, value: Schema.Unknown });
 const Binding = Schema.Struct({
@@ -142,6 +142,7 @@ export const prepareTarget = (input: {
   readonly output: string;
   readonly identity: Identity;
   readonly sourceRevision: string;
+  readonly canonicalOrigin?: string;
   readonly authorizeTarget: boolean;
 }) =>
   Effect.gen(function* () {
@@ -151,6 +152,13 @@ export const prepareTarget = (input: {
       );
     const identity = yield* Schema.decodeUnknown(Identity)(input.identity).pipe(
       Effect.mapError(() => failure("configuration", "identity-invalid")),
+    );
+    const canonicalOrigin = yield* Schema.decodeUnknown(CanonicalOrigin)(
+      input.canonicalOrigin ?? identity.defaultOrigin,
+    ).pipe(
+      Effect.mapError(() =>
+        failure("configuration", "canonical-origin-invalid"),
+      ),
     );
     const revision = yield* Schema.decodeUnknown(Revision)(
       input.sourceRevision,
@@ -224,7 +232,7 @@ export const prepareTarget = (input: {
       return yield* Effect.fail(failure("configuration", "binding-missing"));
     if (
       config.vars.CANONICAL_ORIGIN !== undefined &&
-      config.vars.CANONICAL_ORIGIN !== identity.defaultOrigin
+      config.vars.CANONICAL_ORIGIN !== canonicalOrigin
     )
       return yield* Effect.fail(
         failure("configuration", "canonical-origin-conflict"),
@@ -251,7 +259,7 @@ export const prepareTarget = (input: {
       account_id: identity.accountId,
       main,
       workers_dev: true,
-      vars: { ...config.vars, CANONICAL_ORIGIN: identity.defaultOrigin },
+      vars: { ...config.vars, CANONICAL_ORIGIN: canonicalOrigin },
       assets: { ...rawAssets, directory: assets },
       d1_databases: [
         {
@@ -313,6 +321,7 @@ export const prepareTarget = (input: {
     });
     const artifact = yield* Schema.decodeUnknown(Artifact)({
       identity,
+      canonicalOrigin,
       sourceRevision: revision,
       configPath: output,
       artifactDigest: contents.artifactDigest,

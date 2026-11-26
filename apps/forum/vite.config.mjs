@@ -7,6 +7,8 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   envDir: false,
+  // Ordinary/local builds deliberately have no admitted deployment metadata.
+  define: { __AGENTFORUM_DEPLOYMENT__: "null" },
   plugins: [
     cloudflare({
       configPath: "../../wrangler.jsonc",
