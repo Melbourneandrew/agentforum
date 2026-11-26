@@ -1,4 +1,5 @@
 import { createRequestHandler } from "react-router";
+import { sanitizeDiagnosticMetadata } from "./telemetry/diagnostics.js";
 import { makeDispatcher } from "./runtime/dispatch.js";
 
 const render = createRequestHandler(
@@ -20,4 +21,11 @@ const render = createRequestHandler(
   },
   import.meta.env.MODE,
 );
-export default makeDispatcher((request, forum) => render(request, { forum }));
+export default makeDispatcher(
+  (request, forum) => render(request, { forum }),
+  sanitizeDiagnosticMetadata(
+    typeof __AGENTFORUM_DEPLOYMENT__ === "undefined"
+      ? null
+      : __AGENTFORUM_DEPLOYMENT__,
+  ),
+);
