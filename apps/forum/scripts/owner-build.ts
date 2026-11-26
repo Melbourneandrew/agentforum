@@ -131,7 +131,7 @@ export const ownerBuild = (input: unknown, env: NodeJS.ProcessEnv) =>
           .pipe(Effect.map(own)),
         release,
       );
-      yield* Effect.async<undefined, DeliveryError>((resume) => {
+      yield* Effect.async<boolean, DeliveryError>((resume) => {
         let terminal = false,
           stopped = false;
         const deny = () => {
@@ -163,7 +163,7 @@ export const ownerBuild = (input: unknown, env: NodeJS.ProcessEnv) =>
           if (!stopped)
             resume(
               terminal && code === 0 && signal === null
-                ? Effect.succeed(undefined)
+                ? Effect.succeed(true)
                 : Effect.fail(invalid()),
             );
         });

@@ -58,6 +58,20 @@ const scope: OwnerScope = {
   grants: ["d1:read", "d1:write", "worker:read", "worker:deploy"],
 };
 describe("secure supported parent CLI boundary", () => {
+  it("rejects excess trusted Scope input before source/build/credential", async () => {
+    const { result, credentials } = await run(() =>
+      Effect.succeed({
+        ...scope,
+        diagnosticEnvironment: "staging" as const,
+        metadataAuthority: "not-a-grant",
+      }),
+    );
+    expect(Either.isLeft(result) && result.left.code).toBe(
+      "owner-execution-authorization-unconfigured",
+    );
+    expect(credentials).toBe(0);
+  });
+
   it("no parent authority means no credential access", async () => {
     const { result, credentials } = await run(() =>
       Effect.fail(failure("authorization", "denied")),
