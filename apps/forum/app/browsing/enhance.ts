@@ -1,3 +1,4 @@
+import { commitOwnedHead, ownedHeadOrigin } from "../../src/crawling/head";
 import { makeReadCoordinator } from "./read-coordinator";
 import { parseReadDocument, type ReadDocument } from "./read-document";
 import { readHtml } from "./read-html";
@@ -30,6 +31,7 @@ export function installReadEnhancement(browser: Window) {
     document.querySelectorAll('[id="forum-read-status"]').length !== 1
   )
     return () => undefined;
+  const metadataOrigin = ownedHeadOrigin(document);
   let composing = false;
   let filterHistory = false;
   let lastIntent = "";
@@ -55,7 +57,12 @@ export function installReadEnhancement(browser: Window) {
         new globalThis.URL(browser.location.href),
         signal,
       );
-      return parseReadDocument(document, result.html, input.url);
+      return parseReadDocument(
+        document,
+        result.html,
+        input.url,
+        metadataOrigin,
+      );
     },
     intent(input) {
       pending(false);
@@ -132,19 +139,7 @@ export function installReadEnhancement(browser: Window) {
             selection.direction ?? "none",
           );
       }
-      document.title = result.title;
-      const description = document.head.querySelector(
-        'meta[name="description"]',
-      );
-      if (result.description === null) description?.remove();
-      else if (description !== null)
-        description.setAttribute("content", result.description);
-      else {
-        const meta = document.createElement("meta");
-        meta.name = "description";
-        meta.content = result.description;
-        document.head.append(meta);
-      }
+      commitOwnedHead(document, result.head);
       if (!preserve) {
         const heading = result.main.querySelector<HTMLElement>("h1");
         heading?.setAttribute("tabindex", "-1");

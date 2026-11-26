@@ -56,6 +56,7 @@ const model = (url: URL): BrowseModel => {
     ],
   };
 };
+const canonicalOrigin = "https://canonical.fixture.example";
 const markup = (value: BrowseModel) =>
   renderToStaticMarkup(
     createElement(
@@ -65,9 +66,24 @@ const markup = (value: BrowseModel) =>
         "head",
         null,
         createElement("title", null, `Module fixture ${value.controls.q}`),
-        createElement("meta", {
-          name: "description",
-          content: "Isolated browser-module test only",
+        value.controls.q === "current"
+          ? null
+          : createElement("meta", {
+              name: "description",
+              content: "Isolated browser-module test only",
+              "data-forum-head": "description",
+            }),
+        value.controls.q === "current"
+          ? null
+          : createElement("link", {
+              rel: "canonical",
+              href: canonicalOrigin + "/",
+              "data-forum-head": "canonical",
+            }),
+        createElement("link", {
+          rel: "alternate",
+          href: "/forbidden-resource",
+          type: "text/markdown",
         }),
         createElement("script", {
           defer: true,
@@ -124,6 +140,20 @@ const server = createServer((request, response) => {
         "</main>",
         '<img src="/forbidden-resource"><script>document.documentElement.setAttribute("data-untrusted-executed","true")</script></main>',
       );
+    if (value.controls.q === "bad-canonical")
+      html = html.replace(canonicalOrigin + "/", "https://untrusted.example/");
+    if (value.controls.q === "query-canonical")
+      html = html.replace(
+        canonicalOrigin + "/",
+        canonicalOrigin + "/?payload=sensitive",
+      );
+    if (value.controls.q === "bad-representation")
+      html = html.replace(
+        "</head>",
+        '<link rel="alternate" type="text/markdown" data-forum-head="representation" href="' +
+          canonicalOrigin +
+          '/unsupported-post.md"></head>',
+      );
     response.writeHead(value.kind === "failure" ? 503 : 200, {
       "Content-Type": "text/html; charset=utf-8",
       "Content-Security-Policy": `default-src 'none'; script-src '${asset.integrity}'; script-src-attr 'none'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
@@ -146,6 +176,17 @@ try {
   context.setDefaultTimeout(10_000);
   const page = await context.newPage();
   await page.goto(origin, { waitUntil: "networkidle" });
+  const initialTitle = await page.title();
+  // Inject a stale platform-owned representation only to prove removal on commit.
+  await page.evaluate((href) => {
+    const link = document.createElement("link");
+    link.rel = "alternate";
+    link.type = "text/markdown";
+    link.href = href;
+    link.dataset.forumHead = "representation";
+    document.head.append(link);
+  }, canonicalOrigin + "/docs/index.md");
+
   assert.equal(
     requests.filter((url) => url.pathname === "/").length,
     1,
@@ -174,6 +215,14 @@ try {
   );
   assert.equal(new URL(page.url()).searchParams.get("q"), "sunrise");
   assert.equal(
+    await page
+      .locator('link[data-forum-head="canonical"]')
+      .getAttribute("href"),
+    canonicalOrigin + "/",
+  );
+  assert.equal(await page.title(), initialTitle); // pending head follows displayed content, not intent URL.
+
+  assert.equal(
     requests.filter((url) =>
       ["s", "sun"].includes(url.searchParams.get("q") ?? ""),
     ).length,
@@ -195,6 +244,11 @@ try {
     7,
   );
   assert.equal(await page.locator("main").getAttribute("aria-busy"), "false");
+  assert.equal(
+    await page.locator('link[data-forum-head="representation"]').count(),
+    0,
+    "Absent representation removes previous owned node",
+  );
   const oldGate = Promise.withResolvers<undefined>();
   holds.set("obsolete", oldGate);
   const oldRequested = page.waitForRequest(
@@ -215,6 +269,13 @@ try {
     0,
   );
   assert.equal(new URL(page.url()).searchParams.get("q"), "current");
+  assert.equal(await page.title(), "Module fixture current");
+  assert.equal(
+    await page.locator('link[data-forum-head="canonical"]').count(),
+    0,
+  );
+  assert.equal(await page.locator('meta[name="description"]').count(), 0);
+
   const beforeIme = requests.filter((url) => url.pathname === "/").length;
   await search.dispatchEvent("compositionstart", { data: "日" });
   await search.fill("日本");
@@ -255,6 +316,10 @@ try {
   await page
     .getByRole("link", { name: "Result unavailable", exact: true })
     .waitFor();
+  const retainedTitle = await page.title();
+  const retainedCanonical = await page
+    .locator('link[data-forum-head="canonical"]')
+    .getAttribute("href");
   await search.fill("hostile");
   await page.locator('#forum-read-status a[data-forum-retry="true"]').waitFor();
   assert.equal(
@@ -270,6 +335,14 @@ try {
     "Template parsed without resource reads",
   );
   assert.equal(await page.locator("[data-untrusted-executed]").count(), 0);
+  assert.equal(await page.title(), retainedTitle);
+  assert.equal(
+    await page
+      .locator('link[data-forum-head="canonical"]')
+      .getAttribute("href"),
+    retainedCanonical,
+  );
+
   await page.goBack();
   await page.waitForFunction(
     () =>
@@ -277,6 +350,31 @@ try {
       !document.querySelector('#forum-read-status a[data-forum-retry="true"]'),
   );
   assert.notEqual(new URL(page.url()).searchParams.get("q"), "hostile");
+  const beforeRejectedMetadata = await page.title();
+  const beforeRejectedCanonical = await page
+    .locator('link[data-forum-head="canonical"]')
+    .getAttribute("href");
+  for (const query of [
+    "bad-canonical",
+    "query-canonical",
+    "bad-representation",
+  ]) {
+    await search.fill(query);
+    await page
+      .locator('#forum-read-status a[data-forum-retry="true"]')
+      .waitFor();
+    assert.equal(await page.title(), beforeRejectedMetadata);
+    assert.equal(
+      await page
+        .locator('link[data-forum-head="canonical"]')
+        .getAttribute("href"),
+      beforeRejectedCanonical,
+    );
+    assert.equal(
+      await page.locator('link[data-forum-head="representation"]').count(),
+      0,
+    );
+  }
   const nojs = await browser.newContext({ javaScriptEnabled: false });
   const native = await nojs.newPage();
   await native.goto(origin);
@@ -290,6 +388,16 @@ try {
     .waitFor();
   assert.equal(
     requests.filter((url) => url.pathname.startsWith("/v1")).length,
+    0,
+  );
+  assert.equal(
+    await native
+      .locator('link[data-forum-head="canonical"]')
+      .getAttribute("href"),
+    canonicalOrigin + "/",
+  );
+  assert.equal(
+    await page.locator('link[data-forum-head="representation"]').count(),
     0,
   );
   console.log(

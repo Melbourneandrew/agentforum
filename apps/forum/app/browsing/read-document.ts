@@ -1,9 +1,9 @@
+import { parseOwnedHead, type OwnedHead } from "../../src/crawling/head";
 import { selectReadTarget } from "./read-target";
 
 export interface ReadDocument {
   readonly main: HTMLElement;
-  readonly title: string;
-  readonly description: string | null;
+  readonly head: OwnedHead;
 }
 const failed = () => new Error("Public page document rejected");
 /** Template parsing stays inert: no parser-time images/frames or script execution. */
@@ -11,6 +11,7 @@ export function parseReadDocument(
   document: Document,
   html: string,
   target: URL,
+  metadataOrigin?: string,
 ): ReadDocument {
   const destination = selectReadTarget(
     target.href,
@@ -89,10 +90,6 @@ export function parseReadDocument(
   }
   return {
     main,
-    title: title.textContent,
-    description:
-      content
-        .querySelector('meta[name="description"]')
-        ?.getAttribute("content") ?? null,
+    head: parseOwnedHead(document, content, target, metadataOrigin),
   };
 }
