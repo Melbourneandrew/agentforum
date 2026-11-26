@@ -242,6 +242,17 @@ describe("complete-page crawler format boundaries", () => {
     expect(() =>
       sitemapIndex(origin, ["/sitemaps/fixed.xml"], sitemapByteLimit + 1),
     ).toThrow();
+    const fullIndexPaths = Array.from(
+      { length: 50_000 },
+      (_, index) => `/sitemaps/posts-0-${String(index + 1)}.xml`,
+    );
+    expect(
+      (sitemapIndex(origin, fullIndexPaths).match(/<sitemap>/g) ?? []).length,
+    ).toBe(50_000);
+    expect(() =>
+      sitemapIndex(origin, [...fullIndexPaths, "/sitemaps/fixed.xml"]),
+    ).toThrow();
+    expect(() => sitemapIndex(origin, ["/sitemaps/index.xml"])).toThrow();
     const index = sitemapIndex(origin, ["/sitemaps/fixed.xml"]);
     expect(() =>
       sitemapIndex(

@@ -177,6 +177,16 @@ try {
   const page = await context.newPage();
   await page.goto(origin, { waitUntil: "networkidle" });
   const initialTitle = await page.title();
+  // Inject a stale platform-owned representation only to prove removal on commit.
+  await page.evaluate((href) => {
+    const link = document.createElement("link");
+    link.rel = "alternate";
+    link.type = "text/markdown";
+    link.href = href;
+    link.dataset.forumHead = "representation";
+    document.head.append(link);
+  }, canonicalOrigin + "/docs/index.md");
+
   assert.equal(
     requests.filter((url) => url.pathname === "/").length,
     1,
@@ -234,6 +244,11 @@ try {
     7,
   );
   assert.equal(await page.locator("main").getAttribute("aria-busy"), "false");
+  assert.equal(
+    await page.locator('link[data-forum-head="representation"]').count(),
+    0,
+    "Absent representation removes previous owned node",
+  );
   const oldGate = Promise.withResolvers<undefined>();
   holds.set("obsolete", oldGate);
   const oldRequested = page.waitForRequest(
