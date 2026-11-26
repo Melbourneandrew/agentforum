@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import {
   checkSqliteMigrations,
+  checkOperationalMigrations,
   SqliteMigrationError,
 } from "./sqlite-migrations.js";
 
@@ -12,6 +13,7 @@ try {
     resolve(import.meta.dirname, ".."),
     base,
   );
+  await checkOperationalMigrations(resolve(import.meta.dirname, ".."), base);
   console.log(
     `SQLite migration safety passed: ${String(report.migrations)} migrations, ${String(report.statements)} statements; trusted-base history and native SQLite/Wrangler replay.`,
   );
