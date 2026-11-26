@@ -52,8 +52,6 @@ const proofs = new WeakMap<
     readonly state: PhysicalState;
   }
 >();
-const running = (child: import("node:child_process").ChildProcess) =>
-  child.exitCode === null && child.signalCode === null;
 const invalid = () => failure("build", "recovery-evidence-unverified");
 const io = <A>(use: () => Promise<A>) =>
   Effect.tryPromise({ try: use, catch: invalid });
@@ -324,7 +322,6 @@ export const qualifyLocalRecovery = (input: {
             ],
             { env, timeout: 10000 },
           );
-          const agent = new Agent({ ca: await readFile(certificate) });
           const socket = createServer();
           socket.listen(0, "127.0.0.1");
           await once(socket, "listening");
@@ -338,6 +335,7 @@ export const qualifyLocalRecovery = (input: {
               else success();
             }),
           );
+          const agent = new Agent({ ca: await readFile(certificate) });
           const base = `https://127.0.0.1:${String(port)}`;
           const child = spawn(
             process.execPath,
@@ -371,22 +369,38 @@ export const qualifyLocalRecovery = (input: {
               "--env-file",
               "/dev/null",
             ],
-            { cwd: input.applicationRepository, env, stdio: "ignore" },
+            {
+              cwd: input.applicationRepository,
+              env,
+              stdio: "ignore",
+              detached: true,
+            },
           );
           child.on("error", () => undefined);
-          return { child, agent, base };
+          const closed = new Promise<void>((done) => {
+            child.once("close", () => {
+              done();
+            });
+          });
+          return { child, closed, agent, base };
         }),
         (runtime) =>
-          io(async () => {
-            if (running(runtime.child)) {
-              const exited = once(runtime.child, "exit");
-              runtime.child.kill("SIGTERM");
-              await Promise.race([exited, delay(3000)]);
-              if (running(runtime.child)) runtime.child.kill("SIGKILL");
-              await exited;
-            }
+          Effect.promise(async () => {
+            const signal = (value: NodeJS.Signals) => {
+              if (runtime.child.pid !== undefined) {
+                try {
+                  process.kill(-runtime.child.pid, value);
+                } catch {
+                  /* Already closed. */
+                }
+              }
+            };
+            signal("SIGTERM");
+            await Promise.race([runtime.closed, delay(3000)]);
+            signal("SIGKILL");
+            await runtime.closed;
             runtime.agent.destroy();
-          }).pipe(Effect.orDie),
+          }),
       );
       const request = async (path: string, init?: RequestInit) => {
         const incoming = new Request(`${runtime.base}${path}`, init),

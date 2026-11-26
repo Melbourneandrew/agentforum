@@ -597,6 +597,22 @@ it("complete archived Worker retains data on exact newer native schema; real con
     };
     const newerConfig = join(state, "fixture-newer.json");
     await writeFile(newerConfig, JSON.stringify(newerTarget));
+    // Exact newer tuple required: the old native prefix cannot mint a witness.
+    const prefixProof = await Effect.runPromise(
+      Effect.either(
+        qualifyLocalRecovery({
+          archive,
+          artifact: prepared.artifact,
+          applicationRepository: root,
+          toolingRepository: tooling,
+          state,
+          migrationSources: newerSources,
+        }),
+      ),
+    );
+    expect(Either.isLeft(prefixProof) && prefixProof.left.code).toBe(
+      "physical-state-unqualified",
+    );
     await run([
       "d1",
       "migrations",
@@ -857,7 +873,10 @@ it("complete archived Worker retains data on exact newer native schema; real con
     };
     let credentials = 0,
       selections = 0;
-    const owner = (data: typeof selection) =>
+    const owner = (
+      data: typeof selection,
+      admittedScope: OwnerScope = context,
+    ) =>
       Effect.either(
         ownerReleaseCommand([
           "cli",
@@ -867,7 +886,7 @@ it("complete archived Worker retains data on exact newer native schema; real con
           "recover",
         ]).pipe(
           Effect.provideService(ParentExecution, {
-            authorize: () => Effect.succeed(context),
+            authorize: () => Effect.succeed(admittedScope),
             recovery: Effect.sync(() => {
               selections++;
               return data;
@@ -891,12 +910,36 @@ it("complete archived Worker retains data on exact newer native schema; real con
       "recovery-evidence-unverified",
     );
     expect(credentials).toBe(0);
+    const wrongMetadata = await Effect.runPromise(
+      owner(selection, { ...context, diagnosticEnvironment: "staging" }),
+    );
+    expect(Either.isLeft(wrongMetadata) && wrongMetadata.left.code).toBe(
+      "archive-integrity-unverified",
+    );
+    expect(credentials).toBe(0);
+    const claimedAFromB = await Effect.runPromise(
+      owner(selection, { ...context, repository: tooling }),
+    );
+    expect(Either.isLeft(claimedAFromB) && claimedAFromB.left.code).toBe(
+      "parent-source-context-mismatch",
+    );
+    expect(credentials).toBe(0);
     const admittedOwner = await Effect.runPromise(owner(selection));
     expect(Either.isLeft(admittedOwner) && admittedOwner.left.code).toBe(
       "test-stop-before-provider-construction",
     );
     expect(credentials).toBe(1);
-    expect(selections).toBe(2);
+    expect(selections).toBe(3);
+    const configBytes = await readFile(recovery.prepared.artifact.configPath);
+    await writeFile(
+      recovery.prepared.artifact.configPath,
+      JSON.stringify({ ...recovery.prepared.target, workers_dev: false }),
+    );
+    expect(
+      Either.isLeft(await Effect.runPromise(Effect.either(recovery.verify))),
+    ).toBe(true);
+    await writeFile(recovery.prepared.artifact.configPath, configBytes);
+    await Effect.runPromise(recovery.verify);
     let businessMigrations = 0;
     const recoveredArtifact = recovery.prepared.artifact;
     const recoverPorts: typeof ReleasePorts.Service = {
