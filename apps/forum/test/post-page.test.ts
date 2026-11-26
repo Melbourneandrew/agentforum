@@ -1,3 +1,5 @@
+import { encodeTagControl } from "../app/browsing/tag-control";
+import { readClient } from "../app/browsing/client-manifest";
 import { postHref } from "../app/posts/links";
 import { env } from "cloudflare:workers";
 import { Effect, Option } from "effect";
@@ -113,15 +115,18 @@ describe("real D1 Post pages through request-local typed queries", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store, private");
     expect(response.headers.get("Content-Security-Policy")).toContain(
-      "script-src 'none'",
+      `script-src '${readClient.integrity}'`,
     );
     expect(response.headers.get("Content-Security-Policy")).toContain(
-      "form-action 'none'",
+      "form-action 'self'",
     );
     const html = await response.text();
+    expect(html).toContain('data-forum-view="post"');
+    expect(html).toContain('data-agent-content="true"');
+    expect(html).toContain('data-forum-navigation="true"');
     expect(html).toContain("<strong>GFM</strong>");
     expect(html).toContain("&lt;tag&gt;&amp;");
-    expect(html).toContain(" spaced\ntag ");
+    expect(html).toContain(" spaced\\ntag ");
     expect(html).toContain(authorId);
     expect(html.indexOf('aria-label="Publication facts"')).toBeLessThan(
       html.indexOf('aria-label="Body of Post'),
@@ -132,6 +137,26 @@ describe("real D1 Post pages through request-local typed queries", () => {
     expect(html).not.toMatch(
       /<form|<script|<iframe|Inspect source|content is untrusted/i,
     );
+  });
+  it("preserves raw opaque control-character Tags while presenting reversible facts", async () => {
+    const tags = [
+      "a\nb",
+      "a\rb",
+      "a\r\nb",
+      "a\0b",
+      "\\n",
+      "\\u0000",
+      "%0A",
+      "\\unknown",
+    ];
+    const post = await publish("Lossless Post facts", tags);
+    const result = await postModel(post.id);
+    if (result.model.kind !== "post") throw new Error("Expected real Post");
+    expect(result.model.entry.post.tags).toEqual(tags);
+    const html = render(result.model);
+    for (const tag of tags) expect(html).toContain(encodeTagControl(tag));
+    expect(html).not.toContain("\0");
+    expect(html).toContain('data-agent-content="true"');
   });
   it("uses bounded exact direct-reply pages, excluding nested and unrelated Posts", async () => {
     const first = await postModel(parentId);
@@ -348,6 +373,9 @@ describe("untrusted state and safe failure classification", () => {
     expect(result.model.kind).toBe("post");
     const html = render(result.model);
     expect(html).toContain("Replies could not be loaded");
+    expect(html).toContain('data-forum-view="post"');
+    expect(html).toContain('data-agent-content="true"');
+    expect(html).toContain('class="page-state" role="alert"');
     expect(html).toContain("<strong>GFM</strong>");
     expect(html).not.toMatch(/private dependency|No direct replies/);
   });

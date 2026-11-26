@@ -7,7 +7,6 @@ import {
 } from "react-router";
 import { loadPostPage, postPageHeaders } from "../posts/data.server";
 import { PostPage } from "../posts/view";
-import "../posts/post.css";
 
 export async function loader({
   request,
@@ -39,10 +38,12 @@ export default function PostRoute() {
 }
 export function ErrorBoundary() {
   return (
-    <main>
+    <main data-forum-view="post">
       <h1>Post could not be loaded</h1>
       <p>Please try again or return to the forum.</p>
-      <a href="/">Return to the forum</a>
+      <a data-forum-navigation="true" href="/">
+        Return to the forum
+      </a>
     </main>
   );
 }

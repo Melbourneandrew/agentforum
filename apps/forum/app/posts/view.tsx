@@ -1,3 +1,4 @@
+import { encodeTagControl } from "../browsing/tag-control";
 import {
   PageState,
   PublicationFacts,
@@ -24,17 +25,23 @@ function PostContent({ entry }: { readonly entry: PostEntry }) {
       {post.reply_to === null ? null : (
         <p>
           In reply to{" "}
-          <a href={postHref(post.reply_to)}>Parent Post {post.reply_to}</a>
+          <a data-forum-navigation="true" href={postHref(post.reply_to)}>
+            Parent Post {post.reply_to}
+          </a>
         </p>
       )}
       {post.tags.length === 0 ? null : (
         <ul className="post-tags" aria-label="Tags">
           {post.tags.map((tag) => (
-            <li key={tag}>{tag}</li>
+            <li key={tag}>{encodeTagControl(tag)}</li>
           ))}
         </ul>
       )}
-      <section className="post-content" aria-label={`Body of Post ${post.id}`}>
+      <section
+        className="post-content"
+        data-agent-content="true"
+        aria-label={`Body of Post ${post.id}`}
+      >
         {rendering.status === "rendered" ? (
           // Only the existing complete-tree sanitizer's output reaches this sink.
           <div
@@ -62,7 +69,7 @@ function PostContent({ entry }: { readonly entry: PostEntry }) {
 export function PostPage({ model }: { readonly model: PostPageModel }) {
   if (model.kind === "failure")
     return (
-      <main>
+      <main data-forum-view="post">
         <h1>{model.title}</h1>
         <PageState
           kind={model.status === 404 ? "empty" : "error"}
@@ -74,7 +81,7 @@ export function PostPage({ model }: { readonly model: PostPageModel }) {
     );
   const { entry, replies } = model;
   return (
-    <main>
+    <main data-forum-view="post">
       <article aria-label={`Post ${entry.post.id}`}>
         <h1>Post</h1>
         <PostContent entry={entry} />
@@ -99,7 +106,12 @@ export function PostPage({ model }: { readonly model: PostPageModel }) {
                   aria-label={`Reply ${reply.post.id}`}
                 >
                   <h3>
-                    <a href={postHref(reply.post.id)}>Reply {reply.post.id}</a>
+                    <a
+                      data-forum-navigation="true"
+                      href={postHref(reply.post.id)}
+                    >
+                      Reply {reply.post.id}
+                    </a>
                   </h3>
                   <PostContent entry={reply} />
                 </article>
@@ -108,12 +120,21 @@ export function PostPage({ model }: { readonly model: PostPageModel }) {
             {replies.paged || replies.next !== null ? (
               <nav className="pagination" aria-label="Direct reply pages">
                 {replies.paged ? (
-                  <a href={postHref(entry.post.id)}>First replies</a>
+                  <a
+                    data-forum-navigation="true"
+                    href={postHref(entry.post.id)}
+                  >
+                    First replies
+                  </a>
                 ) : (
                   <span />
                 )}
                 {replies.next === null ? null : (
-                  <a href={replies.next} rel="next">
+                  <a
+                    data-forum-navigation="true"
+                    href={replies.next}
+                    rel="next"
+                  >
                     Next replies
                   </a>
                 )}

@@ -1,5 +1,7 @@
 // Local-only production verification. No fixture or fault endpoint is installed.
 import assert from "node:assert/strict";
+import { readClient } from "../app/browsing/client-manifest";
+import { encodeTagControl } from "../app/browsing/tag-control";
 import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
@@ -200,15 +202,16 @@ try {
   assert.match(response.headers.get("Content-Type") ?? "", /text\/html/);
   assert.equal(response.headers.get("Cache-Control"), "no-store, private");
   const policy = response.headers.get("Content-Security-Policy") ?? "";
-  assert.equal(
-    policy,
-    "default-src 'none'; style-src 'self'; img-src 'self'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; font-src 'self'",
-  );
+  assert.ok(policy.includes(`script-src '${readClient.integrity}'`));
+  assert.ok(policy.includes("script-src-attr 'none'"));
+  assert.ok(policy.includes("connect-src 'self'"));
+  assert.doesNotMatch(policy, /unsafe-inline|unsafe-eval|script-src 'self'/);
+  assert.equal((await get("/posts/" + "M".repeat(21))).status, 404);
   const html = await response.text();
   assert.ok(!html.includes(identity.apiKey), "No credentials in HTML");
   assert.doesNotMatch(
     html,
-    /<(script|iframe|img|form)\b|<link[^>]+(?:prefetch|preload)/i,
+    /<(iframe|img|form)\b|<script(?![^>]+src="\/first-party\/read\.)|<link[^>]+(?:prefetch|preload)/i,
   );
   assert.ok(html.includes(parent.id) && html.includes(parent.authorId));
   assert.equal((await get(path, { method: "HEAD" })).status, 200);
@@ -216,7 +219,7 @@ try {
   assert.equal((await get(path, { method: "OPTIONS" })).status, 204);
   assert.equal((await get(path, { method: "POST" })).status, 405);
   console.log(
-    "PASS production real HTTPS publication/retrieval, SSR HTML, safe methods, strict CSP and no scripts/mutations/prefetch",
+    "PASS production real HTTPS publication/retrieval, SSR HTML, safe methods, hash-only CSP/sole external script and no Agent scripts/mutations/prefetch",
   );
 
   browser = await chromium.launch({ headless: true });
@@ -269,7 +272,7 @@ try {
     );
     assert.deepEqual(
       await page.locator(".post-tags li").allTextContents(),
-      tags,
+      tags.map(encodeTagControl),
     );
     assert.equal(
       await page.locator('article[aria-label^="Reply "]').count(),
@@ -282,7 +285,16 @@ try {
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     );
-    assert.equal(await page.locator("script,iframe,img,form").count(), 0);
+    assert.equal(await page.locator("iframe,img,form").count(), 0);
+    assert.equal(await page.locator("script").count(), 1);
+    assert.equal(
+      await page.locator("script").getAttribute("src"),
+      readClient.path,
+    );
+    assert.equal(
+      await page.locator("script").getAttribute("integrity"),
+      readClient.integrity,
+    );
     assert.ok(!(await page.evaluate(() => "__postExecuted" in window)));
     await page.screenshot({
       path: join(evidence, `post-${name}.png`),
@@ -522,7 +534,7 @@ try {
   );
   console.log(`Evidence: ${evidence}`);
   console.log(
-    "NOT CLAIMED: in-document initial loading indicator under allReady/no-script SSR; parent disposition required. Native browser navigation loading remains available. No deployment/provider/full integrated acceptance.",
+    "Direct/reload retains full SSR/noJS/allReady/final status; initial wait is browser-owned. Eligible enhanced pending journeys are verified separately by the assembled production suite. No deployment/provider/full-app release acceptance.",
   );
 } finally {
   try {

@@ -58,17 +58,18 @@ client page bundle. Descriptive title/description identify the resource without
 inventing a stored title. No SEO helper exists on the foundation base; WO-31 owns
 the installation-wide canonical/representation/sitemap policy and helper.
 
-## Explicit loading acceptance gap (AC-HV-004.7)
+## Composed first-party reads and loading
 
-The approved foundation sends complete SSR only (`entry.server.tsx` waits for
-`allReady`) and forbids every client script. A new initial document cannot show
-an in-document loading indicator before that document is sent. This order does
-NOT change the entrypoint/CSP, invent a loading fixture/route, fake a completed
-result, or claim a static component proves actual pending behavior. The parent
-was notified on WO-27 before implementation. Native navigation remains browser
-behavior; **in-document initial loading acceptance is unresolved and requires
-parent disposition/authorized integration**. No requirements were relaxed or
-edited. This remains visible even if all implemented-path tests and CI pass.
+Direct/reload remains complete SSR/allReady/noJS with accurate final status; its
+initial document wait belongs to the browser under accepted runtime ADR-002.
+The ONE existing external hashed/SRI read client enhances eligible platform
+Post/parent/reply/pagination/retry/history links with genuine pending status and
+stale protection. No mount re-fetch, streaming shell, second enhancer or fetched
+head resources are introduced. Every Post main has its owned view marker;
+Markdown/raw-fallback sections are explicitly Agent content and cannot own site
+hooks. Public raw Tags remain untouched; facts use the existing reversible
+backslash/CR/LF/NUL notation. The actual Post CSS is imported by root, not a
+route-only SSR Links chunk, so main swaps retain its table/reply/Tag styles.
 
 ## Verification
 
@@ -106,8 +107,7 @@ or app HTML. Screenshots default to `/tmp/wo27-evidence`; override
 The supplemental script is intentionally independent of parent-owned
 `bundle-smoke.ts` and CI. Run it explicitly and retain its evidence alongside
 full local gates and exact-head remote CI. All evidence is local, not provider,
-public activation, full-app/WO-36 acceptance, or proof of the unresolved loading
-criterion. Parent retains independent review, guarded merge, actual-main proof
+public activation or full-app/WO-36 release acceptance. Parent retains independent review, guarded merge, actual-main proof
 and final WO completion; this delegated owner does not merge or Complete.
 
 ## Verified WO-30 base refresh and current loading disposition
@@ -117,14 +117,18 @@ Bootstrap45313676555 SUCCESS, then authorized one refresh of retained26/27/28.
 This branch first fast-forwarded to parent's d0eba90 regression, then merged that
 EXACT base once without conflict or history rewrite.30 schema/meta/guides/Docs and
 whole35 wrapper/capture are preserved; dispatcher differs only by Post admission.
-No common26 client code is copied/stacked into this retained Post branch.
+Historical base-only receipt: no common26 client code was then composed.
 
 Accepted runtime ADR-002 supersedes the old cold-loading decision-hold prose:
 direct/reload complete SSR/noJS/final HTTP status remains authoritative; the initial
 document wait belongs to the browser. Actual eligible enhanced reads require site
 pending status. Narrow external hash/SRI/root/CSP proposal and standalone26 proof
 are recorded on execution-index thread83948d8f; no inline hydration is allowed.
-Actual27 common-asset/status/hooks and cross-page pending tests are NOT installed
-or proven by this base-only refresh. That is remaining serialized integration,
-not an unresolved cold interpretation or a waiver. No requirements/ADR changes,
-provider/production tests/merge/Complete/domain hardcode or new release scope.
+Current composition consumes exact main da3a9d42f5504481c1bd3f49e110eec9d74eb4f3
+(parent actual-main Bootstrap45873308935 SUCCESS) in one refresh preserving f7/d0
+ancestry. `productionPostCompositionSmoke` runs inside the existing built-Worker
+browse gate and verifies actual native JS/noJS pending, parent/replies/history,
+root-owned computed styles, genuine503/retry, Agent isolation and unchanged data.
+The complete inherited Docs/discovery/privacy/security gates remain required.
+Only route admission changes in dispatch; telemetry build/runtime seams are not
+owned here. WO31 canonical policy and provider/full-release claims stay deferred.
