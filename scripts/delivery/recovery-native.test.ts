@@ -262,6 +262,7 @@ it("complete archived Worker retains data on exact newer native schema; real con
       });
     };
     const start = async () => {
+      await stop();
       await Effect.runPromise(
         verifyMaterializedArchive(archive, prepared.artifact),
       );
@@ -310,6 +311,82 @@ it("complete archived Worker retains data on exact newer native schema; real con
       }
       throw new Error("Local Worker unavailable");
     };
+    // Prior-version native prefix, with real API rows/keys/checkpoint before the
+    // acknowledged failure. The pending approved migration builds/rebuilds FTS.
+    const priorDirectory = join(state, "prior-migrations");
+    await mkdir(priorDirectory);
+    for (const source of migrationSources.slice(0, 2))
+      await cp(
+        join(root, source.path),
+        join(priorDirectory, source.path.split("/").at(-1) ?? "invalid"),
+      );
+    const priorConfig = join(state, "prior.json");
+    await writeFile(
+      priorConfig,
+      JSON.stringify({
+        ...prepared.target,
+        d1_databases: prepared.target.d1_databases.map((binding) => ({
+          ...binding,
+          migrations_dir: priorDirectory,
+        })),
+      }),
+    );
+    await run([
+      "d1",
+      "migrations",
+      "apply",
+      "DB",
+      "--local",
+      "--config",
+      priorConfig,
+      "--persist-to",
+      persist,
+    ]);
+    await start();
+    const call = (
+      operation: string,
+      input: unknown,
+      method = "POST",
+      apiKey = "",
+    ) => {
+      const payload = JSON.stringify(input);
+      return request(
+        `/v1/${operation}${method === "GET" ? `?payload=${encodeURIComponent(payload)}` : ""}`,
+        {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+          },
+          ...(method === "POST" ? { body: payload } : {}),
+        },
+      );
+    };
+    const register = async (name: string, method: string) => {
+      const response = await call("register", { name }, method);
+      expect(response.status).toBe(201);
+      return Schema.decodeUnknownPromise(RegistrationResult)(
+        await response.json(),
+      );
+    };
+    const retainedAgent = await register("ArchiveRetainedAgent", "POST");
+    const originalAuthor = await register("ArchiveOriginalAuthor", "GET");
+    const initialResponse = await call(
+      "publish",
+      { body: "archivelegacytoken retained", tags: ["ArchiveRetained"] },
+      "POST",
+      originalAuthor.apiKey,
+    );
+    expect(initialResponse.status).toBe(201);
+    const initialPost = await Schema.decodeUnknownPromise(PostResult)(
+      await initialResponse.json(),
+    );
+    const checkpointResponse = await call("search", {}, "GET");
+    expect(checkpointResponse.status).toBe(200);
+    const checkpoint = await Schema.decodeUnknownPromise(PostPageResult)(
+      await checkpointResponse.json(),
+    );
+    expect(checkpoint.posts.map((post) => post.id)).toEqual([initialPost.id]);
     let activations = 0,
       stopped = 0;
     const ports: typeof ReleasePorts.Service = {
@@ -435,50 +512,9 @@ it("complete archived Worker retains data on exact newer native schema; real con
     );
     expect(Either.isLeft(retry) && retry.left.stage).toBe("readiness");
     expect(activations).toBe(1);
-    const call = (
-      operation: string,
-      input: unknown,
-      method = "POST",
-      apiKey = "",
-    ) => {
-      const payload = JSON.stringify(input);
-      return request(
-        `/v1/${operation}${method === "GET" ? `?payload=${encodeURIComponent(payload)}` : ""}`,
-        {
-          method,
-          headers: {
-            "Content-Type": "application/json",
-            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-          },
-          ...(method === "POST" ? { body: payload } : {}),
-        },
-      );
-    };
-    const register = async (name: string, method: string) => {
-      const response = await call("register", { name }, method);
-      expect(response.status).toBe(201);
-      return Schema.decodeUnknownPromise(RegistrationResult)(
-        await response.json(),
-      );
-    };
-    const retainedAgent = await register("ArchiveRetainedAgent", "POST");
-    const originalAuthor = await register("ArchiveOriginalAuthor", "GET");
-    const initialResponse = await call(
-      "publish",
-      { body: "archivelegacytoken retained", tags: ["ArchiveRetained"] },
-      "POST",
-      originalAuthor.apiKey,
-    );
-    expect(initialResponse.status).toBe(201);
-    const initialPost = await Schema.decodeUnknownPromise(PostResult)(
-      await initialResponse.json(),
-    );
-    const checkpointResponse = await call("search", {}, "GET");
-    expect(checkpointResponse.status).toBe(200);
-    const checkpoint = await Schema.decodeUnknownPromise(PostPageResult)(
-      await checkpointResponse.json(),
-    );
-    expect(checkpoint.posts.map((post) => post.id)).toEqual([initialPost.id]);
+    // Fixture-only tracked extension allowed by the existing safety policy.
+    // Existing-table index/backfill is not authorized by its generic DDL rule.
+    // Do not bypass it with raw writes or alter the production safety gate.
     // Fixture-only tracked extension. Never add it to production source or insert
     // native history by hand. Archive A remains byte-for-byte unchanged.
     const fixtureMigrations = join(state, "fixture-newer-migrations");
@@ -488,15 +524,16 @@ it("complete archived Worker retains data on exact newer native schema; real con
         join(root, source.path),
         join(fixtureMigrations, source.path.split("/").at(-1) ?? "invalid"),
       );
-    const newerName = "99990001_archive_additive.sql",
+    const newerName = "20990101000001_archive_additive.sql",
       newerBytes = Buffer.from(
-        "CREATE INDEX fixture_archive_body ON posts(body);\nCREATE TABLE fixture_archive_backfill(post_id TEXT PRIMARY KEY);\nINSERT INTO fixture_archive_backfill SELECT id FROM posts ORDER BY publication_order LIMIT 2;\n",
+        "CREATE TABLE fixture_archive_additive(post_id TEXT PRIMARY KEY);\nCREATE INDEX fixture_archive_post_id ON fixture_archive_additive(post_id);\n",
       );
     await writeFile(join(fixtureMigrations, newerName), newerBytes);
     const newerSources = [
       ...migrationSources,
       { path: `apps/forum/migrations/${newerName}`, bytes: newerBytes },
     ];
+    const newerStates = await Effect.runPromise(physicalStates(newerSources));
     const newerTarget = {
       ...prepared.target,
       d1_databases: prepared.target.d1_databases.map((binding) => ({
@@ -538,7 +575,7 @@ it("complete archived Worker retains data on exact newer native schema; real con
             await start(); // actual archived complete Worker on newer D1
             for (const path of [
               "/",
-              "/docs",
+              "/docs/",
               "/docs/openapi.json",
               "/llms.txt",
               "/skill.md",
@@ -591,11 +628,11 @@ it("complete archived Worker retains data on exact newer native schema; real con
             expect(
               await Effect.runPromise(
                 controls.database.query(
-                  "SELECT post_id FROM fixture_archive_backfill ORDER BY post_id",
+                  "SELECT post_id FROM fixture_archive_additive ORDER BY post_id",
                   [],
                 ),
               ),
-            ).toEqual([{ post_id: initialPost.id }]);
+            ).toEqual([]);
             expect(
               await Effect.runPromise(
                 controls.database.query(
@@ -614,6 +651,7 @@ it("complete archived Worker retains data on exact newer native schema; real con
     expect(observation.archiveContentDigest).toBe(archive.contentDigest);
     expect(observation.nativeHistory.at(-1)).toBe(newerName);
     expect(observation.physicalDigest).not.toBe(completeA.physicalDigest);
+    expect(observation.physicalDigest).toBe(newerStates.at(-1)?.physicalDigest);
     expect(observation.kind).toBe(
       "local-pair-observation-not-release-authorization",
     );
