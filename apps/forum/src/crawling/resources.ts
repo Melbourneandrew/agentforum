@@ -25,12 +25,42 @@ export const discoveryResources = [
   "/docs/openapi.json",
   "/docs/post.schema.json",
 ] as const;
+export const problemDocuments = [
+  "get-url-too-large",
+  "internal-error",
+  "invalid-origin",
+  "invalid-request",
+  "method-not-allowed",
+  "name-unavailable",
+  "not-found",
+  "not-implemented",
+  "parent-not-found",
+  "payload-too-large",
+  "publication-limited",
+  "tag-byte-limit",
+  "tag-count-limit",
+  "tag-grapheme-limit",
+  "unauthorized",
+  "unavailable",
+  "unsupported-media",
+]
+  .map((name) => `/docs/problems/${name}.json`)
+  .concat(
+    [
+      "get-url-too-large",
+      "internal-error",
+      "method-not-allowed",
+      "not-found",
+      "not-implemented",
+    ].map((name) => `/docs/problems/${name}.html`),
+  );
 export const fixedPublicPaths: readonly string[] = [
   "/",
   "/authors",
   "/about",
   ...documentation.map((item) => item.path),
   ...discoveryResources,
+  ...problemDocuments,
 ];
 export type PublicResource =
   | { readonly kind: "posts" | "authors" | "about" }
@@ -60,7 +90,10 @@ export function preferredPath(resource: PublicResource): string {
         (item) => item.path === resource.path || item.raw === resource.path,
       );
       if (doc) return doc.path;
-      if (discoveryResources.some((path) => path === resource.path))
+      if (
+        discoveryResources.some((path) => path === resource.path) ||
+        problemDocuments.includes(resource.path)
+      )
         return resource.path;
       throw new Error("Invalid public resource");
     }

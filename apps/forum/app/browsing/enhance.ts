@@ -1,4 +1,4 @@
-import { commitOwnedHead } from "../../src/crawling/head";
+import { commitOwnedHead, ownedHeadOrigin } from "../../src/crawling/head";
 import { makeReadCoordinator } from "./read-coordinator";
 import { parseReadDocument, type ReadDocument } from "./read-document";
 import { readHtml } from "./read-html";
@@ -31,6 +31,7 @@ export function installReadEnhancement(browser: Window) {
     document.querySelectorAll('[id="forum-read-status"]').length !== 1
   )
     return () => undefined;
+  const metadataOrigin = ownedHeadOrigin(document);
   let composing = false;
   let filterHistory = false;
   let lastIntent = "";
@@ -56,7 +57,12 @@ export function installReadEnhancement(browser: Window) {
         new globalThis.URL(browser.location.href),
         signal,
       );
-      return parseReadDocument(document, result.html, input.url);
+      return parseReadDocument(
+        document,
+        result.html,
+        input.url,
+        metadataOrigin,
+      );
     },
     intent(input) {
       pending(false);

@@ -17,12 +17,13 @@ export interface OwnedHead {
   }[];
 }
 const failed = () => new Error("Public metadata rejected");
-const boundedText = (value: string) =>
-  value.length <= 1024 &&
-  [...value].every(
-    (character) =>
-      character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127,
-  );
+const boundedText = (value: string) => {
+  if (value.length > 1024) return false;
+  for (const character of value)
+    if (character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
+      return false;
+  return true;
+};
 /** origin is ONLY installationOrigin/PageContext.origin; this helper creates no origin policy. */
 export function publicHead(
   origin: string,
@@ -132,11 +133,21 @@ const targetCanonical = (url: URL): string => {
   if (name && validName(name)) return `/authors/${name}`;
   throw failed();
 };
+/** Capture once from initial trusted SSR, so removing metadata never loses its origin. */
+export function ownedHeadOrigin(document: Document): string {
+  const anchor = document.head
+    .querySelector('link[data-forum-head="canonical"]')
+    ?.getAttribute("href");
+  return anchor === undefined || anchor === null
+    ? new globalThis.URL(document.URL).origin
+    : new globalThis.URL(anchor).origin;
+}
 /** Inert template metadata only. Trust is anchored in the initial server-owned head. */
 export function parseOwnedHead(
   document: Document,
   content: DocumentFragment,
   target: URL,
+  origin = ownedHeadOrigin(document),
 ): OwnedHead {
   const titles = content.querySelectorAll("title");
   const descriptions = content.querySelectorAll('meta[name="description"]');
@@ -154,15 +165,8 @@ export function parseOwnedHead(
     canonicals.length > 1
   )
     throw failed();
-  // A configured canonical origin can differ from the served provider origin.
-  const anchor = document.head
-    .querySelector('link[data-forum-head="canonical"]')
-    ?.getAttribute("href");
-  const origin =
-    anchor === undefined || anchor === null
-      ? new globalThis.URL(document.URL).origin
-      : new globalThis.URL(anchor).origin;
   const canonicalHref = canonicals[0]?.getAttribute("href") ?? null;
+  if (canonicals.length === 1 && canonicalHref === null) throw failed();
   if (canonicalHref !== null) {
     const canonical = localUrl(canonicalHref, origin);
     const expected = targetCanonical(target);

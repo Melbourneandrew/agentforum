@@ -11,6 +11,7 @@ export function parseReadDocument(
   document: Document,
   html: string,
   target: URL,
+  metadataOrigin?: string,
 ): ReadDocument {
   const destination = selectReadTarget(
     target.href,
@@ -89,6 +90,6 @@ export function parseReadDocument(
   }
   return {
     main,
-    head: parseOwnedHead(document, content, target),
+    head: parseOwnedHead(document, content, target, metadataOrigin),
   };
 }

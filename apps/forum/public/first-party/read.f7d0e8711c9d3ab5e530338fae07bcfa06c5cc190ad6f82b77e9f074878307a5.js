@@ -24,15 +24,47 @@
       `/docs/llms.txt`,
       `/docs/openapi.json`,
       `/docs/post.schema.json`,
-    ];
-  [...e.map((e) => e.path), ...t];
-  var n = (e) => /^[A-Za-z0-9_-]{21}$/.test(e),
-    r = (e) => /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/.test(e),
-    i = () => Error(`Public metadata rejected`),
-    a = (e) =>
-      e.length <= 1024 &&
-      [...e].every((e) => e.charCodeAt(0) >= 32 && e.charCodeAt(0) !== 127),
-    o = (e, t) => {
+    ],
+    n = [
+      `get-url-too-large`,
+      `internal-error`,
+      `invalid-origin`,
+      `invalid-request`,
+      `method-not-allowed`,
+      `name-unavailable`,
+      `not-found`,
+      `not-implemented`,
+      `parent-not-found`,
+      `payload-too-large`,
+      `publication-limited`,
+      `tag-byte-limit`,
+      `tag-count-limit`,
+      `tag-grapheme-limit`,
+      `unauthorized`,
+      `unavailable`,
+      `unsupported-media`,
+    ]
+      .map((e) => `/docs/problems/${e}.json`)
+      .concat(
+        [
+          `get-url-too-large`,
+          `internal-error`,
+          `method-not-allowed`,
+          `not-found`,
+          `not-implemented`,
+        ].map((e) => `/docs/problems/${e}.html`),
+      );
+  [...e.map((e) => e.path), ...t, ...n];
+  var r = (e) => /^[A-Za-z0-9_-]{21}$/.test(e),
+    i = (e) => /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/.test(e),
+    a = () => Error(`Public metadata rejected`),
+    o = (e) => {
+      if (e.length > 1024) return !1;
+      for (let t of e)
+        if (t.charCodeAt(0) < 32 || t.charCodeAt(0) === 127) return !1;
+      return !0;
+    },
+    s = (e, t) => {
       let n = new globalThis.URL(e);
       if (
         n.origin !== t ||
@@ -42,50 +74,52 @@
         n.hash ||
         ![`http:`, `https:`].includes(n.protocol)
       )
-        throw i();
+        throw a();
       return n;
     },
-    s = (e) => {
+    c = (e) => {
       let t = e.pathname.replace(/\/$/, ``) || `/`;
       if ([`/`, `/authors`, `/about`].includes(t)) return t;
-      let a = /^\/posts\/([^/]+)$/.exec(t)?.[1];
-      if (a && n(a)) return `/posts/${a}`;
+      let n = /^\/posts\/([^/]+)$/.exec(t)?.[1];
+      if (n && r(n)) return `/posts/${n}`;
       let o = /^\/authors\/([^/]+)$/.exec(t)?.[1];
-      if (o && r(o)) return `/authors/${o}`;
-      throw i();
+      if (o && i(o)) return `/authors/${o}`;
+      throw a();
     };
-  function c(t, n, c) {
-    let l = n.querySelectorAll(`title`),
-      u = n.querySelectorAll(`meta[name="description"]`),
-      d = n.querySelectorAll(`link[data-forum-head="canonical"]`),
-      f = l[0]?.textContent,
-      p = u[0]?.getAttribute(`content`) ?? null;
+  function l(e) {
+    let t = e.head
+      .querySelector(`link[data-forum-head="canonical"]`)
+      ?.getAttribute(`href`);
+    return t == null
+      ? new globalThis.URL(e.URL).origin
+      : new globalThis.URL(t).origin;
+  }
+  function u(t, n, r, u = l(t)) {
+    let d = n.querySelectorAll(`title`),
+      f = n.querySelectorAll(`meta[name="description"]`),
+      p = n.querySelectorAll(`link[data-forum-head="canonical"]`),
+      m = d[0]?.textContent,
+      h = f[0]?.getAttribute(`content`) ?? null;
     if (
-      l.length !== 1 ||
-      f === void 0 ||
-      !a(f) ||
-      u.length > 1 ||
-      (p !== null && !a(p)) ||
-      d.length > 1
+      d.length !== 1 ||
+      m === void 0 ||
+      !o(m) ||
+      f.length > 1 ||
+      (h !== null && !o(h)) ||
+      p.length > 1
     )
-      throw i();
-    let m = t.head
-        .querySelector(`link[data-forum-head="canonical"]`)
-        ?.getAttribute(`href`),
-      h =
-        m == null
-          ? new globalThis.URL(t.URL).origin
-          : new globalThis.URL(m).origin,
-      g = d[0]?.getAttribute(`href`) ?? null;
+      throw a();
+    let g = p[0]?.getAttribute(`href`) ?? null;
+    if (p.length === 1 && g === null) throw a();
     if (g !== null) {
-      let e = o(g, h),
-        t = s(c);
+      let e = s(g, u),
+        t = c(r);
       if (e.pathname !== t) {
         let n = /^\/authors\/([^/]+)$/.exec(t)?.[1],
-          a = /^\/authors\/([^/]+)$/.exec(e.pathname)?.[1];
-        if (!n || !a || !r(a) || n.toLowerCase() !== a.toLowerCase()) throw i();
+          r = /^\/authors\/([^/]+)$/.exec(e.pathname)?.[1];
+        if (!n || !r || !i(r) || n.toLowerCase() !== r.toLowerCase()) throw a();
       }
-      if (d[0]?.getAttribute(`rel`) !== `canonical`) throw i();
+      if (p[0]?.getAttribute(`rel`) !== `canonical`) throw a();
     }
     let _ = [
       ...n.querySelectorAll(`link[data-forum-head="representation"]`),
@@ -96,16 +130,16 @@
         t.getAttribute(`rel`) !== `alternate` ||
         t.getAttribute(`type`) !== `text/markdown`
       )
-        throw i();
-      let r = o(n, h),
-        a = e.find((e) => e.path === c.pathname && e.raw === r.pathname);
-      if (!a || g !== new globalThis.URL(a.path, h).href) throw i();
-      return { href: r.href, type: `text/markdown` };
+        throw a();
+      let i = s(n, u),
+        o = e.find((e) => e.path === r.pathname && e.raw === i.pathname);
+      if (!o || g !== new globalThis.URL(o.path, u).href) throw a();
+      return { href: i.href, type: `text/markdown` };
     });
-    if (_.length > 1) throw i();
-    return { title: f, description: p, canonical: g, representations: _ };
+    if (_.length > 1) throw a();
+    return { title: m, description: h, canonical: g, representations: _ };
   }
-  function l(e, t) {
+  function d(e, t) {
     e.title = t.title;
     for (let t of e.head.querySelectorAll(
       `meta[name="description"],link[data-forum-head="canonical"],link[data-forum-head="representation"]`,
@@ -134,19 +168,19 @@
         e.head.append(t));
     }
   }
-  var u = (e, t) => {
+  var f = (e, t) => {
       let n = globalThis.setTimeout(t, e);
       return () => {
         globalThis.clearTimeout(n);
       };
     },
-    d = () => void 0,
-    f = (e) => {
+    p = () => void 0,
+    m = (e) => {
       let t = 0,
         n = !0,
-        r = d,
-        i = d,
-        a = () => (t++, r(), (r = d), i(), (i = d), t),
+        r = p,
+        i = p,
+        a = () => (t++, r(), (r = p), i(), (i = p), t),
         o = async (r, a) => {
           if (!n || a !== t) return;
           let o = new globalThis.AbortController();
@@ -161,7 +195,7 @@
           } catch {
             s() && e.failure(r);
           } finally {
-            s() && ((i = d), e.settled(r));
+            s() && ((i = p), e.settled(r));
           }
         };
       return {
@@ -169,8 +203,8 @@
           if (!n) return;
           let i = a();
           (e.intent(t),
-            (r = (e.delay ?? u)(250, () => {
-              ((r = d), o(t, i));
+            (r = (e.delay ?? f)(250, () => {
+              ((r = p), o(t, i));
             })));
         },
         navigate(t) {
@@ -186,8 +220,8 @@
         },
       };
     },
-    p = `tagText`,
-    m = (e) =>
+    h = `tagText`,
+    g = (e) =>
       e.replace(/\\([\\rn0])/g, (e, t) => {
         switch (t) {
           case `r`:
@@ -201,16 +235,16 @@
             return `\\`;
         }
       }),
-    h = (e) => {
+    _ = (e) => {
       let t = new globalThis.URLSearchParams(e);
       if (t.has(`tagText`) && !t.has(`tag`)) {
-        let e = t.getAll(p).map(m);
-        t.delete(p);
+        let e = t.getAll(h).map(g);
+        t.delete(h);
         for (let n of e) t.append(`tag`, n);
       }
       return t;
     },
-    g = (e, t) => {
+    v = (e, t) => {
       let n;
       try {
         n = new globalThis.URL(e, t);
@@ -241,8 +275,8 @@
                 ? { kind: `read`, url: n, view: `about` }
                 : { kind: `native` };
     },
-    _ = (e) => {
-      let t = h(e);
+    y = (e) => {
+      let t = _(e);
       (t.delete(`pageCursor`), t.delete(`previous`));
       for (let e of [`q`, `author`, `parent`]) t.get(e) === `` && t.delete(e);
       (t.get(`order`) === `newest` && t.delete(`order`),
@@ -253,34 +287,34 @@
       let r = t.toString();
       return r === `` ? `/` : `/?${r}`;
     },
-    v = () => Error(`Public page document rejected`);
-  function y(e, t, n) {
-    let r = g(n.href, new globalThis.URL(e.URL));
-    if (r.kind !== `read`) throw v();
-    let i = e.createElement(`template`);
-    i.innerHTML = t;
-    let a = i.content,
-      o = a.querySelector(`#forum-content > main`),
-      s = a.querySelector(`#forum-read-status`),
-      l = a.querySelector(`title`);
+    b = () => Error(`Public page document rejected`);
+  function x(e, t, n, r) {
+    let i = v(n.href, new globalThis.URL(e.URL));
+    if (i.kind !== `read`) throw b();
+    let a = e.createElement(`template`);
+    a.innerHTML = t;
+    let o = a.content,
+      s = o.querySelector(`#forum-content > main`),
+      c = o.querySelector(`#forum-read-status`),
+      l = o.querySelector(`title`);
     if (
-      !(o instanceof globalThis.HTMLElement) ||
-      o.dataset.forumView !== r.view ||
-      a.querySelectorAll(`main`).length !== 1 ||
-      a.querySelectorAll(`[id="forum-content"]`).length !== 1 ||
-      a.querySelectorAll(`[id="forum-read-status"]`).length !== 1 ||
-      s === null ||
-      s.parentElement?.id !== `forum-content` ||
-      s.getAttribute(`role`) !== `status` ||
-      o.contains(s) ||
+      !(s instanceof globalThis.HTMLElement) ||
+      s.dataset.forumView !== i.view ||
+      o.querySelectorAll(`main`).length !== 1 ||
+      o.querySelectorAll(`[id="forum-content"]`).length !== 1 ||
+      o.querySelectorAll(`[id="forum-read-status"]`).length !== 1 ||
+      c === null ||
+      c.parentElement?.id !== `forum-content` ||
+      c.getAttribute(`role`) !== `status` ||
+      s.contains(c) ||
       l === null ||
-      a.querySelectorAll(`title`).length !== 1 ||
-      o.querySelector(
+      o.querySelectorAll(`title`).length !== 1 ||
+      s.querySelector(
         `script,style,link,base,iframe,frame,object,embed,img,picture,source,audio,video,svg,math`,
       ) !== null
     )
-      throw v();
-    for (let e of [o, ...o.querySelectorAll(`*`)]) {
+      throw b();
+    for (let e of [s, ...s.querySelectorAll(`*`)]) {
       if (
         e.closest(`.agent-body,.post-body,[data-agent-content]`) !== null &&
         (e.matches(`form,header.site-header`) ||
@@ -290,7 +324,7 @@
               (e.name === `id` && e.value.startsWith(`forum-`)),
           ))
       )
-        throw v();
+        throw b();
       for (let t of e.attributes)
         if (
           /^on/i.test(t.name) ||
@@ -303,32 +337,32 @@
             `formtarget`,
           ].includes(t.name)
         )
-          throw v();
+          throw b();
     }
-    for (let e of o.querySelectorAll(`form`))
+    for (let e of s.querySelectorAll(`form`))
       if (
-        r.view !== `posts` ||
+        i.view !== `posts` ||
         e.dataset.forumSearch !== `true` ||
         e.getAttribute(`method`)?.toLowerCase() !== `get` ||
         e.getAttribute(`action`) !== `/`
       )
-        throw v();
-    for (let e of o.querySelectorAll(`a[href]`)) {
+        throw b();
+    for (let e of s.querySelectorAll(`a[href]`)) {
       let t = e.getAttribute(`href`);
-      if (t === null) throw v();
+      if (t === null) throw b();
       let r = new globalThis.URL(t, n);
       if (![`http:`, `https:`].includes(r.protocol) || r.username || r.password)
-        throw v();
+        throw b();
     }
-    return { main: o, head: c(e, a, n) };
+    return { main: s, head: u(e, o, n, r) };
   }
-  var b = 35e3,
-    x = () => Error(`Public page read failed`);
-  async function S(e, t, n, r = {}) {
-    if (g(e.href, t).kind !== `read`) throw x();
+  var S = 35e3,
+    C = () => Error(`Public page read failed`);
+  async function w(e, t, n, r = {}) {
+    if (v(e.href, t).kind !== `read`) throw C();
     let i = r.maximumBytes ?? 16777216;
-    if (!Number.isSafeInteger(i) || i < 1 || i > 16777216) throw x();
-    let a = globalThis.AbortSignal.any([n, globalThis.AbortSignal.timeout(b)]);
+    if (!Number.isSafeInteger(i) || i < 1 || i > 16777216) throw C();
+    let a = globalThis.AbortSignal.any([n, globalThis.AbortSignal.timeout(S)]);
     a.throwIfAborted();
     let o = await (r.request ?? globalThis.fetch)(e.href, {
       method: `GET`,
@@ -347,10 +381,10 @@
       !/^text\/html(?:\s*;|$)/i.test(o.headers.get(`Content-Type`) ?? ``) ||
       o.body === null
     )
-      throw (await o.body?.cancel(), x());
+      throw (await o.body?.cancel(), C());
     let s = o.headers.get(`Content-Length`);
     if (s !== null && (!/^\d+$/.test(s) || Number(s) > i))
-      throw (await o.body.cancel(), x());
+      throw (await o.body.cancel(), C());
     let c = o.body.getReader(),
       l = new globalThis.TextDecoder(`utf-8`, { fatal: !0 }),
       u = 0,
@@ -360,10 +394,10 @@
         a.throwIfAborted();
         let e = await c.read();
         if ((a.throwIfAborted(), e.done)) break;
-        if (((u += e.value.byteLength), u > i)) throw x();
+        if (((u += e.value.byteLength), u > i)) throw C();
         d += l.decode(e.value, { stream: !0 });
       }
-      if (((d += l.decode()), u === 0)) throw x();
+      if (((d += l.decode()), u === 0)) throw C();
       return { html: d, status: o.status };
     } finally {
       try {
@@ -373,7 +407,7 @@
       }
     }
   }
-  function C(e) {
+  function T(e) {
     let t = e.document,
       n = t.getElementById(`forum-content`),
       r = t.getElementById(`forum-read-status`),
@@ -395,44 +429,45 @@
       t.querySelectorAll(`[id="forum-read-status"]`).length !== 1
     )
       return () => void 0;
-    let s = !1,
+    let s = l(t),
       c = !1,
-      u = ``,
-      d = (e) => {
+      u = !1,
+      f = ``,
+      p = (e) => {
         (i()?.setAttribute(`aria-busy`, String(e)),
           (r.hidden = !e),
           (r.textContent = e ? `Loading public page…` : ``));
       },
-      p = (e) =>
+      h = (e) =>
         e instanceof globalThis.Element && e.closest(o) === null
           ? e.closest(`form[data-forum-search="true"]`)
           : null,
-      m = (e) =>
+      g = (e) =>
         e !== null &&
         i()?.contains(e) &&
         e.closest(o) === null &&
         e.getAttribute(`method`)?.toLowerCase() === `get` &&
         e.getAttribute(`action`) === `/`,
-      h = f({
+      _ = m({
         read: async (n, r) => {
-          let i = await S(n.url, new globalThis.URL(e.location.href), r);
-          return y(t, i.html, n.url);
+          let i = await w(n.url, new globalThis.URL(e.location.href), r);
+          return x(t, i.html, n.url, s);
         },
         intent(t) {
-          (d(!1),
-            (u = t.url.href),
+          (p(!1),
+            (f = t.url.href),
             t.kind === `filter` &&
               ((r.hidden = !1),
               (r.textContent = `Filters changed; displayed results have not yet updated.`)),
             t.kind === `history`
-              ? (c = !1)
-              : (t.url.href === e.location.href || (t.kind === `filter` && c)
+              ? (u = !1)
+              : (t.url.href === e.location.href || (t.kind === `filter` && u)
                   ? e.history.replaceState(null, ``, t.url)
                   : e.history.pushState(null, ``, t.url),
-                (c = t.kind === `filter`)));
+                (u = t.kind === `filter`)));
         },
         pending() {
-          d(!0);
+          p(!0);
         },
         commit(e, n) {
           let r = i();
@@ -440,14 +475,14 @@
           let a = r.querySelector(`form[data-forum-search="true"]`),
             o = n.main.querySelector(`form[data-forum-search="true"]`),
             s = t.activeElement,
-            u = s instanceof globalThis.HTMLInputElement ? s : null,
-            d =
-              u?.selectionStart === null || u === null
+            c = s instanceof globalThis.HTMLInputElement ? s : null,
+            l =
+              c?.selectionStart === null || c === null
                 ? null
                 : {
-                    start: u.selectionStart,
-                    end: u.selectionEnd,
-                    direction: u.selectionDirection,
+                    start: c.selectionStart,
+                    end: c.selectionEnd,
+                    direction: c.selectionDirection,
                   },
             f = e.kind === `filter` && a !== null && o !== null;
           if (f) {
@@ -466,19 +501,19 @@
               s instanceof globalThis.HTMLElement &&
               a.contains(s) &&
               (s.focus({ preventScroll: !0 }),
-              d !== null &&
-                d.end !== null &&
-                u?.setSelectionRange(d.start, d.end, d.direction ?? `none`)),
-            l(t, n.head),
+              l !== null &&
+                l.end !== null &&
+                c?.setSelectionRange(l.start, l.end, l.direction ?? `none`)),
+            d(t, n.head),
             !f)
           ) {
             let e = n.main.querySelector(`h1`);
             (e?.setAttribute(`tabindex`, `-1`), e?.focus());
           }
-          c = !1;
+          u = !1;
         },
         failure(e) {
-          (d(!1),
+          (p(!1),
             (r.hidden = !1),
             (r.textContent = `Could not load this public page. Displayed content has not been updated. `));
           let n = t.createElement(`a`);
@@ -486,49 +521,49 @@
             (n.textContent = `Try again`),
             (n.dataset.forumRetry = `true`),
             r.append(n),
-            (c = !1));
+            (u = !1));
         },
         settled() {
           (i()?.setAttribute(`aria-busy`, `false`),
-            r.querySelector(`a[data-forum-retry="true"]`) === null && d(!1));
+            r.querySelector(`a[data-forum-retry="true"]`) === null && p(!1));
         },
       }),
-      v = (t, n = !1, r = !1) => {
+      b = (t, n = !1, r = !1) => {
         let i = new globalThis.URLSearchParams();
         for (let [e, n] of new globalThis.FormData(t)) {
           if (typeof n != `string`) return;
           i.append(e, n);
         }
-        let a = new globalThis.URL(_(i), e.location.href);
-        if (a.href === u && !r) return;
+        let a = new globalThis.URL(y(i), e.location.href);
+        if (a.href === f && !r) return;
         let o = { url: a, kind: `filter` };
-        n ? h.navigate(o) : h.change(o);
+        n ? _.navigate(o) : _.change(o);
       },
-      b = (e) => {
+      S = (e) => {
         if (
           e.type === `change` &&
           !(e.target instanceof globalThis.HTMLSelectElement)
         )
           return;
-        let t = p(e.target);
-        !s &&
+        let t = h(e.target);
+        !c &&
           !(e instanceof globalThis.InputEvent && e.isComposing) &&
-          m(t) &&
+          g(t) &&
           t !== null &&
-          v(t, e.target instanceof globalThis.HTMLSelectElement);
-      },
-      x = (e) => {
-        let t = p(e.target);
-        m(t) && t !== null && (e.preventDefault(), s || v(t, !0, !0));
+          b(t, e.target instanceof globalThis.HTMLSelectElement);
       },
       C = (e) => {
-        m(p(e.target)) && ((s = !0), (u = ``), h.cancel(), d(!1));
+        let t = h(e.target);
+        g(t) && t !== null && (e.preventDefault(), c || b(t, !0, !0));
       },
-      w = (e) => {
-        let t = p(e.target);
-        m(t) && t !== null && ((s = !1), v(t));
+      T = (e) => {
+        g(h(e.target)) && ((c = !0), (f = ``), _.cancel(), p(!1));
       },
-      T = (t) => {
+      E = (e) => {
+        let t = h(e.target);
+        g(t) && t !== null && ((c = !1), b(t));
+      },
+      D = (t) => {
         if (
           t.defaultPrevented ||
           t.button !== 0 ||
@@ -556,42 +591,42 @@
           n.closest(o) !== null
         )
           return;
-        let c = g(n.href, new globalThis.URL(e.location.href));
-        c.kind === `read` &&
+        let s = v(n.href, new globalThis.URL(e.location.href));
+        s.kind === `read` &&
           (t.preventDefault(),
-          (s = !1),
-          h.navigate({ url: c.url, kind: `navigation` }));
+          (c = !1),
+          _.navigate({ url: s.url, kind: `navigation` }));
       },
-      E = () => {
+      O = () => {
         let t = new globalThis.URL(e.location.href);
-        g(t.href, t).kind === `read` &&
-          ((s = !1), h.navigate({ url: t, kind: `history` }));
+        v(t.href, t).kind === `read` &&
+          ((c = !1), _.navigate({ url: t, kind: `history` }));
       },
-      D = () => {
-        (h.cancel(), d(!1));
+      k = () => {
+        (_.cancel(), p(!1));
       };
     return (
-      t.addEventListener(`input`, b),
-      t.addEventListener(`change`, b),
-      t.addEventListener(`submit`, x),
-      t.addEventListener(`compositionstart`, C),
-      t.addEventListener(`compositionend`, w),
-      t.addEventListener(`click`, T),
-      e.addEventListener(`popstate`, E),
-      e.addEventListener(`pagehide`, D),
+      t.addEventListener(`input`, S),
+      t.addEventListener(`change`, S),
+      t.addEventListener(`submit`, C),
+      t.addEventListener(`compositionstart`, T),
+      t.addEventListener(`compositionend`, E),
+      t.addEventListener(`click`, D),
+      e.addEventListener(`popstate`, O),
+      e.addEventListener(`pagehide`, k),
       () => {
-        (h.dispose(),
-          d(!1),
-          t.removeEventListener(`input`, b),
-          t.removeEventListener(`change`, b),
-          t.removeEventListener(`submit`, x),
-          t.removeEventListener(`compositionstart`, C),
-          t.removeEventListener(`compositionend`, w),
-          t.removeEventListener(`click`, T),
-          e.removeEventListener(`popstate`, E),
-          e.removeEventListener(`pagehide`, D));
+        (_.dispose(),
+          p(!1),
+          t.removeEventListener(`input`, S),
+          t.removeEventListener(`change`, S),
+          t.removeEventListener(`submit`, C),
+          t.removeEventListener(`compositionstart`, T),
+          t.removeEventListener(`compositionend`, E),
+          t.removeEventListener(`click`, D),
+          e.removeEventListener(`popstate`, O),
+          e.removeEventListener(`pagehide`, k));
       }
     );
   }
-  C(globalThis.window);
+  T(globalThis.window);
 })();
