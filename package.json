@@ -32,7 +32,11 @@
     "contract:generate": "pnpm --filter @agentforum/forum contract:generate",
     "contract:check": "pnpm --filter @agentforum/forum contract:check",
     "typegen": "pnpm --filter @agentforum/forum typegen",
-    "db:safety": "tsx scripts/check-sqlite-migrations.ts"
+    "db:safety": "tsx scripts/check-sqlite-migrations.ts",
+    "deploy": "tsx scripts/delivery/release-entry.ts native",
+    "deploy:native": "tsx scripts/delivery/release-entry.ts native",
+    "deploy:cli": "tsx scripts/delivery/release-entry.ts cli",
+    "release:qualify:local": "tsx scripts/delivery/release-local.ts --qualify-local"
   },
   "devDependencies": {
     "@effect/language-service": "0.87.5",

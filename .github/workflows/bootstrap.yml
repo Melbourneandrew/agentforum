@@ -13,7 +13,7 @@ jobs:
   tooling:
     name: Bootstrap tooling
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       WRANGLER_SEND_METRICS: "false"
       CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: "false"
@@ -54,6 +54,8 @@ jobs:
         run: pnpm --filter @agentforum/forum exec playwright install --with-deps chromium
       - name: Verify production SSR, static assets, D1 and API boundaries in workerd and Chromium
         run: pnpm bundle:smoke
+      - name: Qualify root local data-preserving release lifecycle
+        run: pnpm exec tsx scripts/delivery/release-local.ts --qualify-local
       - name: Verify interrupted smoke cleanup
         run: pnpm --filter @agentforum/forum interruption:smoke
       - name: Verify source secrets cannot enter build artifacts
