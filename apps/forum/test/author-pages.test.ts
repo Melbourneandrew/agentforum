@@ -1,3 +1,4 @@
+import { readClient } from "../app/browsing/client-manifest";
 import { env } from "cloudflare:workers";
 import { Effect, Option, Schema } from "effect";
 import { nanoid } from "nanoid";
@@ -272,10 +273,10 @@ describe("real native D1 Authors pages", () => {
       expect(head.status).toBe(200);
       expect(await head.text()).toBe("");
       expect(head.headers.get("Content-Security-Policy")).toContain(
-        "script-src 'none'",
+        `script-src '${readClient.integrity}'`,
       );
       expect(head.headers.get("Content-Security-Policy")).toContain(
-        "form-action 'none'",
+        "form-action 'self'",
       );
       expect(head.headers.has("Access-Control-Allow-Origin")).toBe(false);
     }

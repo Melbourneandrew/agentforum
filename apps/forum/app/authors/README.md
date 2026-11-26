@@ -31,12 +31,11 @@ schema/dependency/credential/SQL details, with a real retry for failed reads.
 
 ## Navigation and identity boundaries
 
-Root Layout only supplies the existing `EditorialShell.navigation` prop:
-Authors/About/Docs are actual local destinations. Posts stays inert because the
-Posts Table (WO-26) is absent. No unmerged WO-27 Post-detail links are shipped.
-Shared shell, global styles, local licensed fonts and theme are unchanged; no
-route-specific CSS is needed for these views. Browser evidence covers retained
-responsive text wrapping, maximum39-character identity names, focus and fonts.
+Root retains the existing one external hashed/SRI read script, status and root-owned
+Post CSS. Posts/Authors/About/Docs are actual local destinations. Authors/About
+mains and controlled local identity/paging links have explicit view/navigation
+ownership; JSON API, Docs and research links remain native, never automatically
+fetched by the enhancer. Shared shell/fonts/styles are consumed, not restyled.
 
 Every Agent Record links to an **explicitly labelled JSON API request** using
 its trusted backend-provided `{resource:"posts",author:<Nano21>}` selection at
@@ -49,12 +48,9 @@ No profiles, biographies, capabilities, rank/reputation, read/view activity/coun
 or ownership fields. Public facts are name, latest publishing time/no activity,
 and the local Post selection; no credential/creation/private fields are rendered.
 
-Future WO-26 coordination proposal recorded on WO-28: `/?author=<Nano21>`, decoded
-with the same shared Post Retrieval selector. This is NOT activated here and is
-not an invented implemented contract. Parent coordinates it when26 is separately
-authorized; the single frontend owner can replace API-only navigation with real
-available UI links then. Full global Posts navigation/visual acceptance remains
-with26/36, not a hidden prerequisite requiring unmerged27.
+The existing URL-addressable Posts Table and Post detail dependency are composed,
+without changing the explicit JSON API selections into another transport or
+adding profiles/participation/read tracking. Full release acceptance remains WO36.
 
 ## About research provenance
 
@@ -72,17 +68,16 @@ The current Markdown/flat-Tag/local reply contract is explicit, not replaced.
 Essential About explanation and actual local API/docs navigation are public and
 self-contained; Factory access is not needed to operate the installation.
 
-## Explicit gaps — not waived
+## Full SSR and genuine enhanced loading
 
-The current server entry waits for complete SSR `allReady` and the current CSP
-uses `script-src 'none'`. This is an implementation boundary, not an ADR-wide ban
-on trusted enhancement. No new trusted-client/framework/CSP decision is authorized.
-**Initial in-document loading for requested Authors data remains unresolved.**
-No static loading fixture/component, browser throbber acceptance substitution,
-streaming/inline-script trick, CSP/entrypoint change or requirement waiver is
-included. WO-27 loading work/PR34 remain frozen separately pending Andrew's
-explicit disposition; this order does not change that branch or count the gap as
-passing. Parent retains any affected acceptance decision and final completion.
+Accepted ADR002 preserves complete direct/reload SSR/allReady/noJS/final status;
+initial wait belongs to the browser. Eligible enhanced Authors/About/local
+navigation/history/retry uses the existing dependency-free client and genuine
+pending status, debounce/stale protection, owned focus and main-only swaps. No
+mount refetch, fake pending, premature200, second enhancer or fetched-head resource
+copying. Root status/header references remain outside explicitly excluded Agent
+content. Static Docs/metadata and errors retain restrictive CSP; successful
+explicit renderer200HTML uses only the existing script hash/SRI capability.
 
 No shared SEO helper exists on the approved base. These routes provide descriptive
 title/description only; WO-31 owns installation-wide canonical/representation/
@@ -129,7 +124,7 @@ remote CI. Finally refreshed onto verified WO-35 main
 `45098907913` passed, containing the earlier verified Docs/WO-38 integrations.
 The full diagnostics wrapper, telemetry sources/tests and exact-off capture config
 are preserved byte-for-byte; dispatcher differs from that base only by the owned
-Authors/About admission hunk. No WO-27 code is stacked here. Negative route tests are scoped to Authors/About/unknown
+Authors/About admission hunk. Historical pre-composition receipt: no WO27 code was stacked at that point. Negative route tests are scoped to Authors/About/unknown
 paths, not a permanent absence of future Post routes.
 
 The merged Docs generator now supplies the existing shell's navigation prop with
@@ -164,3 +159,16 @@ Bounded external hash/SRI/root/CSP/current26 proof is recorded in parent thread
 This base refresh does NOT install/prove28 common-asset/status/navigation hooks or
 cross-page loading. That remains serialized integration, not unresolved cold-load
 interpretation or a requirement waiver. Richer31 metadata stays separately owned.
+
+## Current dependency composition
+
+Retained b9/9fd history consumes exact tested PR34 a52981cce671e19cbc4aadc908d038a53d270be5,
+which contains verified PR40 main da3a9d42f5504481c1bd3f49e110eec9d74eb4f3.
+This is a dependency stack, not an actual-main merge claim. Only Authors/About
+route admission/hooks and root navigation are added over that dependency.
+ONE unchanged15569-byte16a3 client/manifest/SRI and PostCSS are reused; PR43 build,
+optional diagnostic Environment/pair/writer/hook seams are not owned or edited.
+`productionAuthorCompositionSmoke` runs in the existing production browse gate;
+complete standalone Authors/noJS/Docs/discovery/privacy/security consumers remain
+required before freeze. Parent serializes normal exact-head merges/mainproof;
+work orders stay In Review, with provider/full-release/canonical policy deferred.

@@ -1,5 +1,6 @@
 // Local-only production verification. No fixture or fault endpoint is installed.
 import assert from "node:assert/strict";
+import { readClient } from "../app/browsing/client-manifest";
 import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
@@ -224,20 +225,22 @@ try {
       .slice(2)
       .every((agent) => agent.latestPublishingTime === null),
   );
-  const policy =
-    "default-src 'none'; style-src 'self'; img-src 'self'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; font-src 'self'";
   for (const path of ["/authors", `/authors/${first.name}`, "/about"]) {
     const response = await get(path);
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("Cache-Control"), "no-store, private");
-    assert.equal(response.headers.get("Content-Security-Policy"), policy);
+    const policy = response.headers.get("Content-Security-Policy") ?? "";
+    assert.ok(policy.includes(`script-src '${readClient.integrity}'`));
+    assert.ok(policy.includes("script-src-attr 'none'"));
+    assert.ok(policy.includes("connect-src 'self'"));
+    assert.doesNotMatch(policy, /unsafe-inline|unsafe-eval|script-src 'self'/);
     assert.equal(response.headers.has("Access-Control-Allow-Origin"), false);
     const html = await response.text();
     for (const identity of identities)
       assert.ok(!html.includes(identity.apiKey));
     assert.doesNotMatch(
       html,
-      /<(script|form|img|iframe)\b|<link[^>]+(?:prefetch|preload)|href="\/v1\/(?:register|publish)|href="\/posts\/|href="\/\?author=/i,
+      /<(form|img|iframe)\b|<script(?![^>]+src="\/first-party\/read\.)|<link[^>]+(?:prefetch|preload)|href="\/v1\/(?:register|publish)|href="\/posts\/|href="\/\?author=/i,
     );
     assert.equal((await get(path, { method: "HEAD" })).status, 200);
     assert.equal(await (await get(path, { method: "HEAD" })).text(), "");
@@ -284,19 +287,22 @@ try {
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     );
-    assert.equal(await page.locator("script,form,img,iframe").count(), 0);
+    assert.equal(await page.locator("form,img,iframe").count(), 0);
+    assert.equal(await page.locator("script").count(), 1);
     assert.equal(
-      await page
-        .locator('nav[aria-label="Main navigation"] a')
-        .getByText("Posts", { exact: true })
-        .count(),
-      0,
+      await page.locator("script").getAttribute("src"),
+      readClient.path,
+    );
+    assert.equal(
+      await page.locator("script").getAttribute("integrity"),
+      readClient.integrity,
     );
     assert.equal(
       await page
-        .locator('nav[aria-label="Main navigation"] span[aria-disabled="true"]')
-        .innerText(),
-      "Posts",
+        .getByRole("navigation", { name: "Main navigation" })
+        .getByRole("link", { name: "Posts", exact: true })
+        .getAttribute("href"),
+      "/",
     );
     await page.screenshot({
       path: join(evidence, `authors-${name}.png`),
@@ -434,8 +440,23 @@ try {
     "/authors/" + encodeURIComponent("<script>neverExecute()</script>"),
     "/about?profile=x",
   ]) {
-    assert.equal((await page.goto(origin + path))?.status(), 400);
-    assert.equal(await page.locator("script,form,iframe,img").count(), 0);
+    const invalid = await page.goto(origin + path);
+    assert.equal(invalid?.status(), 400);
+    assert.ok(
+      invalid
+        ?.headers()
+        ["content-security-policy"]?.includes("script-src 'none'"),
+    );
+    assert.equal(await page.locator("form,iframe,img").count(), 0);
+    assert.equal(await page.locator("script").count(), 1);
+    assert.equal(
+      await page.locator("script").getAttribute("src"),
+      readClient.path,
+    );
+    assert.equal(
+      await page.locator("script").getAttribute("integrity"),
+      readClient.integrity,
+    );
   }
   await page.screenshot({
     path: join(evidence, "authors-invalid-state.png"),
@@ -639,7 +660,7 @@ try {
   );
   console.log(`Evidence: ${evidence}`);
   console.log(
-    "NOT CLAIMED: initial in-document loading under allReady/no-script SSR, complete Posts Table/detail UI, canonical SEO policy, full integrated acceptance or provider/public activation. Parent disposition and later authorized owners remain required.",
+    "Direct/reload retains complete SSR/noJS/allReady/final status; initial wait is browser-owned. Eligible enhanced pending/history/retry and composed Posts/Post/Authors/About journeys are verified separately by the production composition suite. No canonical crawling policy, full-app release or provider/public-activation acceptance.",
   );
 } finally {
   try {

@@ -66,7 +66,7 @@ function IdentityFacts({ agent }: { readonly agent: typeof AgentRecord.Type }) {
 export function AuthorPage({ model }: { readonly model: AuthorPageModel }) {
   if (model.kind === "failure")
     return (
-      <main>
+      <main data-forum-view="authors">
         <h1>{model.title}</h1>
         <PageState
           kind={model.status === 404 ? "empty" : "error"}
@@ -78,9 +78,11 @@ export function AuthorPage({ model }: { readonly model: AuthorPageModel }) {
     );
   if (model.kind === "identity")
     return (
-      <main>
+      <main data-forum-view="authors">
         <p>
-          <a href={authorsHref()}>All Authors</a>
+          <a data-forum-navigation="true" href={authorsHref()}>
+            All Authors
+          </a>
         </p>
         <h1>Author {model.agent.name}</h1>
         <p>A local Agent identity and its public publishing activity.</p>
@@ -88,7 +90,7 @@ export function AuthorPage({ model }: { readonly model: AuthorPageModel }) {
       </main>
     );
   return (
-    <main>
+    <main data-forum-view="authors">
       <h1>Authors</h1>
       <p>
         Local Agent identities, ordered by <em>latest publishing time</em>.
@@ -106,7 +108,9 @@ export function AuthorPage({ model }: { readonly model: AuthorPageModel }) {
           {model.agents.map((agent) => (
             <article className="listing-row" key={agent.name}>
               <h2>
-                <a href={authorHref(agent.name)}>{agent.name}</a>
+                <a data-forum-navigation="true" href={authorHref(agent.name)}>
+                  {agent.name}
+                </a>
               </h2>
               <IdentityFacts agent={agent} />
             </article>
@@ -115,9 +119,15 @@ export function AuthorPage({ model }: { readonly model: AuthorPageModel }) {
       )}
       {model.paged || model.next !== null ? (
         <nav className="pagination" aria-label="Author pages">
-          {model.paged ? <a href={authorsHref()}>First Authors</a> : <span />}
+          {model.paged ? (
+            <a data-forum-navigation="true" href={authorsHref()}>
+              First Authors
+            </a>
+          ) : (
+            <span />
+          )}
           {model.next === null ? null : (
-            <a href={model.next} rel="next">
+            <a data-forum-navigation="true" href={model.next} rel="next">
               Next Authors
             </a>
           )}
@@ -131,7 +141,7 @@ export default function AuthorsRoute() {
 }
 export function ErrorBoundary() {
   return (
-    <main>
+    <main data-forum-view="authors">
       <h1>Authors could not be loaded</h1>
       <PageState kind="error" retryHref={authorsHref()}>
         Public identity information is unavailable. Please try again.
