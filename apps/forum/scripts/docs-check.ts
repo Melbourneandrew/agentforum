@@ -141,13 +141,11 @@ for (const [path, content] of outputs) {
   assert.ok(navigation, `Missing public navigation: ${path}`);
   assert.deepEqual(
     Array.from(navigation.matchAll(/href="([^"]+)"/g), (match) => match[1]),
-    ["/authors", "/about", "/docs/"],
+    ["/", "/authors", "/about", "/docs/"],
     `Only implemented public destinations may be advertised: ${path}`,
   );
-  assert.match(
-    navigation,
-    /<span\s+aria-disabled="true"[^>]*>\s*Posts\s*<\/span>/,
-  );
+  assert.match(navigation, /<a\s+href="\/">\s*Posts\s*<\/a>/);
+  assert.doesNotMatch(navigation, /aria-disabled|data-forum-navigation/);
   for (const match of content.matchAll(/href="([^"]+)"/g)) {
     const href = match[1];
     assert.ok(href);
@@ -160,7 +158,7 @@ for (const [path, content] of outputs) {
       ? `${url.pathname}index.html`
       : url.pathname;
     // These exact public SSR destinations exist on the combined WO-28 base.
-    // No future Posts/filter/detail route is admitted as a documentation target.
+    // No filter/detail route is admitted as a documentation target.
     if (["/", "/authors", "/about"].includes(url.pathname)) {
       assert.equal(url.search, "");
       assert.equal(url.hash, "");

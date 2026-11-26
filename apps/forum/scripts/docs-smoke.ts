@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { chromium } from "playwright";
+import { readClient } from "../app/browsing/client-manifest";
 
 const origin = process.env.DOCS_ORIGIN ?? "http://127.0.0.1:8794";
 const url = new URL(origin);
@@ -166,6 +167,123 @@ try {
     "Documentation browser checks passed: actual production Worker, JavaScript disabled; desktop/mobile/320px reflow; local fonts/CSP/styles; keyboard/skip/disclosures; raw Markdown/contract; no external or API requests.",
   );
   await context.close();
+  for (const javaScriptEnabled of [false, true]) {
+    const journeyContext = await browser.newContext({
+      javaScriptEnabled,
+      ignoreHTTPSErrors: true,
+    });
+    const forbidden: string[] = [];
+    journeyContext.on("request", (request) => {
+      const target = new URL(request.url());
+      if (
+        target.origin !== origin ||
+        target.pathname.startsWith("/v1") ||
+        request.method() !== "GET" ||
+        request.headers().authorization !== undefined ||
+        request.headers().cookie !== undefined
+      )
+        forbidden.push("Forbidden observer request");
+    });
+    try {
+      const journey = await journeyContext.newPage();
+      journey.on("pageerror", () => forbidden.push("Browser error"));
+      const navigation = () =>
+        journey.getByRole("navigation", { name: "Main navigation" });
+      const documentClick = async (
+        path: string,
+        click: () => Promise<void>,
+      ) => {
+        const [response] = await Promise.all([
+          journey.waitForResponse(
+            (response) =>
+              response.url() === origin + path &&
+              response.request().isNavigationRequest() &&
+              response.request().resourceType() === "document",
+          ),
+          click(),
+        ]);
+        assert.equal(response.status(), 200);
+        await journey.waitForLoadState("load");
+        assert.equal(new URL(journey.url()).pathname, path);
+        return response;
+      };
+      const postsShell = async () => {
+        assert.equal(
+          await journey.locator('main[data-forum-view="posts"]').count(),
+          1,
+        );
+        assert.equal(await journey.locator("#forum-read-status").count(), 1);
+        const script = journey.locator("script");
+        assert.equal(await script.count(), 1);
+        assert.equal(await script.getAttribute("src"), readClient.path);
+        assert.equal(
+          await script.getAttribute("integrity"),
+          readClient.integrity,
+        );
+      };
+      for (const path of [
+        "/docs/",
+        "/docs/publication/",
+        "/docs/retrieval/",
+        "/docs/api/",
+      ]) {
+        assert.equal((await journey.goto(origin + "/"))?.status(), 200);
+        await postsShell();
+        const response = await documentClick("/docs/", () =>
+          navigation().getByRole("link", { name: "Docs", exact: true }).click(),
+        );
+        const entryPolicy = response.headers()["content-security-policy"];
+        assert.ok(entryPolicy?.includes("script-src 'none'"));
+        const docsResponse = await journey.goto(origin + path);
+        assert.ok(docsResponse);
+        assert.equal(docsResponse.status(), 200);
+        const policy = docsResponse.headers()["content-security-policy"];
+        assert.ok(policy?.includes("script-src 'none'"));
+        assert.ok(policy?.includes("default-src 'none'"));
+        assert.doesNotMatch(policy ?? "", /connect-src(?! 'none')/);
+        assert.ok(policy?.includes("form-action 'none'"));
+        assert.equal(
+          await journey
+            .locator(
+              "script, form, #forum-read-status, [data-forum-navigation]",
+            )
+            .count(),
+          0,
+        );
+        assert.deepEqual(
+          await navigation()
+            .locator("a")
+            .evaluateAll((links) =>
+              links.map((link) => link.getAttribute("href")),
+            ),
+          ["/", "/authors", "/about", "/docs/"],
+        );
+        assert.equal(
+          await navigation().locator('[aria-disabled="true"]').count(),
+          0,
+        );
+        const posts = navigation().getByRole("link", {
+          name: "Posts",
+          exact: true,
+        });
+        assert.equal(await posts.getAttribute("href"), "/");
+        assert.equal(await posts.getAttribute("data-forum-navigation"), null);
+        if (path === "/docs/")
+          await journey.screenshot({
+            path: `${evidence}/docs-posts-link-${javaScriptEnabled ? "js" : "nojs"}.png`,
+            fullPage: false,
+          });
+        await documentClick("/", () => posts.click());
+        await postsShell();
+      }
+      assert.deepEqual(forbidden, []);
+      console.log(
+        `Native Posts→Docs→Posts PASS: all four Docs pages, JavaScript ${javaScriptEnabled ? "on" : "off"}, actual document requests200, script-free restrictive Docs CSP/native links, unchanged sole client/SRI/root status and local credential-free GET-only/no API or external reads.`,
+      );
+    } finally {
+      await journeyContext.close();
+    }
+  }
 } finally {
   await browser.close();
 }

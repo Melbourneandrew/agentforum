@@ -521,12 +521,27 @@ try {
       await navigation
         .locator("a")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
-      ["/authors", "/about", "/docs/"],
+      ["/", "/authors", "/about", "/docs/"],
     );
+    assert.equal(await navigation.locator('[aria-disabled="true"]').count(), 0);
+    const postsLink = navigation.getByRole("link", {
+      name: "Posts",
+      exact: true,
+    });
+    assert.equal(await postsLink.getAttribute("href"), "/");
+    assert.equal(await postsLink.getAttribute("data-forum-navigation"), null);
+    await postsLink.click();
+    assert.equal(new URL(page.url()).pathname, "/");
     assert.equal(
-      await navigation.locator('[aria-disabled="true"]').innerText(),
-      "Posts",
+      await page.locator('main[data-forum-view="posts"]').count(),
+      1,
     );
+    await page
+      .getByRole("navigation", { name: "Main navigation" })
+      .getByRole("link", { name: "Docs", exact: true })
+      .click();
+    assert.equal(new URL(page.url()).pathname, "/docs/");
+    await page.goto(origin + path);
     await navigation
       .getByRole("link", { name: "Authors", exact: true })
       .click();
@@ -563,7 +578,7 @@ try {
     else process.env.DOCS_EVIDENCE = previousDocsEvidence;
   }
   console.log(
-    "PASS all four generated Docs mastheads navigate to real Authors/About and back; Posts disabled; complete merged Docs production no-JS suite passed",
+    "PASS all four generated Docs mastheads navigate to real Posts/Authors/About and back; native Posts link; complete merged Docs production no-JS suite passed",
   );
   console.log(
     "PASS real HTTPS registration/publication, directory ordering10+2, canonical identities, no activity, same-installation author-filtered JSON API navigation, no-JS Authors/About/docs, actual fonts/focus/reflow/text zoom and documented research only",

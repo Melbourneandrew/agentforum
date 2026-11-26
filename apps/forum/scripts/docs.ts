@@ -116,7 +116,7 @@ const document = async (title: string, content: ReactNode) =>
             h(EditorialShell, {
               current: "Docs",
               navigation: [
-                { label: "Posts" },
+                { label: "Posts", href: "/" },
                 { label: "Authors", href: "/authors" },
                 { label: "About", href: "/about" },
                 { label: "Docs", href: "/docs/" },
