@@ -9,17 +9,32 @@ import {
   mkdtemp,
   readFile,
   readdir,
+  symlink,
   rm,
   writeFile,
 } from "node:fs/promises";
 import { Agent, request as httpsRequest } from "node:https";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import { Effect, Either, Option, Schema } from "effect";
 import { expect, it } from "vitest";
+import {
+  ownerBuild,
+  buildProcessLive,
+} from "../../apps/forum/scripts/owner-build.js";
+import {
+  qualifyLocalRecovery,
+  prepareRecovery,
+  verifyRecoveryCandidate,
+} from "./release-recovery.js";
+import {
+  ownerReleaseCommand,
+  ParentExecution,
+  type OwnerScope,
+} from "./owner-executor.js";
 import { Identity, failure } from "./model.js";
 import { decodeConfig, prepareTarget } from "./release-config.js";
 import {
@@ -41,7 +56,11 @@ import {
   makeControlCoordinator,
   readControl,
 } from "./release-control.js";
-import { ReleaseCoordinator, ReleasePorts } from "./release-model.js";
+import {
+  ReleaseCoordinator,
+  ReleasePorts,
+  type Artifact,
+} from "./release-model.js";
 import { inspectInstalled, physicalStates } from "./remote-state.js";
 import { release } from "./release.js";
 import {
@@ -51,8 +70,9 @@ import {
 } from "../../apps/forum/src/api/contracts.js";
 const exec = promisify(execFile);
 it("complete archived Worker retains data on exact newer native schema; real control ACK stop precedes activation and retry", async () => {
-  const root = process.cwd(),
+  const tooling = process.cwd(),
     state = await mkdtemp(join(tmpdir(), "wo34-complete-archive-"));
+  const root = join(state, "application-A");
   const env = {
     PATH: process.env.PATH ?? "",
     HOME: state,
@@ -63,7 +83,10 @@ it("complete archived Worker retains data on exact newer native schema; real con
     WRANGLER_LOG_PATH: join(state, "wrangler.log"),
     WRANGLER_RESOURCES_PROVISION: "false",
   };
-  const wrangler = resolve("apps/forum/node_modules/wrangler/bin/wrangler.js");
+  const wrangler = join(
+    root,
+    "apps/forum/node_modules/wrangler/bin/wrangler.js",
+  );
   const run = async (args: string[]) =>
     (
       await exec(
@@ -89,17 +112,40 @@ it("complete archived Worker retains data on exact newer native schema; real con
     child = undefined;
   };
   try {
-    // Exactly one fresh complete build for this new qualification, never a cached
-    // infrastructure result or the small origin-only fixture.
-    await exec("pnpm", ["build", "--force"], {
-      cwd: root,
+    // Current trusted tooling B, separate clean supported application checkout A.
+    // Exact approved base is retained in full CI history; no moving-main lookup.
+    await exec("git", ["clone", "--quiet", "--no-hardlinks", tooling, root], {
       env,
-      timeout: 180000,
-      maxBuffer: 8 * 1024 * 1024,
     });
+    await exec(
+      "git",
+      ["checkout", "--quiet", "1310eb41f01352e7287f55dc05bea39a6612ceb5"],
+      { cwd: root, env },
+    );
+    for (const path of ["node_modules", "apps/forum/node_modules"]) {
+      await mkdir(join(root, path));
+      for (const name of await readdir(join(tooling, path)))
+        await symlink(join(tooling, path, name), join(root, path, name));
+    }
     const sourceRevision = (
       await exec("git", ["rev-parse", "HEAD"], { cwd: root, env })
     ).stdout.trim();
+    expect(sourceRevision).not.toBe(
+      (
+        await exec("git", ["rev-parse", "HEAD"], { cwd: tooling, env })
+      ).stdout.trim(),
+    );
+    await Effect.runPromise(
+      ownerBuild(
+        {
+          version: 1,
+          repository: root,
+          revision: sourceRevision,
+          metadata: { environment: "local", revision: sourceRevision },
+        },
+        env,
+      ).pipe(Effect.provide(buildProcessLive)),
+    );
     const identity = Schema.decodeUnknownSync(Identity)({
       version: 1,
       accountId: "a".repeat(32),
@@ -162,7 +208,12 @@ it("complete archived Worker retains data on exact newer native schema; real con
     expect(prepared.artifact.artifactDigest).not.toBe(
       original.artifact.artifactDigest,
     );
-    const controls = await localControls({ prepared, root, state, run });
+    const controls = await localControls({
+      prepared,
+      root: tooling,
+      state,
+      run,
+    });
     await Effect.runPromise(
       bootstrapControl().pipe(
         Effect.provideService(ControlDatabase, controls.database),
@@ -261,7 +312,7 @@ it("complete archived Worker retains data on exact newer native schema; real con
         outgoing.end(body);
       });
     };
-    const start = async () => {
+    const start = async (selectedArtifact: Artifact = prepared.artifact) => {
       await stop();
       await Effect.runPromise(
         verifyMaterializedArchive(archive, prepared.artifact),
@@ -273,7 +324,10 @@ it("complete archived Worker retains data on exact newer native schema; real con
           "dev",
           "--local",
           "--no-bundle",
-          ...nativeConfig,
+          "--config",
+          selectedArtifact.configPath,
+          "--persist-to",
+          persist,
           "--ip",
           "127.0.0.1",
           "--port",
@@ -661,12 +715,292 @@ it("complete archived Worker retains data on exact newer native schema; real con
         name.endsWith(".sql"),
       ),
     ).toHaveLength(newerSources.length);
-    // No recovery consumer/compatibleSchemas assertion is invented here. The
-    // exact pair is observed; authority/source-pairing integration remains gated.
+    await stop();
+    const witness = await Effect.runPromise(
+      qualifyLocalRecovery({
+        archive,
+        artifact: prepared.artifact,
+        applicationRepository: root,
+        toolingRepository: tooling,
+        state,
+        migrationSources: newerSources,
+      }),
+    );
+    const selection = {
+      ...archive,
+      originalArtifact: preparedOriginal.artifact,
+      witness,
+    };
+    const recovery = await Effect.runPromise(
+      prepareRecovery({
+        selection,
+        applicationRepository: root,
+        identity,
+        sourceRevision,
+        canonicalOrigin: identity.defaultOrigin,
+        output: join(state, "recovered-target.json"),
+      }),
+    );
+    expect(recovery.prepared.artifact.sourceRevision).toBe(sourceRevision);
+    expect(recovery.prepared.artifact.compatibleSchemas).toEqual([
+      observation.physicalDigest,
+    ]);
+    expect(recovery.prepared.artifact.artifactDigest).toBe(
+      prepared.artifact.artifactDigest,
+    );
+    expect(
+      Either.isLeft(
+        await Effect.runPromise(
+          Effect.either(
+            verifyMaterializedArchive(archive, recovery.prepared.artifact),
+          ),
+        ),
+      ),
+    ).toBe(true);
+    // Forged/cloned witnesses, wrong parent provenance/UUID/origin/source and
+    // supplied compatibility lists never reach a credential. Real admission uses
+    // current tooling and A's actual private IPC child, not fake pnpm.
+    for (const bad of [
+      { ...selection, witness: { ...witness } },
+      { ...selection, witness: structuredClone(witness) },
+      { ...selection, contentDigest: "f".repeat(64) },
+      {
+        ...selection,
+        originalArtifact: {
+          ...selection.originalArtifact,
+          sourceRevision: "a".repeat(40),
+        },
+      },
+      { ...selection, compatibleSchemas: [observation.physicalDigest] },
+    ]) {
+      expect(
+        Either.isLeft(
+          await Effect.runPromise(
+            Effect.either(
+              prepareRecovery({
+                selection: bad,
+                applicationRepository: root,
+                identity,
+                sourceRevision,
+                canonicalOrigin: identity.defaultOrigin,
+                output: join(state, "denied-target.json"),
+              }),
+            ),
+          ),
+        ),
+      ).toBe(true);
+    }
+    for (const change of [
+      { sourceRevision: "b".repeat(40) },
+      {
+        identity: {
+          ...identity,
+          databaseId: "22222222-2222-2222-2222-222222222222",
+        },
+      },
+      { canonicalOrigin: "https://foreign.fixture.workers.dev" },
+    ])
+      expect(
+        Either.isLeft(
+          await Effect.runPromise(
+            Effect.either(
+              prepareRecovery({
+                selection,
+                applicationRepository: root,
+                identity,
+                sourceRevision,
+                canonicalOrigin: identity.defaultOrigin,
+                output: join(state, "denied-target.json"),
+                ...change,
+              }),
+            ),
+          ),
+        ),
+      ).toBe(true);
+    for (const candidate of [
+      {
+        ...recovery.prepared.artifact,
+        compatibleSchemas: [completeA.physicalDigest],
+      },
+      {
+        ...recovery.prepared.artifact,
+        compatibleSchemas: [
+          observation.physicalDigest,
+          completeA.physicalDigest,
+        ],
+      },
+      {
+        ...recovery.prepared.artifact,
+        migrations: recovery.prepared.artifact.migrations.slice(0, 1),
+      },
+    ])
+      expect(
+        Either.isLeft(
+          await Effect.runPromise(
+            Effect.either(verifyRecoveryCandidate(witness, archive, candidate)),
+          ),
+        ),
+      ).toBe(true);
+    const journal = join(state, "identity.json");
+    await writeFile(journal, JSON.stringify({ state: "resolved", identity }), {
+      mode: 0o600,
+    });
+    const context: OwnerScope = {
+      repository: root,
+      journalPath: journal,
+      identity,
+      sourceRevision,
+      diagnosticEnvironment: "local",
+      executorRef: "trusted-parent:archive-consumer-native",
+      operation: "recover",
+      grants: ["d1:read", "d1:write", "worker:read", "worker:deploy"],
+    };
+    let credentials = 0,
+      selections = 0;
+    const owner = (data: typeof selection) =>
+      Effect.either(
+        ownerReleaseCommand([
+          "cli",
+          "--identity",
+          journal,
+          "--operation",
+          "recover",
+        ]).pipe(
+          Effect.provideService(ParentExecution, {
+            authorize: () => Effect.succeed(context),
+            recovery: Effect.sync(() => {
+              selections++;
+              return data;
+            }),
+            credential: Effect.suspend(() => {
+              credentials++;
+              return Effect.fail(
+                failure(
+                  "authorization",
+                  "test-stop-before-provider-construction",
+                ),
+              );
+            }),
+          }),
+        ),
+      );
+    const forgedOwner = await Effect.runPromise(
+      owner({ ...selection, witness: { ...witness } }),
+    );
+    expect(Either.isLeft(forgedOwner) && forgedOwner.left.code).toBe(
+      "recovery-evidence-unverified",
+    );
+    expect(credentials).toBe(0);
+    const admittedOwner = await Effect.runPromise(owner(selection));
+    expect(Either.isLeft(admittedOwner) && admittedOwner.left.code).toBe(
+      "test-stop-before-provider-construction",
+    );
+    expect(credentials).toBe(1);
+    expect(selections).toBe(2);
+    let businessMigrations = 0;
+    const recoveredArtifact = recovery.prepared.artifact;
+    const recoverPorts: typeof ReleasePorts.Service = {
+      ...ports,
+      build: () => Effect.succeed(recoveredArtifact),
+      verify: () => recovery.verify,
+      installed: () =>
+        inspectInstalled(recoveredArtifact, recovery.states, controls.database),
+      migrate: () => {
+        businessMigrations++;
+        return Effect.fail(
+          failure("initialization", "recovery-must-not-migrate"),
+        );
+      },
+      activate: (artifact, token) =>
+        Effect.tryPromise({
+          try: async () => {
+            await start(artifact);
+            activations++;
+            return {
+              activation: {
+                sourceRevision,
+                artifactDigest: artifact.artifactDigest,
+                version: "local-archived-worker-not-provider-version",
+              },
+              receipt: {
+                ...token,
+                identity,
+                sourceRevision,
+                artifactDigest: artifact.artifactDigest,
+                operationRef: "native:local:archived-worker-recovered",
+                outcome: "succeeded" as const,
+              },
+            };
+          },
+          catch: () => failure("deployment", "local-recovery-outcome-unknown"),
+        }),
+    };
+    const coordinator = await Effect.runPromise(
+      makeControlCoordinator({
+        artifact: recoveredArtifact,
+        ownerId: "55555555-5555-5555-5555-555555555555",
+        executorRef: "local:archive:recovery",
+      }).pipe(Effect.provideService(ControlDatabase, controls.database)),
+    );
+    const recovered = await Effect.runPromise(
+      Effect.either(
+        release({ identity, sourceRevision, operation: "recover" }).pipe(
+          Effect.provideService(ReleasePorts, recoverPorts),
+          Effect.provideService(ReleaseCoordinator, coordinator),
+          Effect.provideService(ControlDatabase, controls.database),
+        ),
+      ),
+    );
+    expect(Either.isLeft(recovered) && recovered.left.stage).toBe("readiness");
+    expect(businessMigrations).toBe(0);
+    expect(activations).toBe(2);
+    const retainedWrite = await call(
+      "publish",
+      { body: "retained recovery key still valid" },
+      "POST",
+      retainedAgent.apiKey,
+    );
+    expect(retainedWrite.status).toBe(201);
+    for (const method of ["GET", "POST"]) {
+      const response = await call(
+        "search",
+        { readCursor: checkpoint.readCursor },
+        method,
+      );
+      expect(response.status).toBe(200);
+      const records = await Schema.decodeUnknownPromise(PostPageResult)(
+        await response.json(),
+      );
+      expect(records.posts.map((post) => post.id)).toEqual(
+        expect.arrayContaining(resumedIds),
+      );
+    }
+    expect(
+      await Effect.runPromise(
+        controls.database.query(
+          "SELECT count(*) AS n FROM post_fts WHERE post_fts MATCH 'archivelegacytoken'",
+          [],
+        ),
+      ),
+    ).toEqual([{ n: 1 }]);
+    expect(
+      await Effect.runPromise(
+        inspectInstalled(recoveredArtifact, recovery.states, controls.database),
+      ),
+    ).toEqual({
+      databaseId: identity.databaseId,
+      schemaDigest: observation.physicalDigest,
+    });
+    const recoveryClosed = await Effect.runPromise(
+      readControl(controls.database),
+    );
+    expect(Option.isSome(recoveryClosed) && recoveryClosed.value.phase).toBe(
+      "idle",
+    );
   } finally {
     await stop();
     tls?.destroy();
     await chmod(join(state, "archive"), 0o700).catch(() => undefined);
     await rm(state, { recursive: true, force: true });
   }
-}, 300000);
+}, 480000);

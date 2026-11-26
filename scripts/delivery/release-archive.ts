@@ -366,3 +366,34 @@ export const verifyMaterializedArchive = (
         failure("build", "archive-materialization-mismatch"),
       );
   });
+// Recovery-only admission: ensure the fresh supported A build corresponds to the
+// archived application bytes (including immutable metadata). Generated Wrangler
+// config contains location-dependent paths and is checked separately by the
+// existing target materializer/approved Scope. Ordinary verification is unchanged.
+export const verifyArchiveBuild = (
+  archive: CompleteArchive,
+  repository: string,
+) =>
+  Effect.gen(function* () {
+    const artifact = known.get(archive);
+    if (!artifact)
+      return yield* Effect.fail(failure("build", "archive-handle-unverified"));
+    const manifest = yield* check(
+      archive.directory,
+      archive.contentDigest,
+      artifact,
+    );
+    yield* io(async () => {
+      if (
+        JSON.stringify(await list(repository)) !==
+        JSON.stringify(manifest.files.map((file) => file.path))
+      )
+        throw new Error("fresh inventory mismatch");
+      for (const file of manifest.files) {
+        if (file.path === built) continue;
+        const bytes = await regular(join(repository, file.path));
+        if (bytes.length !== file.size || hash(bytes) !== file.digest)
+          throw new Error("fresh application mismatch");
+      }
+    });
+  });

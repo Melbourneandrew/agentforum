@@ -36,6 +36,7 @@ import { decodeConfig, prepareTarget } from "./release-config.js";
 import { authorizeZoneTarget, ZoneGrant } from "./zone-authority.js";
 import { physicalStates } from "./remote-state.js";
 import { remotePorts } from "./remote-release.js";
+import { prepareRecovery, type RecoverySelection } from "./release-recovery.js";
 import {
   entryCommand,
   EntryAdapters,
@@ -66,6 +67,9 @@ export class ParentExecution extends Context.Tag("delivery/ParentExecution")<
       input: EntryInput,
     ) => Effect.Effect<OwnerScope, DeliveryError>;
     readonly credential: Effect.Effect<string, DeliveryError>;
+    // Selection/evidence DATA, accessed only after existing Scope/journal/source
+    // admission and fresh private IPC build. Never supplies authority or grants.
+    readonly recovery?: Effect.Effect<RecoverySelection, DeliveryError>;
   }
 >() {}
 export const deniedParentExecution: typeof ParentExecution.Service = {
@@ -144,6 +148,10 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
         let built =
           Option.none<
             Effect.Effect.Success<ReturnType<typeof prepareTarget>>
+          >();
+        let recovered =
+          Option.none<
+            Effect.Effect.Success<ReturnType<typeof prepareRecovery>>
           >();
         const prepare = (context: OwnerScope, output: string) => {
           const builtConfig = join(
@@ -230,6 +238,40 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
               join(state, "target.json"),
             );
             built = Option.some(prepared);
+            if (
+              context.operation === "recover" &&
+              parent.recovery !== undefined
+            ) {
+              const selection = yield* parent.recovery;
+              // No credential has been read. Keep the admitted fresh output and
+              // select the archive independently; never relabel checkout B as A.
+              const selected = yield* prepareRecovery({
+                selection,
+                applicationRepository: context.repository,
+                identity: context.identity,
+                sourceRevision: context.sourceRevision,
+                canonicalOrigin:
+                  context.canonicalOrigin ?? context.identity.defaultOrigin,
+                output: join(state, "recovery-target.json"),
+              });
+              yield* authorizeZoneTarget(
+                selected.prepared.target,
+                context.zoneGrants ?? [],
+              );
+              const current = yield* prepare(
+                context,
+                join(state, "precredential-fresh-verify.json"),
+              );
+              if (
+                current.artifact.artifactDigest !==
+                prepared.artifact.artifactDigest
+              )
+                return yield* Effect.fail(
+                  failure("build", "owner-artifact-changed"),
+                );
+              yield* source(context);
+              recovered = Option.some(selected);
+            }
           }).pipe(
             Effect.zipRight(parent.credential),
             Effect.flatMap((value) => {
@@ -321,7 +363,10 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
               const context = scope.value,
                 credential = token.value;
               yield* source(context);
-              const prepared = built.value;
+              const fresh = built.value;
+              const prepared = Option.isSome(recovered)
+                ? recovered.value.prepared
+                : fresh;
               yield* authorizeZoneTarget(
                 prepared.target,
                 context.zoneGrants ?? [],
@@ -341,7 +386,9 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
                   })),
                 ),
               );
-              const states = yield* physicalStates(sources);
+              const states = Option.isSome(recovered)
+                ? recovered.value.states
+                : yield* physicalStates(sources);
               // Recovery cannot infer compatibility from an old prefix. This admitted
               // source is qualified only against its exact fully migrated physical state.
               // A future schema needs separate archived-Worker compatibility qualification.
@@ -350,14 +397,16 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
                 return yield* Effect.fail(
                   failure("build", "physical-state-required"),
                 );
-              const artifact = {
-                ...prepared.artifact,
-                schemaDigest: completeState.physicalDigest,
-                compatibleSchemas:
-                  input.operation === "recover"
-                    ? [completeState.physicalDigest]
-                    : [],
-              };
+              const artifact = Option.isSome(recovered)
+                ? prepared.artifact
+                : {
+                    ...prepared.artifact,
+                    schemaDigest: completeState.physicalDigest,
+                    compatibleSchemas:
+                      input.operation === "recover"
+                        ? [completeState.physicalDigest]
+                        : [],
+                  };
               const verify = Effect.gen(function* () {
                 yield* source(context);
                 const current = yield* prepare(
@@ -365,21 +414,24 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
                   join(state, "verify-only.json"),
                 );
                 if (
-                  current.artifact.artifactDigest !== artifact.artifactDigest ||
+                  current.artifact.artifactDigest !==
+                    fresh.artifact.artifactDigest ||
                   (yield* io(() => readFile(artifact.configPath, "utf8"))) !==
                     JSON.stringify(prepared.target)
                 )
                   return yield* Effect.fail(
                     failure("build", "owner-artifact-changed"),
                   );
+                if (Option.isSome(recovered)) yield* recovered.value.verify;
               });
-              yield* io(() =>
-                writeFile(
-                  artifact.configPath,
-                  JSON.stringify(prepared.target),
-                  { flag: "wx", mode: 0o600 },
-                ),
-              );
+              if (Option.isNone(recovered))
+                yield* io(() =>
+                  writeFile(
+                    artifact.configPath,
+                    JSON.stringify(prepared.target),
+                    { flag: "wx", mode: 0o600 },
+                  ),
+                );
               const v1 = yield* io(() =>
                 readFile(
                   join(
