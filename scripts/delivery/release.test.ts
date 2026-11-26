@@ -184,6 +184,88 @@ describe("WO-34 complete built target", () => {
       (await Effect.runPromise(prepareTarget(f.input))).artifact.artifactDigest,
     ).not.toBe(before);
   });
+  it("trusted custom canonical label retains provider identity, DB, unknown/off fields and default hosting", async () => {
+    const f = fixture();
+    const baseline = await Effect.runPromise(prepareTarget(f.input));
+    const canonicalOrigin = "https://forum.example.com";
+    const raw = {
+      ...f.raw,
+      vars: { CANONICAL_ORIGIN: canonicalOrigin, future_var: "unchanged" },
+      observability: {
+        enabled: false,
+        logs: { enabled: false, persist: false, future_off: true },
+        future_capture: { enabled: false },
+      },
+    };
+    const custom = await Effect.runPromise(
+      prepareTarget({ ...f.input, raw, canonicalOrigin }),
+    );
+    expect(custom.target.vars).toEqual(raw.vars);
+    expect(
+      Schema.decodeUnknownSync(
+        Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+      )(custom.target).observability,
+    ).toEqual(raw.observability);
+    expect(
+      Schema.decodeUnknownSync(
+        Schema.Record({ key: Schema.String, value: Schema.Unknown }),
+      )(custom.target).future_security_field,
+    ).toEqual(f.raw.future_security_field);
+    expect(custom.target.workers_dev).toBe(true);
+    expect(custom.target.d1_databases).toEqual(baseline.target.d1_databases);
+    expect(custom.artifact.identity).toEqual(identity);
+    expect(custom.artifact.canonicalOrigin).toBe(canonicalOrigin);
+    expect(baseline.artifact.canonicalOrigin).toBe(identity.defaultOrigin);
+    expect(custom.artifact.artifactDigest).not.toBe(
+      baseline.artifact.artifactDigest,
+    );
+    expect(f.raw.vars).toEqual({});
+  });
+  it.each([
+    "http://forum.example.com",
+    "https://user:pass@forum.example.com",
+    "https://forum.example.com/",
+    "https://forum.example.com/path",
+    "https://forum.example.com?x=1",
+    "https://forum.example.com#x",
+    "https://forum.example.com?",
+    "https://forum.example.com#",
+    " https://forum.example.com",
+    "https://forum.example.com\n",
+    "https://FORUM.example.com",
+    "https://forum.example.com:443",
+    "https://forum.example.com/%2e",
+    "//forum.example.com",
+    "not-an-origin",
+  ])(
+    "rejects malformed canonical origin %j without normalization",
+    async (canonicalOrigin) => {
+      const f = fixture();
+      expect(
+        code(await outcome(prepareTarget({ ...f.input, canonicalOrigin }))),
+      ).toBe("canonical-origin-invalid");
+    },
+  );
+  it.each([{}, { canonicalOrigin: "https://approved.example.com" }])(
+    "raw config cannot introduce an unapproved/conflicting canonical %j",
+    async (approval) => {
+      const f = fixture();
+      expect(
+        code(
+          await outcome(
+            prepareTarget({
+              ...f.input,
+              ...approval,
+              raw: {
+                ...f.raw,
+                vars: { CANONICAL_ORIGIN: "https://hostile.example.com" },
+              },
+            }),
+          ),
+        ),
+      ).toBe("canonical-origin-conflict");
+    },
+  );
   it("preserves every actual merged WO35 capture field without freezing the older root object", async () => {
     const f = fixture();
     const source = Schema.decodeUnknownSync(
@@ -574,6 +656,30 @@ describe("WO-34 fail-closed orchestration contracts (not provider proof)", () =>
     };
     expect(code(await h.run(request, guard))).toBe("fixture-closure-unknown");
   });
+  it("readiness for the default origin cannot acknowledge a distinct approved canonical", async () => {
+    const h = harness({
+      build: () =>
+        Effect.succeed({
+          ...artifact,
+          canonicalOrigin: "https://forum.example.com",
+        }),
+      readiness: () =>
+        Effect.succeed({
+          sourceRevision: artifact.sourceRevision,
+          artifactDigest: artifact.artifactDigest,
+          defaultOrigin: identity.defaultOrigin,
+          checks: {
+            website: true,
+            docs: true,
+            discovery: true,
+            contract: true,
+            apiReads: true,
+          },
+        }),
+    });
+    expect(code(await h.run())).toBe("readiness-artifact-or-origin-mismatch");
+    expect(h.events.at(-1)).toBe("acknowledged");
+  });
   it("rejects scaffold readiness through injected HTTP without ambient fetch", async () => {
     const seen: string[] = [];
     const program = inspectReadiness(
@@ -601,10 +707,26 @@ describe("accepted Docs32 OpenAPI origin contract", () => {
       Schema.Record({ key: Schema.String, value: Schema.Unknown }),
     ),
   )(readFileSync("apps/forum/public/docs/openapi.json", "utf8"));
-  const probe = (servers: readonly { url: string }[]) => {
-    const calls: { path: string; method: string }[] = [];
-    const program = inspectReadiness(artifact, {
+  const probe = (
+    servers: readonly { url: string }[],
+    options: {
+      canonicalOrigin?: string;
+      renderedOrigin?: string;
+      unavailableCanonical?: boolean;
+      unavailableDefault?: boolean;
+    } = {},
+  ) => {
+    const origin = options.canonicalOrigin ?? identity.defaultOrigin;
+    const selected = {
       ...artifact,
+      ...(options.canonicalOrigin === undefined
+        ? {}
+        : { canonicalOrigin: options.canonicalOrigin }),
+    };
+    const origins: string[] = [];
+    const calls: { path: string; method: string }[] = [];
+    const program = inspectReadiness(selected, {
+      ...selected,
       version: "local-contract-probe",
     }).pipe(
       Effect.provideService(ReadinessHttp, {
@@ -612,6 +734,14 @@ describe("accepted Docs32 OpenAPI origin contract", () => {
           Effect.sync(() => {
             const path = new URL(request.url).pathname;
             calls.push({ path, method: request.method });
+            const hosted = new URL(request.url).origin;
+            origins.push(hosted);
+            if (
+              (options.unavailableCanonical &&
+                hosted === options.canonicalOrigin) ||
+              (options.unavailableDefault && hosted === identity.defaultOrigin)
+            )
+              return new Response("", { status: 503 });
             if (path === "/" || path === "/docs/")
               return new Response("<main>contract probe fixture</main>");
             if (path === "/llms.txt" || path === "/skill.md")
@@ -634,7 +764,7 @@ describe("accepted Docs32 OpenAPI origin contract", () => {
                 "/agents.json",
               ].includes(path)
             )
-              return discoveryResponse(path, identity.defaultOrigin);
+              return discoveryResponse(path, options.renderedOrigin ?? origin);
             if (path === "/docs/openapi.json")
               return new Response(JSON.stringify({ ...actual, servers }));
             if (path === "/v1/search")
@@ -645,7 +775,7 @@ describe("accepted Docs32 OpenAPI origin contract", () => {
           }),
       }),
     );
-    return { program, calls };
+    return { program, calls, origins };
   };
   for (const url of ["/", identity.defaultOrigin])
     it(`accepts the same-origin contract server ${url} with read-only probes`, async () => {
@@ -669,6 +799,73 @@ describe("accepted Docs32 OpenAPI origin contract", () => {
       expect(code(await outcome(h.program))).toBe("contract-origin-mismatch");
       expect(h.calls.some((call) => call.path.startsWith("/v1/"))).toBe(false);
     });
+  it.each(["/", "https://forum.example.com"])(
+    "custom canonical %s is checked at BOTH hosts with canonical descriptions",
+    async (url) => {
+      const canonicalOrigin = "https://forum.example.com";
+      const h = probe([{ url }], { canonicalOrigin });
+      const result = await Effect.runPromise(h.program);
+      expect(result.defaultOrigin).toBe(identity.defaultOrigin);
+      expect(result.canonicalOrigin).toBe(canonicalOrigin);
+      expect([...new Set(h.origins)]).toEqual([
+        identity.defaultOrigin,
+        canonicalOrigin,
+      ]);
+      expect(h.calls.filter((call) => call.path === "/v1/search")).toHaveLength(
+        4,
+      );
+    },
+  );
+  it("incomplete custom setup with NO approved canonical still qualifies default only", async () => {
+    const h = probe([{ url: "/" }]);
+    expect((await Effect.runPromise(h.program)).canonicalOrigin).toBe(
+      identity.defaultOrigin,
+    );
+    expect(new Set(h.origins)).toEqual(new Set([identity.defaultOrigin]));
+  });
+  it("explicit custom unavailability denies ready AFTER verifying default; it does not disable hosting", async () => {
+    const canonicalOrigin = "https://forum.example.com";
+    const h = probe([{ url: "/" }], {
+      canonicalOrigin,
+      unavailableCanonical: true,
+    });
+    expect(code(await outcome(h.program))).toBe("required-surface-unavailable");
+    expect(h.calls.filter((call) => call.path === "/v1/search")).toHaveLength(
+      2,
+    );
+    expect(h.origins[0]).toBe(identity.defaultOrigin);
+    expect(h.origins.at(-1)).toBe(canonicalOrigin);
+  });
+  it("custom availability cannot hide an unavailable default hosted address", async () => {
+    const h = probe([{ url: "/" }], {
+      canonicalOrigin: "https://forum.example.com",
+      unavailableDefault: true,
+    });
+    expect(code(await outcome(h.program))).toBe("required-surface-unavailable");
+    expect(h.origins).toEqual([identity.defaultOrigin]);
+  });
+  it("hostile reflected descriptions are not approved canonical metadata", async () => {
+    const h = probe([{ url: "/" }], {
+      canonicalOrigin: "https://forum.example.com",
+      renderedOrigin: "https://hostile.example.com",
+    });
+    expect(code(await outcome(h.program))).toBe(
+      "discovery-description-mismatch",
+    );
+  });
+  it("default-host contract server is rejected when a different canonical was approved", async () => {
+    const h = probe([{ url: identity.defaultOrigin }], {
+      canonicalOrigin: "https://forum.example.com",
+    });
+    expect(code(await outcome(h.program))).toBe("contract-origin-mismatch");
+  });
+  it("malformed artifact canonical denies before readiness HTTP", async () => {
+    const h = probe([{ url: "/" }], {
+      canonicalOrigin: "https://forum.example.com/path",
+    });
+    expect(code(await outcome(h.program))).toBe("canonical-origin-invalid");
+    expect(h.calls).toEqual([]);
+  });
   it("rejects an invented contract path before HTTP", async () => {
     const h = probe([{ url: "/" }]);
     const result = await outcome(

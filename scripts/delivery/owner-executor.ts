@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Context, Effect, Option, Schema } from "effect";
 import { Identity, failure, type DeliveryError } from "./model.js";
-import { Revision } from "./release-model.js";
+import { CanonicalOrigin, Revision } from "./release-model.js";
 import {
   ExecutorRef,
   CONTROL_FILE,
@@ -50,6 +50,7 @@ const Scope = Schema.Struct({
   diagnosticEnvironment: Schema.optional(DiagnosticEnvironment),
   executorRef: ExecutorRef,
   operation: Schema.Literal("update", "recover"),
+  canonicalOrigin: Schema.optional(CanonicalOrigin),
   zoneGrants: Schema.optional(Schema.Array(ZoneGrant)),
   grants: Schema.Array(
     Schema.Literal("d1:read", "d1:write", "worker:read", "worker:deploy"),
@@ -160,6 +161,9 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
                 builtConfig,
                 output,
                 identity: context.identity,
+                ...(context.canonicalOrigin === undefined
+                  ? {}
+                  : { canonicalOrigin: context.canonicalOrigin }),
                 sourceRevision: context.sourceRevision,
                 authorizeTarget: true,
               }),
