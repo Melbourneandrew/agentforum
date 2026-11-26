@@ -1,3 +1,8 @@
+import {
+  DiagnosticEnvironment,
+  ownerBuild,
+  buildProcessLive,
+} from "../../apps/forum/scripts/owner-build.js";
 // Supported parent-executor ABI. The authority service is supplied directly by
 // the trusted execution boundary, never decoded from CLI/JSON/env/files. Source,
 // account, exact retained identity, operation and grants precede secret access.
@@ -15,7 +20,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Context, Effect, Option, Schema } from "effect";
 import { Identity, failure, type DeliveryError } from "./model.js";
-import { Revision } from "./release-model.js";
+import { CanonicalOrigin, Revision } from "./release-model.js";
 import {
   ExecutorRef,
   CONTROL_FILE,
@@ -42,8 +47,10 @@ const Scope = Schema.Struct({
   journalPath: Schema.NonEmptyString,
   identity: Identity,
   sourceRevision: Revision,
+  diagnosticEnvironment: Schema.optional(DiagnosticEnvironment),
   executorRef: ExecutorRef,
   operation: Schema.Literal("update", "recover"),
+  canonicalOrigin: Schema.optional(CanonicalOrigin),
   zoneGrants: Schema.optional(Schema.Array(ZoneGrant)),
   grants: Schema.Array(
     Schema.Literal("d1:read", "d1:write", "worker:read", "worker:deploy"),
@@ -154,6 +161,9 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
                 builtConfig,
                 output,
                 identity: context.identity,
+                ...(context.canonicalOrigin === undefined
+                  ? {}
+                  : { canonicalOrigin: context.canonicalOrigin }),
                 sourceRevision: context.sourceRevision,
                 authorizeTarget: true,
               }),
@@ -199,13 +209,21 @@ export const ownerReleaseCommand = (args: readonly string[]) =>
             yield* source(context);
             // Exactly one fresh complete build, before ANY credential access or
             // provider construction. Journal/source identity is already checked.
-            yield* command(
-              "pnpm",
-              ["exec", "turbo", "run", "build", "--force"],
-              context.repository,
+            yield* ownerBuild(
+              {
+                version: 1,
+                repository: context.repository,
+                revision: context.sourceRevision,
+                metadata:
+                  context.diagnosticEnvironment === undefined
+                    ? null
+                    : {
+                        environment: context.diagnosticEnvironment,
+                        revision: context.sourceRevision,
+                      },
+              },
               env,
-              "build",
-            );
+            ).pipe(Effect.provide(buildProcessLive));
             yield* source(context);
             const prepared = yield* prepare(
               context,

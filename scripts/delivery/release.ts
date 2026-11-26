@@ -135,7 +135,9 @@ export const release = (input: unknown) =>
             if (
               readiness.sourceRevision !== activation.sourceRevision ||
               readiness.artifactDigest !== artifact.artifactDigest ||
-              readiness.defaultOrigin !== artifact.identity.defaultOrigin
+              readiness.defaultOrigin !== artifact.identity.defaultOrigin ||
+              (readiness.canonicalOrigin ?? readiness.defaultOrigin) !==
+                (artifact.canonicalOrigin ?? artifact.identity.defaultOrigin)
             )
               return yield* Effect.fail(
                 failure("readiness", "readiness-artifact-or-origin-mismatch"),

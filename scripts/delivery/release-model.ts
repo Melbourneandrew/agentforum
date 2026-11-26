@@ -3,11 +3,29 @@ import { Identity } from "./model.js";
 import type { EffectToken, TerminalReceipt } from "./release-control.js";
 import type { DeliveryError } from "./model.js";
 
+// Exact trusted HTTPS origin, matching the runtime's existing origin contract.
+// No normalization, request-host inference, hostname policy or attachment grant.
+export const CanonicalOrigin = Schema.String.pipe(
+  Schema.filter((value) => {
+    try {
+      const url = new URL(value);
+      return (
+        url.origin === value &&
+        url.protocol === "https:" &&
+        !url.username &&
+        !url.password
+      );
+    } catch {
+      return false;
+    }
+  }),
+);
 export const Revision = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{40}$/));
 export const Digest = Schema.String.pipe(Schema.pattern(/^[a-f0-9]{64}$/));
 export const Migration = Schema.Struct({ name: Schema.String, digest: Digest });
 export const Artifact = Schema.Struct({
   identity: Identity,
+  canonicalOrigin: Schema.optional(CanonicalOrigin),
   sourceRevision: Revision,
   configPath: Schema.String,
   artifactDigest: Digest,
@@ -33,6 +51,7 @@ export const Readiness = Schema.Struct({
   sourceRevision: Revision,
   artifactDigest: Digest,
   defaultOrigin: Identity.fields.defaultOrigin,
+  canonicalOrigin: Schema.optional(CanonicalOrigin),
   checks: Schema.Struct({
     website: Schema.Literal(true),
     docs: Schema.Literal(true),

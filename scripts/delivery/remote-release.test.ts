@@ -202,6 +202,22 @@ describe("real remote lifecycle commands (injected execution)", () => {
       ).toBe(true);
     },
   );
+  it("canonical relabeling after artifact preparation cannot bypass exact native intent/receipt", async () => {
+    const { ports, token, calls, reads } = fixture("activate");
+    const result = await Effect.runPromise(
+      Effect.either(
+        ports.activate(
+          { ...artifact, canonicalOrigin: "https://forum.example.com" },
+          token,
+        ),
+      ),
+    );
+    expect(Either.isLeft(result) && result.left.code).toBe(
+      "remote-artifact-mismatch",
+    );
+    expect(calls).toEqual([]);
+    expect(reads()).toBe(0);
+  });
   it("scaffold readiness cannot declare installation complete", async () => {
     const { ports } = fixture("activate", { readiness: true });
     const result = await Effect.runPromise(
