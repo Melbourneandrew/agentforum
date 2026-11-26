@@ -1,10 +1,14 @@
 import { readClient } from "../../app/browsing/client-manifest.js";
 import { discoveryPaths, discoveryResponse } from "../discovery/responses.js";
-import { requestDiagnostics } from "../telemetry/diagnostics.js";
+import {
+  makeDiagnosticWriter,
+  type DiagnosticMetadata,
+  requestDiagnostics,
+} from "../telemetry/diagnostics.js";
 import { ForumQueries } from "../api/services.js";
 import { forumQueriesLayer } from "../queries/service.js";
 import { queryStoreLayer } from "../queries/store.js";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 import { apiHandler, problemResponse } from "../api/handler.js";
 import type { ProblemCode } from "../api/problems.js";
 import {
@@ -130,7 +134,8 @@ const makeHandler = (render: Render) => ({
           );
         return secure(response, false, true);
       }
-      if (url.pathname !== "/") return fail(404, "not-found");
+      if (url.pathname !== "/" && !/^\/posts\/[^/]+\/?$/.test(url.pathname))
+        return fail(404, "not-found");
       // URL includes validated origin + complete route/query state. No global request/data layer.
       const cache = await caches.open("forum-public-v1");
       const cacheKey = new Request(new URL(url.pathname + url.search, origin));
@@ -186,7 +191,11 @@ const makeHandler = (render: Render) => ({
 });
 
 // Request-local diagnostics only; routing, safe-method and cache policy stay above.
-export const makeDispatcher = (render: Render) => {
+export const makeDispatcher = (
+  render: Render,
+  metadata: Option.Option<DiagnosticMetadata> = Option.none(),
+) => {
+  const writer = makeDiagnosticWriter(metadata);
   const handler = makeHandler(render);
   return {
     async fetch(
@@ -195,7 +204,7 @@ export const makeDispatcher = (render: Render) => {
       execution: Execution,
     ): Promise<Response> {
       const id = crypto.randomUUID();
-      const complete = requestDiagnostics(request, id);
+      const complete = requestDiagnostics(request, id, writer);
       try {
         const response = await handler.fetch(request, bindings, execution, id);
         complete(response.status);
